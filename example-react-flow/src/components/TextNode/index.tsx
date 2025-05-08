@@ -1,15 +1,22 @@
-import React, { useState, useCallback } from 'react';
+import React, { useState, useCallback, useEffect } from 'react';
 import { Handle, Position, NodeProps } from 'reactflow';
 import './styles.css';
 
 interface TextNodeData {
   label: string;
   result?: string;
+  initialEditing?: boolean;
 }
 
 const TextNode: React.FC<NodeProps<TextNodeData>> = ({ id, data, selected }) => {
   const [isEditing, setIsEditing] = useState(false);
   const [text, setText] = useState(data.label || '');
+
+  useEffect(() => {
+    if (data.initialEditing) {
+      setIsEditing(true);
+    }
+  }, [data.initialEditing]);
 
   // 处理双击事件，进入编辑模式
   const handleDoubleClick = useCallback(() => {
@@ -21,21 +28,27 @@ const TextNode: React.FC<NodeProps<TextNodeData>> = ({ id, data, selected }) => 
     setText(e.target.value);
   }, []);
 
+  // 退出编辑状态的复用逻辑
+  const exitEdit = useCallback(() => {
+    setIsEditing(false);
+    data.label = text;
+    if (data.initialEditing) {
+      delete data.initialEditing;
+    }
+  }, [text, data]);
+
   // 处理编辑完成
   const handleBlur = useCallback(() => {
-    setIsEditing(false);
-    // 这里可以添加保存文本的逻辑
-    data.label = text;
-  }, [text, data]);
+    exitEdit();
+  }, [exitEdit]);
 
   // 处理按键事件，按下Enter键完成编辑
   const handleKeyDown = useCallback((e: React.KeyboardEvent) => {
     if (e.key === 'Enter' && !e.shiftKey) {
       e.preventDefault();
-      setIsEditing(false);
-      data.label = text;
+      exitEdit();
     }
-  }, [text, data]);
+  }, [exitEdit]);
 
   return (
     <div className={`text-node ${selected ? 'selected' : ''}`}>
@@ -51,10 +64,15 @@ const TextNode: React.FC<NodeProps<TextNodeData>> = ({ id, data, selected }) => 
           onBlur={handleBlur}
           onKeyDown={handleKeyDown}
           autoFocus
+          placeholder="// 在此输入代码"
         />
       ) : (
         <div className="text-node-content" onDoubleClick={handleDoubleClick}>
-          <pre>{text}</pre>
+          {text ? (
+            <pre>{text}</pre>
+          ) : (
+            <pre style={{ color: '#bbb' }}>// 在此输入代码</pre>
+          )}
           {data.result && <div className="text-node-result">{data.result}</div>}
         </div>
       )}

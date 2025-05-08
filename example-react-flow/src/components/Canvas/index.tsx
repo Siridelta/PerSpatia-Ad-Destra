@@ -67,6 +67,14 @@ const Canvas: React.FC = () => {
   // ReactFlow 实例引用
   const reactFlowInstance = useRef<ReactFlowInstance | null>(null);
 
+  // 复用的创建新节点函数
+  const createTextNode = useCallback((position: { x: number; y: number }) => ({
+    id: `node-${Date.now()}`,
+    type: 'textNode',
+    position,
+    data: { label: '', initialEditing: true },
+  }), []);
+
   // 处理工具变更
   const handleToolChange = useCallback((tool: ToolType) => {
     setActiveTool(tool);
@@ -112,35 +120,39 @@ const Canvas: React.FC = () => {
     [activeTool, connectionStartNode, setEdges]
   );
 
-  // 处理画布点击，用于取消连接
-  const onPaneClick = useCallback(() => {
+  // 选择模式下双击空白处创建节点
+  const onPaneDoubleClick = useCallback((event: React.MouseEvent) => {
+    // 只允许在选择模式下，且双击空白处时触发
+    if (activeTool === 'select' && reactFlowInstance.current) {
+      // 判断是否双击在节点或边上（避免误触）
+      if ((event.target as HTMLElement).closest('.react-flow__node') || (event.target as HTMLElement).closest('.react-flow__edge')) {
+        return;
+      }
+      const reactFlowBounds = event.currentTarget.getBoundingClientRect();
+      const position = reactFlowInstance.current.project({
+        x: event.clientX - reactFlowBounds.left,
+        y: event.clientY - reactFlowBounds.top,
+      });
+      setNodes((nds) => [...nds, createTextNode(position)]);
+    }
+  }, [activeTool, setNodes, createTextNode]);
+
+  // 处理画布点击，用于取消连接或创建新节点
+  const onPaneClick = useCallback((event: React.MouseEvent) => {
+    if (activeTool === 'text' && reactFlowInstance.current) {
+      const reactFlowBounds = event.currentTarget.getBoundingClientRect();
+      const position = reactFlowInstance.current.project({
+        x: event.clientX - reactFlowBounds.left,
+        y: event.clientY - reactFlowBounds.top,
+      });
+      setNodes((nds) => [...nds, createTextNode(position)]);
+      setActiveTool('select'); // 创建后切回选择模式
+      return;
+    }
     if (connectionStartNode) {
       setConnectionStartNode(null);
     }
-  }, [connectionStartNode]);
-
-  // 添加新的文本节点
-  const addTextNode = useCallback(
-    (event: React.MouseEvent) => {
-      if (activeTool === 'text' && reactFlowInstance.current) {
-        const reactFlowBounds = event.currentTarget.getBoundingClientRect();
-        const position = reactFlowInstance.current.project({
-          x: event.clientX - reactFlowBounds.left,
-          y: event.clientY - reactFlowBounds.top,
-        });
-        
-        const newNode: Node = {
-          id: `node-${Date.now()}`,
-          type: 'textNode',
-          position,
-          data: { label: '// 在此输入代码' },
-        };
-        
-        setNodes((nds) => [...nds, newNode]);
-      }
-    },
-    [activeTool, setNodes]
-  );
+  }, [activeTool, setNodes, connectionStartNode, createTextNode]);
 
   return (
     <div className="canvas-container">
@@ -153,7 +165,8 @@ const Canvas: React.FC = () => {
         onConnect={onConnect}
         onNodeClick={onNodeClick}
         onPaneClick={onPaneClick}
-        onMouseDown={activeTool === 'text' ? addTextNode : undefined}
+        zoomOnDoubleClick={false}
+        onDoubleClick={onPaneDoubleClick}
         nodeTypes={nodeTypes}
         edgeTypes={edgeTypes}
         onInit={(instance) => (reactFlowInstance.current = instance)}
