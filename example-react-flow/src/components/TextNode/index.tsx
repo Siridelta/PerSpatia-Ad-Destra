@@ -12,6 +12,8 @@ const TextNode: React.FC<NodeProps<TextNodeData>> = ({ id, data, selected }) => 
   const [isEditing, setIsEditing] = useState(false);
   const [text, setText] = useState(data.label || '');
 
+  // 初始化时需要通过 useEffect 来进行一次 isEditing 的状态切换，这样才能触发编辑态 textarea 的自动聚焦。
+  // 实验发现，如果直接在组件的 state 中设置 isEditing 为 true，则无法触发自动聚焦。
   useEffect(() => {
     if (data.initialEditing) {
       setIsEditing(true);
