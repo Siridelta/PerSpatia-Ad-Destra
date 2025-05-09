@@ -62,3 +62,8 @@
     stroke-dashoffset: 10;
   }
 }
+
+/* 文本模式下，画布空白区为文本光标 */
+.text-mode .react-flow__pane {
+  cursor: text !important;
+}

@@ -1,37 +1,22 @@
-import React, { useState, useCallback, useRef } from 'react';
-import ReactFlow, {
-  Node,
-  Edge,
-  NodeChange,
-  EdgeChange,
-  applyNodeChanges,
-  applyEdgeChanges,
-  Connection,
-  addEdge,
-  useNodesState,
-  useEdgesState,
-  NodeTypes,
-  EdgeTypes,
-  Controls,
-  Background,
-  BackgroundVariant,
-  ReactFlowInstance
-} from 'reactflow';
-import 'reactflow/dist/style.css';
+import React, { useState, useCallback } from 'react';
+import { ReactFlow, Node, Edge, NodeChange, EdgeChange, applyNodeChanges, applyEdgeChanges, Connection, addEdge, useNodesState, useEdgesState, NodeTypes, EdgeTypes, Controls, Background, BackgroundVariant, useReactFlow } from '@xyflow/react';
+import '@xyflow/react/dist/style.css';
 
 import TextNode from '../TextNode';
-import CustomEdge from '../CustomEdge';
-import Toolbar, { ToolType } from '../Toolbar';
+import FloatingEdge from '../CustomEdge';
+import Toolbar from '../Toolbar';
 import './styles.css';
+import { useToolStore } from '../../store/toolStore';
+import CustomConnectionLine from './CustomConnectionLine';
 
 // 注册自定义节点类型
-const nodeTypes: NodeTypes = {
+const nodeTypes = {
   textNode: TextNode,
 };
 
 // 注册自定义边类型
 const edgeTypes: EdgeTypes = {
-  custom: CustomEdge,
+  custom: FloatingEdge,
 };
 
 const initialNodes: Node[] = [
@@ -58,29 +43,24 @@ const Canvas: React.FC = () => {
   const [nodes, setNodes, onNodesChange] = useNodesState(initialNodes);
   const [edges, setEdges, onEdgesChange] = useEdgesState(initialEdges);
   
-  // 当前活动工具
-  const [activeTool, setActiveTool] = useState<ToolType>('select');
+  // 当前活动工具（全局）
+  const activeTool = useToolStore((state) => state.activeTool);
+  const setActiveTool = useToolStore((state) => state.setActiveTool);
   
   // 连接模式的状态
   const [connectionStartNode, setConnectionStartNode] = useState<string | null>(null);
   
   // ReactFlow 实例引用
-  const reactFlowInstance = useRef<ReactFlowInstance | null>(null);
+  const reactFlow = useReactFlow();
+  const { screenToFlowPosition } = useReactFlow();
 
   // 复用的创建新节点函数
   const createTextNode = useCallback((position: { x: number; y: number }) => ({
     id: `node-${Date.now()}`,
     type: 'textNode',
     position,
-    data: { label: '', initialEditing: true },
+    data: { label: '' },
   }), []);
-
-  // 处理工具变更
-  const handleToolChange = useCallback((tool: ToolType) => {
-    setActiveTool(tool);
-    // 重置连接状态
-    setConnectionStartNode(null);
-  }, []);
 
   // 处理连接完成
   const onConnect = useCallback(
@@ -91,88 +71,61 @@ const Canvas: React.FC = () => {
     [setEdges]
   );
 
-  // 处理节点点击，用于连接工具模式
-  const onNodeClick = useCallback(
-    (event: React.MouseEvent, node: Node) => {
-      // 只在连接工具模式下处理
-      if (activeTool === 'connect') {
-        event.preventDefault();
-        
-        if (!connectionStartNode) {
-          // 设置连接起点
-          setConnectionStartNode(node.id);
-        } else if (connectionStartNode !== node.id) {
-          // 创建连接
-          const newEdge: Edge = {
-            id: `e${connectionStartNode}-${node.id}`,
-            source: connectionStartNode,
-            target: node.id,
-            type: 'custom',
-            sourceHandle: 'main',
-            targetHandle: 'main',
-          };
-          
-          setEdges((eds) => [...eds, newEdge]);
-          setConnectionStartNode(null); // 重置连接状态
-        }
-      }
-    },
-    [activeTool, connectionStartNode, setEdges]
-  );
-
   // 选择模式下双击空白处创建节点
   const onPaneDoubleClick = useCallback((event: React.MouseEvent) => {
-    // 只允许在选择模式下，且双击空白处时触发
-    if (activeTool === 'select' && reactFlowInstance.current) {
-      // 判断是否双击在节点或边上（避免误触）
+    if (activeTool === 'select') {
       if ((event.target as HTMLElement).closest('.react-flow__node') || (event.target as HTMLElement).closest('.react-flow__edge')) {
         return;
       }
-      const reactFlowBounds = event.currentTarget.getBoundingClientRect();
-      const position = reactFlowInstance.current.project({
-        x: event.clientX - reactFlowBounds.left,
-        y: event.clientY - reactFlowBounds.top,
+      const position = screenToFlowPosition({
+        x: event.clientX,
+        y: event.clientY,
       });
       setNodes((nds) => [...nds, createTextNode(position)]);
     }
-  }, [activeTool, setNodes, createTextNode]);
+  }, [activeTool, setNodes, createTextNode, screenToFlowPosition]);
 
   // 处理画布点击，用于取消连接或创建新节点
   const onPaneClick = useCallback((event: React.MouseEvent) => {
-    if (activeTool === 'text' && reactFlowInstance.current) {
-      const reactFlowBounds = event.currentTarget.getBoundingClientRect();
-      const position = reactFlowInstance.current.project({
-        x: event.clientX - reactFlowBounds.left,
-        y: event.clientY - reactFlowBounds.top,
+    if (activeTool === 'text') {
+      const position = screenToFlowPosition({
+        x: event.clientX,
+        y: event.clientY,
       });
       setNodes((nds) => [...nds, createTextNode(position)]);
-      setActiveTool('select'); // 创建后切回选择模式
+      setActiveTool('select');
       return;
     }
     if (connectionStartNode) {
       setConnectionStartNode(null);
     }
-  }, [activeTool, setNodes, connectionStartNode, createTextNode]);
+  }, [activeTool, setNodes, connectionStartNode, createTextNode, screenToFlowPosition]);
+
+  const connectionLineStyle = {
+    stroke: '#b1b1b7',
+  };
 
   return (
-    <div className="canvas-container">
-      <Toolbar activeTool={activeTool} onToolChange={handleToolChange} />
+    <div className={`canvas-container${activeTool === 'text' ? ' text-mode' : ''}`}
+      style={{ cursor: activeTool === 'text' ? 'text' : undefined }}
+    >
+      <Toolbar />
       <ReactFlow 
         nodes={nodes} 
         edges={edges} 
         onNodesChange={onNodesChange}
         onEdgesChange={onEdgesChange}
         onConnect={onConnect}
-        onNodeClick={onNodeClick}
         onPaneClick={onPaneClick}
         zoomOnDoubleClick={false}
         onDoubleClick={onPaneDoubleClick}
         nodeTypes={nodeTypes}
         edgeTypes={edgeTypes}
-        onInit={(instance) => (reactFlowInstance.current = instance)}
         fitView
         snapToGrid
         className={`reactflow-canvas ${activeTool === 'connect' && connectionStartNode ? 'connecting-mode' : ''}`}
+        connectionLineComponent={CustomConnectionLine}
+        connectionLineStyle={connectionLineStyle}
       >
         <Background variant={BackgroundVariant.Dots} gap={12} size={1} />
         <Controls />

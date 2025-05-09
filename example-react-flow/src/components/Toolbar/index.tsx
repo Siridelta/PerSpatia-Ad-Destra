@@ -1,19 +1,15 @@
 import React from 'react';
 import './styles.css';
+import { useToolStore, ToolType } from '../../store/toolStore';
 
-export type ToolType = 'select' | 'text' | 'connect';
-
-interface ToolbarProps {
-  activeTool: ToolType;
-  onToolChange: (tool: ToolType) => void;
-}
-
-const Toolbar: React.FC<ToolbarProps> = ({ activeTool, onToolChange }) => {
+const Toolbar: React.FC = () => {
+  const activeTool = useToolStore((state) => state.activeTool);
+  const setActiveTool = useToolStore((state) => state.setActiveTool);
   return (
     <div className="toolbar">
       <button
         className={`toolbar-button ${activeTool === 'select' ? 'active' : ''}`}
-        onClick={() => onToolChange('select')}
+        onClick={() => setActiveTool('select')}
         title="选择工具"
       >
         <svg viewBox="0 0 24 24" width="24" height="24">
@@ -22,7 +18,7 @@ const Toolbar: React.FC<ToolbarProps> = ({ activeTool, onToolChange }) => {
       </button>
       <button
         className={`toolbar-button ${activeTool === 'text' ? 'active' : ''}`}
-        onClick={() => onToolChange('text')}
+        onClick={() => setActiveTool('text')}
         title="文本工具"
       >
         <svg viewBox="0 0 24 24" width="24" height="24">
@@ -31,7 +27,7 @@ const Toolbar: React.FC<ToolbarProps> = ({ activeTool, onToolChange }) => {
       </button>
       <button
         className={`toolbar-button ${activeTool === 'connect' ? 'active' : ''}`}
-        onClick={() => onToolChange('connect')}
+        onClick={() => setActiveTool('connect')}
         title="连接工具"
       >
         <svg viewBox="0 0 24 24" width="24" height="24">
