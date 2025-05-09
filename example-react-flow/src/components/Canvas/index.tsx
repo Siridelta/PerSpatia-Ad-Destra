@@ -51,7 +51,6 @@ const Canvas: React.FC = () => {
   const [connectionStartNode, setConnectionStartNode] = useState<string | null>(null);
   
   // ReactFlow 实例引用
-  const reactFlow = useReactFlow();
   const { screenToFlowPosition } = useReactFlow();
 
   // 复用的创建新节点函数
@@ -59,7 +58,7 @@ const Canvas: React.FC = () => {
     id: `node-${Date.now()}`,
     type: 'textNode',
     position,
-    data: { label: '' },
+    data: { label: '', initialEditing: true },
   }), []);
 
   // 处理连接完成
@@ -101,14 +100,26 @@ const Canvas: React.FC = () => {
     }
   }, [activeTool, setNodes, connectionStartNode, createTextNode, screenToFlowPosition]);
 
-  const connectionLineStyle = {
-    stroke: '#b1b1b7',
-  };
-
   return (
     <div className={`canvas-container${activeTool === 'text' ? ' text-mode' : ''}`}
       style={{ cursor: activeTool === 'text' ? 'text' : undefined }}
     >
+      {/* 全局 marker 定义，所有边和连接线复用 */}
+      <svg style={{ height: 0 }}>
+        <defs>
+          <marker
+            id="custom-edge-arrow"
+            markerWidth="20"
+            markerHeight="20"
+            refX="10"
+            refY="10"
+            orient="auto"
+            markerUnits="userSpaceOnUse"
+          >
+            <polyline points="5,6 10,10 5,14" fill="none" stroke='rgb(88, 88, 88)' strokeWidth="1" strokeLinejoin="round" strokeLinecap="round"/>
+          </marker>
+        </defs>
+      </svg>
       <Toolbar />
       <ReactFlow 
         nodes={nodes} 
@@ -125,16 +136,11 @@ const Canvas: React.FC = () => {
         snapToGrid
         className={`reactflow-canvas ${activeTool === 'connect' && connectionStartNode ? 'connecting-mode' : ''}`}
         connectionLineComponent={CustomConnectionLine}
-        connectionLineStyle={connectionLineStyle}
+        connectionLineStyle={{ stroke: 'rgb(88, 88, 88)', strokeWidth: 1 }}
       >
-        <Background variant={BackgroundVariant.Dots} gap={12} size={1} />
+        <Background bgColor='#090A10' color='rgb(82, 82, 82)' variant={BackgroundVariant.Dots} gap={12} size={1} />
         <Controls />
       </ReactFlow>
-      {connectionStartNode && (
-        <div className="connection-indicator">
-          正在创建连接，请选择目标节点或点击空白区域取消
-        </div>
-      )}
     </div>
   );
 };

@@ -12,44 +12,10 @@
   height: 100%;
 }
 
-/* 连接模式的样式 */
-.reactflow-canvas.connecting-mode {
-  cursor: crosshair;
-}
-
-.reactflow-canvas.connecting-mode .react-flow__node {
-  cursor: pointer;
-}
-
-/* 连接指示器 */
-.connection-indicator {
-  position: absolute;
-  bottom: 20px;
-  left: 50%;
-  transform: translateX(-50%);
-  background-color: rgba(0, 0, 0, 0.7);
-  color: white;
-  padding: 8px 16px;
-  border-radius: 4px;
-  font-size: 14px;
-  z-index: 10;
-  pointer-events: none;
-}
-
-/* 自定义节点样式覆盖 */
-.react-flow__node-textNode {
-  background: transparent;
-  border: none;
-  padding: 0;
-  border-radius: 0;
-  width: auto;
-  min-width: 150px;
-}
-
 /* 自定义边样式 */
 .react-flow__edge-path {
   stroke: #555;
-  stroke-width: 1.5;
+  stroke-width: 1;
 }
 
 .react-flow__edge.animated .react-flow__edge-path {
