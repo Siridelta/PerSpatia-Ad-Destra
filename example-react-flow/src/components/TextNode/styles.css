@@ -2,7 +2,7 @@
   position: relative;
   min-width: 150px;
   min-height: 40px;
-  padding: 6px;
+  padding: 6px 6px 3px 6px;
   background: transparent;
   border: 1px solid transparent;
   border-radius: 2px;
@@ -37,7 +37,7 @@
   width: 100%;
   min-height: 1em;
   color: #fff;
-  font-size: 14px;
+  font-size: 10px;
   line-height: 1.5;
   background: transparent;
 
@@ -60,7 +60,7 @@
   width: 100%;
   min-height: 1em;
   color: #fff;
-  font-size: 14px;
+  font-size: 10px;
   line-height: 1.5;
   border: none;
   outline: none;
@@ -88,8 +88,8 @@
 }
 
 .text-node-result {
-  padding: 0 2px;
-  font-size: 12px;
+  padding: 0px;
+  font-size: 8px;
   color: rgba(188, 242, 255, 0.801);
   background: transparent;
   border-radius: 0;
