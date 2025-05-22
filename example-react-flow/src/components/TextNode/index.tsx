@@ -79,7 +79,7 @@ const TextNode: React.FC<NodeProps<TextNodeType>> = ({ id, data, selected }) => 
       {/* 节点内容 */}
       {isEditing ? (
         <textarea
-          className="text-node-editor nodrag"
+          className="text-node-editor nodrag code-font"
           value={text}
           onChange={handleTextChange}
           onBlur={handleBlur}
@@ -96,7 +96,7 @@ const TextNode: React.FC<NodeProps<TextNodeType>> = ({ id, data, selected }) => 
           }}
         />
       ) : (
-        <div className="text-node-content">
+        <div className="text-node-content code-font">
           {text ? (
             <pre>{text}</pre>
           ) : (
@@ -107,7 +107,7 @@ const TextNode: React.FC<NodeProps<TextNodeType>> = ({ id, data, selected }) => 
       {data.result && (
         <>
           <div className="text-node-divider" />
-          <div className="text-node-result">
+          <div className="text-node-result code-font">
             {data.result}
           </div>
         </>

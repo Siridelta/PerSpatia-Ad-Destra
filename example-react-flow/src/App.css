@@ -6,3 +6,16 @@
   position: relative;
   overflow: hidden;
 }
+
+.code-font {
+    /* font-family: 'Fira Mono', 'Consolas', 'Menlo', 'Source Code Pro',
+    'Noto Sans Mono CJK SC', 'Noto Sans Mono CJK', 'Noto Mono',
+    'Microsoft YaHei Mono', 'Sarasa Mono SC', 'PingFang SC', 'WenQuanYi Micro Hei Mono',
+    sans-serif; */
+  /* font-family: 'JetBrains Mono', 'Sarasa Mono SC', 'Noto Sans SC', monospace; */
+
+  font-family: 'JetBrains Mono', 'AlimamaFangYuanTi', monospace;
+  font-variant-ligatures: none;
+  font-variation-settings: 'BEVL' 0, 'wght' 450;
+  line-height: 1.5;
+}

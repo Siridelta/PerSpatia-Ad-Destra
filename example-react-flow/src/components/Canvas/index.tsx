@@ -104,8 +104,8 @@ const Canvas: React.FC = () => {
     <div className={`canvas-container${activeTool === 'text' ? ' text-mode' : ''}`}
       style={{ cursor: activeTool === 'text' ? 'text' : undefined }}
     >
-      {/* 全局 marker 定义，所有边和连接线复用 */}
-      <svg style={{ height: 0 }}>
+      {/* 箭头(marker)全局定义，所有边和连接线复用 */}
+      <svg style={{ position: 'absolute' }}>
         <defs>
           <marker
             id="custom-edge-arrow"
@@ -116,11 +116,15 @@ const Canvas: React.FC = () => {
             orient="auto"
             markerUnits="userSpaceOnUse"
           >
-            <polyline points="5,6 10,10 5,14" fill="none" stroke='rgb(88, 88, 88)' strokeWidth="1" strokeLinejoin="round" strokeLinecap="round"/>
+            <polyline points="5,6 10,10 1.5,10 10,10 5,14" fill="none" stroke='rgb(88, 88, 88)' strokeWidth="1" strokeLinejoin="round" strokeLinecap="round"/>
           </marker>
         </defs>
       </svg>
+
+      {/* 工具栏 */}
       <Toolbar />
+
+      {/* 画布 */}
       <ReactFlow 
         nodes={nodes} 
         edges={edges} 
@@ -136,9 +140,9 @@ const Canvas: React.FC = () => {
         snapToGrid
         className={`reactflow-canvas ${activeTool === 'connect' && connectionStartNode ? 'connecting-mode' : ''}`}
         connectionLineComponent={CustomConnectionLine}
-        connectionLineStyle={{ stroke: 'rgb(88, 88, 88)', strokeWidth: 1 }}
+        connectionLineStyle={{ stroke: 'rgba(255, 255, 255, 0.30)', strokeWidth: 1 }}
       >
-        <Background bgColor='#090A10' color='rgb(82, 82, 82)' variant={BackgroundVariant.Dots} gap={12} size={1} />
+        <Background bgColor='#090A10' color='rgba(209, 247, 255, 0.24)' variant={BackgroundVariant.Dots} gap={12} size={1} />
         <Controls />
       </ReactFlow>
     </div>

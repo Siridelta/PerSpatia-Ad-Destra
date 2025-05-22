@@ -14,18 +14,27 @@
 
 /* 自定义边样式 */
 .react-flow__edge-path {
-  stroke: #555;
+  stroke: rgba(255, 255, 255, 0.30);
   stroke-width: 1;
+
+  stroke-dasharray: 1 6;
+  animation: dashdraw1 0.7s linear infinite;
+}
+
+@keyframes dashdraw1 {
+  from {
+    stroke-dashoffset: 14;
+  }
 }
 
 .react-flow__edge.animated .react-flow__edge-path {
-  stroke-dasharray: 5;
-  animation: dashdraw 0.5s linear infinite;
+  stroke-dasharray: 7;
+  animation: dashdraw2 0.5s linear infinite;
 }
 
-@keyframes dashdraw {
+@keyframes dashdraw2 {
   from {
-    stroke-dashoffset: 10;
+    stroke-dashoffset: 14;
   }
 }
 

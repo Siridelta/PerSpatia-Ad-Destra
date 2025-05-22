@@ -65,8 +65,7 @@ const FloatingEdge: React.FC<EdgeProps> = ({ id, source, target, style }) => {
       d={edgePath}
       markerEnd={`url(#${markerId})`}
       style={style}
-      stroke='rgb(88, 88, 88)'
-      strokeWidth={2}
+      // 注：样式在 Canvas css 文件里控制
     />
   );
 };
