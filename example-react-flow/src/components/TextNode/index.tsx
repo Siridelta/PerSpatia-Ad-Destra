@@ -1,5 +1,5 @@
 import React, { useState, useCallback, useEffect } from 'react';
-import { Handle, Position, NodeProps, Node, useConnection } from '@xyflow/react';
+import { Handle, Position, NodeProps, Node, useConnection, NodeResizeControl } from '@xyflow/react';
 import './styles.css';
 import { useToolStore } from '../../store/toolStore';
 
@@ -11,11 +11,32 @@ export type TextNodeData = {
 
 export type TextNodeType = Node<TextNodeData, 'text'>;
 
+// 工具函数：将光标定位到指定页面坐标（x, y）处
+function placeCaretAtPoint(x: number, y: number) {
+  let range: Range | null = null;
+  if ((document as any).caretPositionFromPoint) {
+    const pos = (document as any).caretPositionFromPoint(x, y);
+    if (pos) {
+      range = document.createRange();
+      range.setStart(pos.offsetNode, pos.offset);
+      range.collapse(true);
+    }
+  }
+  if (range) {
+    const sel = window.getSelection();
+    sel?.removeAllRanges();
+    sel?.addRange(range);
+    return true;
+  }
+  return false;
+}
+
 const TextNode: React.FC<NodeProps<TextNodeType>> = ({ id, data, selected }) => {
   const [isEditing, setIsEditing] = useState(false);
   const [text, setText] = useState(data.label || '');
   const activeTool = useToolStore((state) => state.activeTool);
   const setActiveTool = useToolStore((state) => state.setActiveTool);
+  const [width, setWidth] = useState<number | undefined>(undefined);
 
   // 初始化时需要通过 useEffect 来进行一次 isEditing 的状态切换，这样才能触发编辑态 textarea 的自动聚焦。
   // 实验发现，如果直接在组件的 state 中设置 isEditing 为 true，则无法触发自动聚焦。
@@ -26,15 +47,23 @@ const TextNode: React.FC<NodeProps<TextNodeType>> = ({ id, data, selected }) => 
     }
   }, [data.initialEditing]);
 
+  // 记录最近一次点击事件，用于进入编辑态时定位光标
+  const lastPointerDown = React.useRef<{ x: number; y: number } | null>(null);
+
   // 处理双击事件，进入编辑模式
-  const handleDoubleClick = useCallback(() => {
+  const handleDoubleClick = useCallback((e: React.MouseEvent<HTMLDivElement>) => {
+    // 记录点击位置
+    lastPointerDown.current = { x: e.clientX, y: e.clientY };
     setIsEditing(true);
   }, []);
 
-  // 处理文本变化
-  const handleTextChange = useCallback((e: React.ChangeEvent<HTMLTextAreaElement>) => {
-    setText(e.target.value);
+  // 处理文本变化（contentEditable div）
+  const handleDivInput = useCallback((e: React.FormEvent<HTMLDivElement>) => {
+    setText(e.currentTarget.innerText);
   }, []);
+
+  // contentEditable div的ref，用于聚焦
+  const editorRef = React.useRef<HTMLDivElement>(null);
 
   // 退出编辑状态的复用逻辑
   const exitEdit = useCallback(() => {
@@ -45,22 +74,41 @@ const TextNode: React.FC<NodeProps<TextNodeType>> = ({ id, data, selected }) => 
     }
   }, [text, data]);
 
-  // 处理编辑完成
-  const handleBlur = useCallback(() => {
-    exitEdit();
-  }, [exitEdit]);
-
-  // 处理按键事件，按下Enter键完成编辑
-  const handleKeyDown = useCallback((e: React.KeyboardEvent) => {
+  // 处理contentEditable的键盘事件
+  const handleDivKeyDown = useCallback((e: React.KeyboardEvent<HTMLDivElement>) => {
     if (e.key === 'Enter' && e.shiftKey) {
       e.preventDefault();
       exitEdit();
     }
   }, [exitEdit]);
 
+  // 编辑态自动聚焦，并根据lastPointerDown定位光标
+  useEffect(() => {
+    if (isEditing && editorRef.current) {
+      // 进入编辑态时初始化内容
+      editorRef.current.innerText = text;
+      editorRef.current.focus();
+      if (lastPointerDown.current) {
+        placeCaretAtPoint(lastPointerDown.current.x, lastPointerDown.current.y);
+        lastPointerDown.current = null;
+      } else {
+        // 默认聚焦到末尾
+        const el = editorRef.current;
+        const range = document.createRange();
+        range.selectNodeContents(el);
+        range.collapse(false);
+        const sel = window.getSelection();
+        sel?.removeAllRanges();
+        sel?.addRange(range);
+      }
+    }
+  }, [isEditing]);
+
   // 处理单击事件：文本模式下单击直接编辑
-  const handleClick = useCallback(() => {
+  const handleClick = useCallback((e: React.MouseEvent<HTMLDivElement>) => {
     if (activeTool === 'text' && !isEditing) {
+      // 记录点击位置
+      lastPointerDown.current = { x: e.clientX, y: e.clientY };
       setIsEditing(true);
       setActiveTool('select');
     }
@@ -71,32 +119,68 @@ const TextNode: React.FC<NodeProps<TextNodeType>> = ({ id, data, selected }) => 
   const isTarget = connection?.inProgress && connection.fromNode.id !== id;
 
   return (
-    <div className={`text-node${selected ? ' selected' : ''}${isEditing ? ' editing' : ''}`}
+    <div
+      className={`text-node${selected ? ' selected' : ''}`}
       onClick={handleClick}
       onDoubleClick={handleDoubleClick}
-      style={{ cursor: activeTool === 'text' ? 'text' : activeTool === 'select' ? 'pointer' : undefined }}
+      style={{
+        width: '100%',
+        boxSizing: 'border-box',
+        cursor: activeTool === 'text' ? 'text' : activeTool === 'select' ? 'pointer' : undefined,
+      }}
     >
+      {/* 左侧宽度调整控制 */}
+      <NodeResizeControl
+        position="left"
+        resizeDirection='horizontal'
+        minWidth={150}
+        maxWidth={600}
+        style={{
+          position: 'absolute',
+          left: 0,
+          top: '50%',
+          width: 8,
+          height: '100%',
+          background: 'transparent',
+          cursor: 'ew-resize',
+          zIndex: 10,
+          border: 'none',
+        }}
+      />
+      {/* 右侧宽度调整控制 */}
+      <NodeResizeControl
+        position="right"
+        resizeDirection='horizontal'
+        minWidth={150}
+        maxWidth={600}
+        style={{
+          position: 'absolute',
+          right: 0,
+          top: '50%',
+          width: 8,
+          height: '100%',
+          background: 'transparent',
+          cursor: 'ew-resize',
+          zIndex: 10,
+          border: 'none',
+        }}
+      />
       {/* 节点内容 */}
       {isEditing ? (
-        <textarea
+        <div
           className="text-node-editor nodrag code-font"
-          value={text}
-          onChange={handleTextChange}
-          onBlur={handleBlur}
-          onKeyDown={handleKeyDown}
-          autoFocus
-          placeholder="// 在此输入代码"
-          rows={2}
-          style={{ minHeight: '1em', overflow: 'hidden', resize: 'none' }}
-          ref={el => {
-            if (el) {
-              el.style.height = '1em';
-              el.style.height = el.scrollHeight + 'px'; // Cursor的奇技淫巧
-            }
-          }}
+          key="text"
+          contentEditable
+          ref={editorRef}
+          suppressContentEditableWarning
+          onInput={handleDivInput}
+          onBlur={exitEdit}
+          onKeyDown={handleDivKeyDown}
+          style={{ width: '100%', boxSizing: 'border-box', minHeight: '1em', outline: 'none', whiteSpace: 'pre-wrap', wordBreak: 'break-all', cursor: 'text' }}
+          spellCheck={false}
         />
       ) : (
-        <div className="text-node-content code-font">
+        <div key="display" className="text-node-content code-font" style={{ width: '100%', boxSizing: 'border-box' }}>
           {text ? (
             <pre>{text}</pre>
           ) : (

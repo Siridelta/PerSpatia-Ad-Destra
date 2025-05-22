@@ -20,12 +20,12 @@ const edgeTypes: EdgeTypes = {
 };
 
 const initialNodes: Node[] = [
-  { id: '1', position: { x: 250, y: 5 }, data: { label: 'function add(a, b) {\n  return a + b;\n}', result: '结果: add(2, 3) = 5' }, type: 'textNode' },
-  { id: '2', position: { x: 100, y: 100 }, data: { label: 'const x = 10;\nconst y = 20;', result: 'x = 10, y = 20' }, type: 'textNode' },
-  { id: '3', position: { x: 400, y: 100 }, data: { label: 'console.log("Hello World");', result: 'Hello World' }, type: 'textNode' },
-  { id: '4', position: { x: 250, y: 200 }, data: { label: 'const arr = [1, 2, 3];\narr.map(x => x * 2);', result: '[2, 4, 6]' }, type: 'textNode' },
-  { id: '5', position: { x: 100, y: 300 }, data: { label: 'const obj = {\n  name: "John",\n  age: 30\n};', result: '{name: "John", age: 30}' }, type: 'textNode' },
-  { id: '6', position: { x: 400, y: 300 }, data: { label: 'function multiply(a, b) {\n  return a * b;\n}', result: '结果: multiply(4, 5) = 20' }, type: 'textNode' },
+  { id: '1', position: { x: 400, y: 20 }, data: { label: 'function add(a, b) {\n  return a + b;\n}', result: '结果: add(2, 3) = 5' }, type: 'textNode' },
+  { id: '2', position: { x: 100, y: 250 }, data: { label: 'const x = 10;\nconst y = 20;', result: 'x = 10, y = 20' }, type: 'textNode' },
+  { id: '3', position: { x: 700, y: 250 }, data: { label: 'console.log("Hello World");', result: 'Hello World' }, type: 'textNode' },
+  { id: '4', position: { x: 400, y: 480 }, data: { label: 'const arr = [1, 2, 3];\narr.map(x => x * 2);', result: '[2, 4, 6]' }, type: 'textNode' },
+  { id: '5', position: { x: 100, y: 720 }, data: { label: 'const obj = {\n  name: "John",\n  age: 30\n};', result: '{name: "John", age: 30}' }, type: 'textNode' },
+  { id: '6', position: { x: 700, y: 720 }, data: { label: 'function multiply(a, b) {\n  return a * b;\n}', result: '结果: multiply(4, 5) = 20' }, type: 'textNode' },
 ];
 
 const initialEdges: Edge[] = [
