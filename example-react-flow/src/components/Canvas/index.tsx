@@ -1,4 +1,4 @@
-import React, { useState, useCallback } from 'react';
+import React, { useState, useCallback, useEffect } from 'react';
 import { ReactFlow, Node, Edge, NodeChange, EdgeChange, applyNodeChanges, applyEdgeChanges, Connection, addEdge, useNodesState, useEdgesState, NodeTypes, EdgeTypes, Controls, Background, BackgroundVariant, useReactFlow } from '@xyflow/react';
 import '@xyflow/react/dist/style.css';
 
@@ -8,6 +8,8 @@ import Toolbar from '../Toolbar';
 import './styles.css';
 import { useToolStore } from '../../store/toolStore';
 import CustomConnectionLine from './CustomConnectionLine';
+import useInertialPan from '../../utils/useInertialPan';
+import { saveCanvasState, loadCanvasState, CanvasState } from '../../utils/persistence';
 
 // 注册自定义节点类型
 const nodeTypes = {
@@ -39,9 +41,10 @@ const initialEdges: Edge[] = [
 ];
 
 const Canvas: React.FC = () => {
-  // 使用 useNodesState 和 useEdgesState 替代 useState
-  const [nodes, setNodes, onNodesChange] = useNodesState(initialNodes);
-  const [edges, setEdges, onEdgesChange] = useEdgesState(initialEdges);
+  // 尝试从 localStorage 恢复初始状态
+  const persisted = loadCanvasState();
+  const [nodes, setNodes, onNodesChange] = useNodesState(persisted?.nodes || initialNodes);
+  const [edges, setEdges, onEdgesChange] = useEdgesState(persisted?.edges || initialEdges);
   
   // 当前活动工具（全局）
   const activeTool = useToolStore((state) => state.activeTool);
@@ -51,7 +54,32 @@ const Canvas: React.FC = () => {
   const [connectionStartNode, setConnectionStartNode] = useState<string | null>(null);
   
   // ReactFlow 实例引用
-  const { screenToFlowPosition } = useReactFlow();
+  const { screenToFlowPosition, setViewport, getViewport } = useReactFlow();
+
+  // 惯性/缓动式视野移动（WASD）
+  useInertialPan({ setViewport, getViewport });
+
+  // V/T/C 快捷键切换工具栏模式
+  useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      // 编辑区聚焦时不响应
+      const tag = (e.target as HTMLElement)?.tagName?.toLowerCase();
+      const isEditable = (tag === 'input' || tag === 'textarea' || (e.target as HTMLElement)?.isContentEditable);
+      if (isEditable) return;
+      if (e.key === 'v' || e.key === 'V') {
+        setActiveTool('select');
+        e.preventDefault();
+      } else if (e.key === 't' || e.key === 'T') {
+        setActiveTool('text');
+        e.preventDefault();
+      } else if (e.key === 'c' || e.key === 'C') {
+        setActiveTool('connect');
+        e.preventDefault();
+      }
+    };
+    window.addEventListener('keydown', handleKeyDown);
+    return () => window.removeEventListener('keydown', handleKeyDown);
+  }, [setActiveTool]);
 
   // 复用的创建新节点函数
   const createTextNode = useCallback((position: { x: number; y: number }) => ({
@@ -100,6 +128,55 @@ const Canvas: React.FC = () => {
     }
   }, [activeTool, setNodes, connectionStartNode, createTextNode, screenToFlowPosition]);
 
+  // 自动保存到 localStorage
+  useEffect(() => {
+    saveCanvasState(nodes, edges);
+  }, [nodes, edges]);
+
+  // 导出画布状态为 JSON 文件
+  const handleExport = useCallback(() => {
+    const data: CanvasState = {
+      version: 1,
+      nodes,
+      edges,
+    };
+    const blob = new Blob([JSON.stringify(data, null, 2)], { type: 'application/json' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = 'julia-canvas-flow.json';
+    a.click();
+    URL.revokeObjectURL(url);
+  }, [nodes, edges]);
+
+  // 导入画布状态
+  const handleImport = useCallback(() => {
+    const input = document.createElement('input');
+    input.type = 'file';
+    input.accept = '.json,application/json';
+    input.onchange = (e: any) => {
+      const file = e.target.files?.[0];
+      if (!file) return;
+      const reader = new FileReader();
+      reader.onload = (evt) => {
+        try {
+          const text = evt.target?.result as string;
+          const data = JSON.parse(text);
+          if (data && Array.isArray(data.nodes) && Array.isArray(data.edges)) {
+            setNodes(data.nodes);
+            setEdges(data.edges);
+          } else {
+            alert('导入的文件格式不正确');
+          }
+        } catch (err) {
+          alert('导入失败，文件内容无法解析');
+        }
+      };
+      reader.readAsText(file);
+    };
+    input.click();
+  }, [setNodes, setEdges]);
+
   return (
     <div className={`canvas-container${activeTool === 'text' ? ' text-mode' : ''}`}
       style={{ cursor: activeTool === 'text' ? 'text' : undefined }}
@@ -122,7 +199,7 @@ const Canvas: React.FC = () => {
       </svg>
 
       {/* 工具栏 */}
-      <Toolbar />
+      <Toolbar onImport={handleImport} onExport={handleExport} />
 
       {/* 画布 */}
       <ReactFlow 

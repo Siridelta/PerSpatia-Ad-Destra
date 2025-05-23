@@ -42,3 +42,8 @@
 .text-mode .react-flow__pane {
   cursor: text !important;
 }
+
+/* 连接模式下，画布空白区为十字光标 */
+/* .connecting-mode .react-flow__pane {
+  cursor: crosshair !important;
+} */

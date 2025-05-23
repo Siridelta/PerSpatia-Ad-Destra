@@ -11,6 +11,10 @@ export type TextNodeData = {
 
 export type TextNodeType = Node<TextNodeData, 'text'>;
 
+// 宽度上下限常量
+const TEXT_NODE_MIN_WIDTH = 150;
+const TEXT_NODE_MAX_WIDTH = 800;
+
 // 工具函数：将光标定位到指定页面坐标（x, y）处
 function placeCaretAtPoint(x: number, y: number) {
   let range: Range | null = null;
@@ -133,8 +137,8 @@ const TextNode: React.FC<NodeProps<TextNodeType>> = ({ id, data, selected }) => 
       <NodeResizeControl
         position="left"
         resizeDirection='horizontal'
-        minWidth={150}
-        maxWidth={600}
+        minWidth={TEXT_NODE_MIN_WIDTH}
+        maxWidth={TEXT_NODE_MAX_WIDTH}
         style={{
           position: 'absolute',
           left: 0,
@@ -151,8 +155,8 @@ const TextNode: React.FC<NodeProps<TextNodeType>> = ({ id, data, selected }) => 
       <NodeResizeControl
         position="right"
         resizeDirection='horizontal'
-        minWidth={150}
-        maxWidth={600}
+        minWidth={TEXT_NODE_MIN_WIDTH}
+        maxWidth={TEXT_NODE_MAX_WIDTH}
         style={{
           position: 'absolute',
           right: 0,
