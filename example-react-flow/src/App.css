@@ -19,3 +19,8 @@
   font-variation-settings: 'BEVL' 0, 'wght' 450;
   line-height: 1.5;
 }
+
+.control-font {
+  font-family: 'JetBrains Mono', 'AlimamaFangYuanTi', sans-serif;
+  font-variant-ligatures: none;
+}

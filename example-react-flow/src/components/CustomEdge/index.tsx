@@ -1,5 +1,5 @@
 import React from 'react';
-import { getBezierPath, EdgeProps, Position, getStraightPath, useInternalNode } from '@xyflow/react';
+import { EdgeProps, getStraightPath, useInternalNode } from '@xyflow/react';
 
 
 // getEdgeParams 逻辑迁移自 sandbox-easy-connect/utils.js
@@ -41,7 +41,7 @@ function getEdgeParams(source: any, target: any) {
 
 const markerId = 'custom-edge-arrow';
 
-const FloatingEdge: React.FC<EdgeProps> = ({ id, source, target, style }) => {
+const FloatingEdge: React.FC<EdgeProps> = ({ id, source, target, style, selected }) => {
   const sourceNode = useInternalNode(source);
   const targetNode = useInternalNode(target);
 
@@ -59,14 +59,29 @@ const FloatingEdge: React.FC<EdgeProps> = ({ id, source, target, style }) => {
   });
 
   return (
-    <path
-      id={id}
-      className="react-flow__edge-path"
-      d={edgePath}
-      markerEnd={`url(#${markerId})`}
-      style={style}
-      // 注：样式在 Canvas css 文件里控制
-    />
+    <>
+      {/* 主要边路径 */}
+      <path
+        id={id}
+        className="react-flow__edge-path"
+        d={edgePath}
+        markerEnd={`url(#${markerId})`}
+        style={{
+          ...style,
+          stroke: selected ? 'rgba(100, 200, 255, 0.8)' : 'rgb(88, 88, 88)',
+          strokeWidth: selected ? 2 : 1,
+        }}
+      />
+      {/* 增加点击区域，便于选中 */}
+      <path
+        d={edgePath}
+        fill="none"
+        strokeOpacity={0}
+        stroke="transparent"
+        strokeWidth={10}
+        className="react-flow__edge-interaction"
+      />
+    </>
   );
 };
 

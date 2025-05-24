@@ -1,0 +1,405 @@
+/* 变量控件区域样式 */
+.variable-controls {
+  margin-top: 10px;
+  transition: all 0.3s ease;
+}
+
+/* 可点击的分割线 */
+.variable-controls-divider {
+  height: 1px;
+  background: rgba(160, 236, 255, 0.2);
+  cursor: pointer;
+  margin-bottom: 8px;
+  transition: background-color 0.2s ease;
+}
+
+.variable-controls-divider:hover {
+  background: rgba(160, 236, 255, 0.4);
+}
+
+.variable-controls-content {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  opacity: 1;
+  transform: translateY(0);
+  transition: opacity 0.3s ease, transform 0.3s ease;
+}
+
+.variable-controls-content.collapsed {
+  opacity: 0;
+  transform: translateY(-10px);
+  height: 0;
+  overflow: hidden;
+}
+
+/* 通用控件样式 */
+.variable-control {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 12px;
+  font-size: 11px;
+  transition: transform 0.2s ease, opacity 0.2s ease;
+}
+
+.variable-control:hover {
+  transform: translateX(2px);
+}
+
+.variable-label {
+  min-width: 60px;
+  color: white;
+}
+
+.variable-name {
+  font-weight: 500;
+}
+
+.variable-value {
+  min-width: 35px;
+  text-align: right;
+  color: rgba(160, 236, 255, 0.9);
+  font-size: 11px;
+  cursor: pointer;
+  padding: 4px 6px;
+  border-radius: 3px;
+  transition: background-color 0.2s ease, transform 0.1s ease;
+  user-select: none;
+}
+
+.variable-value:hover {
+  background: rgba(160, 236, 255, 0.1);
+  transform: scale(1.05);
+}
+
+.variable-value:active {
+  transform: scale(0.98);
+}
+
+/* 滑动条样式 */
+.variable-slider {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 12px;
+  font-size: 11px;
+  transition: opacity 0.2s ease;
+}
+
+.variable-slider .slider-container {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  flex: 1;
+}
+
+.slider-track {
+  position: relative;
+  flex: 1;
+  height: 16px;
+  background: transparent;
+  border-radius: 8px;
+  overflow: visible;
+  transition: background-color 0.2s ease;
+  display: flex;
+  align-items: center;
+  margin-right: 8px;
+}
+
+.slider-track::before {
+  content: '';
+  position: absolute;
+  left: 0;
+  top: 50%;
+  transform: translateY(-50%);
+  width: 100%;
+  height: 3px;
+  background: rgba(160, 236, 255, 0.1);
+  border-radius: 2px;
+  transition: background-color 0.2s ease;
+}
+
+.slider-track:hover::before {
+  background: rgba(160, 236, 255, 0.15);
+}
+
+.slider-progress {
+  position: absolute;
+  left: 0;
+  top: 50%;
+  transform: translateY(-50%);
+  height: 3px;
+  background: rgba(160, 236, 255, 0.7);
+  border-radius: 2px;
+  transition: width 0.1s ease, background-color 0.2s ease;
+  pointer-events: none;
+}
+
+.slider-input {
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+  opacity: 0;
+  cursor: pointer;
+  -webkit-appearance: none;
+  appearance: none;
+}
+
+.slider-input::-webkit-slider-thumb {
+  -webkit-appearance: none;
+  appearance: none;
+  width: 14px;
+  height: 14px;
+  background: rgba(160, 236, 255, 0.9);
+  border-radius: 50%;
+  cursor: pointer;
+  box-shadow: 0 0 3px rgba(160, 236, 255, 0.3);
+  transition: transform 0.1s ease, box-shadow 0.2s ease;
+  border: 2px solid white;
+}
+
+.slider-input::-webkit-slider-thumb:hover {
+  transform: scale(1.3);
+  box-shadow: 0 0 8px rgba(160, 236, 255, 0.5);
+}
+
+.slider-input::-webkit-slider-thumb:active {
+  transform: scale(1.1);
+}
+
+.slider-input::-moz-range-thumb {
+  width: 14px;
+  height: 14px;
+  background: rgba(160, 236, 255, 0.9);
+  border-radius: 50%;
+  cursor: pointer;
+  border: 2px solid white;
+  box-shadow: 0 0 3px rgba(160, 236, 255, 0.3);
+  transition: transform 0.1s ease, box-shadow 0.2s ease;
+}
+
+.slider-input::-moz-range-thumb:hover {
+  transform: scale(1.3);
+  box-shadow: 0 0 8px rgba(160, 236, 255, 0.5);
+}
+
+.slider-input::-moz-range-thumb:active {
+  transform: scale(1.1);
+}
+
+/* 内联参数编辑样式 */
+.slider-inline-edit {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  flex: 1;
+  font-size: 10px;
+  opacity: 0;
+  transform: translateY(-5px) scale(0.95);
+  max-height: 0;
+  overflow: hidden;
+  transition: 
+    opacity 0.4s cubic-bezier(0.4, 0, 0.2, 1),
+    transform 0.4s cubic-bezier(0.4, 0, 0.2, 1),
+    max-height 0.4s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+.slider-inline-edit.visible {
+  opacity: 1;
+  transform: translateY(0) scale(1);
+  max-height: 60px;
+  transition-delay: 0.05s;
+}
+
+.inline-edit-label {
+  color: rgba(160, 236, 255, 0.8);
+  white-space: nowrap;
+  opacity: 0;
+  transform: translateX(-10px);
+  transition: opacity 0.3s ease 0.1s, transform 0.3s ease 0.1s;
+}
+
+.slider-inline-edit.visible .inline-edit-label {
+  opacity: 1;
+  transform: translateX(0);
+}
+
+.inline-edit-input {
+  width: 40px;
+  background: transparent;
+  border: 1px solid rgba(160, 236, 255, 0.3);
+  border-radius: 2px;
+  padding: 2px 4px;
+  color: white;
+  font-family: inherit;
+  font-size: 10px;
+  outline: none;
+  text-align: center;
+  transition: border-color 0.2s ease, box-shadow 0.2s ease, transform 0.1s ease;
+  opacity: 0;
+  transform: scale(0.9);
+}
+
+.slider-inline-edit.visible .inline-edit-input {
+  opacity: 1;
+  transform: scale(1);
+  transition: opacity 0.3s ease 0.15s, transform 0.3s ease 0.15s, border-color 0.2s ease, box-shadow 0.2s ease;
+}
+
+.inline-edit-input:focus {
+  border-color: rgba(160, 236, 255, 0.6);
+  box-shadow: 0 0 3px rgba(160, 236, 255, 0.2);
+  transform: scale(1.05);
+}
+
+.inline-edit-separator {
+  color: rgba(160, 236, 255, 0.6);
+  opacity: 0;
+  transform: scale(0.8);
+  transition: opacity 0.3s ease 0.2s, transform 0.3s ease 0.2s;
+}
+
+.slider-inline-edit.visible .inline-edit-separator {
+  opacity: 1;
+  transform: scale(1);
+}
+
+.edit-done-btn, .edit-cancel-btn {
+  background: transparent;
+  border: 1px solid rgba(160, 236, 255, 0.3);
+  color: rgba(160, 236, 255, 0.8);
+  padding: 2px 6px;
+  border-radius: 2px;
+  cursor: pointer;
+  font-size: 10px;
+  margin-left: 2px;
+  transition: all 0.2s ease;
+  opacity: 0;
+  transform: translateX(10px) scale(0.9);
+  user-select: none;
+}
+
+.edit-cancel-btn {
+  border-color: rgba(255, 160, 160, 0.3);
+  color: rgba(255, 160, 160, 0.8);
+}
+
+.slider-inline-edit.visible .edit-done-btn,
+.slider-inline-edit.visible .edit-cancel-btn {
+  opacity: 1;
+  transform: translateX(0) scale(1);
+  transition: all 0.3s ease 0.25s;
+}
+
+.edit-done-btn:hover {
+  border-color: rgba(160, 236, 255, 0.6);
+  color: rgba(160, 236, 255, 1);
+  background: rgba(160, 236, 255, 0.1);
+  transform: translateX(0) scale(1.05);
+}
+
+.edit-cancel-btn:hover {
+  border-color: rgba(255, 160, 160, 0.6);
+  color: rgba(255, 160, 160, 1);
+  background: rgba(255, 160, 160, 0.1);
+  transform: translateX(0) scale(1.05);
+}
+
+.edit-done-btn:active, .edit-cancel-btn:active {
+  transform: translateX(0) scale(0.95);
+}
+
+/* 文本输入样式 */
+.variable-text .text-input-container {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  flex: 1;
+}
+
+.text-input {
+  flex: 1;
+  background: transparent;
+  border: 1px solid rgba(160, 236, 255, 0.2);
+  border-radius: 3px;
+  padding: 3px 6px;
+  color: white;
+  font-family: inherit;
+  font-size: 11px;
+  outline: none;
+  transition: border-color 0.2s ease, box-shadow 0.2s ease, transform 0.1s ease;
+}
+
+.text-input:focus {
+  border-color: rgba(160, 236, 255, 0.4);
+  box-shadow: 0 0 5px rgba(160, 236, 255, 0.15);
+  transform: scale(1.02);
+}
+
+.text-input::placeholder {
+  color: rgba(160, 236, 255, 0.35);
+  font-family: inherit;
+}
+
+/* 开关样式 */
+.variable-toggle .toggle-container {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex: 1;
+  justify-content: flex-end;
+}
+
+.toggle-switch {
+  position: relative;
+  width: 32px;
+  height: 16px;
+  background: rgba(160, 236, 255, 0.2);
+  border-radius: 8px;
+  cursor: pointer;
+  transition: background-color 0.3s ease;
+}
+
+.toggle-switch.active {
+  background: rgba(160, 236, 255, 0.7);
+}
+
+.toggle-knob {
+  position: absolute;
+  top: 2px;
+  left: 2px;
+  width: 12px;
+  height: 12px;
+  background: white;
+  border-radius: 50%;
+  transition: transform 0.3s ease, box-shadow 0.2s ease;
+  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.2);
+}
+
+.toggle-switch.active .toggle-knob {
+  transform: translateX(16px);
+  box-shadow: 0 2px 6px rgba(160, 236, 255, 0.3);
+}
+
+.toggle-text {
+  color: rgba(160, 236, 255, 0.9);
+  font-size: 11px;
+  min-width: 40px;
+  text-align: right;
+}
+
+/* 悬停效果 */
+.variable-control:hover .slider-progress {
+  background: rgba(160, 236, 255, 0.9);
+}
+
+.variable-control:hover .toggle-switch {
+  box-shadow: 0 0 8px rgba(160, 236, 255, 0.3);
+}
+
+.variable-control:hover .text-input {
+  border-color: rgba(160, 236, 255, 0.4);
+} 
