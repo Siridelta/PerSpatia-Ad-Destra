@@ -1,307 +1,555 @@
+/* 节点容器 - 不再是单一矩形，而是多个矩形的容器 */
 .text-node {
   position: relative;
-  min-width: 150px;
-  min-height: 40px;
-  padding: 3px 4px 3px 4px;
+  display: flex;
+  flex-direction: column;
+  gap: 0;
+  min-width: 200px;
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 14px;
   background: transparent;
-  border: 1px solid transparent;
-  border-radius: 2px;
-  transition: box-shadow 0.3s ease, border-color 0.3s ease, background-color 0.3s ease, transform 0.2s ease, width 0.3s ease, height 0.3s ease;
-  box-shadow: none;
+  border: none;
+  transition: transform 0.2s ease;
 }
 
 .text-node.selected,
 .text-node:focus-within {
-  /* box-shadow: 0 0 8px 1px rgba(100,200,255,0.18);
-  border: 1px solid rgba(100, 201, 255, 0.346); */
-  
-  box-shadow: 0 0 8px 1px rgba(100,200,255,0.02);
-  /* border: 1px solid rgba(100, 201, 255, 0.192); */
-  background-color: rgba(100, 200, 255, 0.05);
-  transform: scale(1.001);
+  transform: scale(1.01);
 }
 
 .text-node:hover:not(.selected):not(:focus-within) {
-  /* box-shadow: 0 0 8px 1px rgba(100,200,255,0.10); */
-  /* border: 1px solid rgba(100, 201, 255, 0.192); */
-  background-color: rgba(100, 200, 255, 0.02);
-  transform: scale(1.0005);
+  transform: scale(1.005);
+}
+
+/* 矩形区域通用样式 */
+.text-node-section {
+  position: relative;
+  background: rgba(9, 14, 28, 0.5);
+  padding: 10px;
+  margin-bottom: 2px;
+  border: none;
+  min-height: 20px;
+  width: 100%;
+  box-sizing: border-box;
+}
+
+.text-node-section:last-child {
+  margin-bottom: 0;
+}
+
+/* 区域标签样式 */
+.section-label {
+  position: absolute;
+  top: -13px;
+  left: -4px;
+  background: transparent;
+  color: #7de1ea;
+  padding: 2px 8px;
+  font-size: 14px;
+  font-weight: 600;
+  font-family: 'JetBrains Mono', monospace;
+  z-index: 10;
+}
+
+/* 可点击标签的样式 */
+.section-label.clickable {
+  transition: color 0.2s ease, transform 0.2s ease;
+}
+
+.section-label.clickable:hover {
+  color: #ffffff;
+  transform: scale(1.05);
+}
+
+/* 代码区域 */
+.text-node-code-section {
+  display: block;
+  padding: 15px;
 }
 
 .text-node-content {
   width: 100%;
   min-height: 1em;
-  color: #fff;
-  font-size: 10px;
-  line-height: 1.5;
+  color: #ffffff;
+  font-size: 14px;
+  line-height: 1.4;
   background: transparent;
-  box-shadow: none;
   border: none;
-  transition: opacity 0.2s ease;
+  font-family: 'JetBrains Mono', monospace;
 }
 
 .text-node-content pre {
   margin: 0;
   background: transparent;
-  color: #fff;
-  font-family: inherit;
-  font-size: inherit;
-  line-height: inherit;
+  color: #ffffff;
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 14px;
+  line-height: 1.4;
   white-space: pre-wrap;
   word-break: break-all;
-  transition: color 0.2s ease;
 }
 
 .text-node-editor {
   width: 100%;
   min-height: 1em;
-  color: #fff;
-  font-size: 10px;
-  line-height: 1.5;
+  color: #ffffff;
+  font-size: 14px;
+  line-height: 1.4;
   border: none;
   outline: none;
   resize: none;
   background: transparent;
   padding: 0;
   margin: 0;
-  font-family: inherit;
+  font-family: 'JetBrains Mono', monospace;
   font-variant-ligatures: none;
-  transition: color 0.2s ease;
-  opacity: 1;
 }
 
 .text-node-editor::placeholder {
-  color: rgba(160, 236, 255, 0.35);
-  font-family: inherit;
+  color: rgba(125, 225, 234, 0.4);
+  font-family: 'JetBrains Mono', monospace;
   font-variant-ligatures: none;
 }
 
-.text-node-divider {
-  width: 100%;
-  height: 1px;
-  background: linear-gradient(90deg, rgba(100,200,255,0.08) 0%, rgba(100,200,255,0.18) 50%, rgba(100,200,255,0.08) 100%);
-  border: none;
-  margin-top: 3px;
-  margin-bottom: 3px;
-  transition: opacity 0.3s ease, transform 0.3s ease;
-  opacity: 0;
-  transform: scaleX(0);
-  animation: dividerAppear 0.4s ease 0.1s forwards;
+/* 输入区域 */
+.text-node-inputs-section {
+  display: block;
 }
 
-@keyframes dividerAppear {
-  from {
-    opacity: 0;
-    transform: scaleX(0);
-  }
-  to {
-    opacity: 1;
-    transform: scaleX(1);
-  }
+/* 输出区域 */
+.text-node-outputs-section {
+  display: block;
 }
 
-.text-node-result {
-  padding: 0px;
-  margin: 0px;
-  font-size: 10px;
-  color: rgba(188, 242, 255, 0.801);
+/* 变量控件样式重写 */
+.variable-control {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin: 5px 0;
+  font-size: 14px;
+  font-family: 'JetBrains Mono', monospace;
+  gap: 12px;
+}
+
+.variable-label {
+  color: #ffffff;
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 14px;
+  min-width: 60px;
+  flex-shrink: 0;
+}
+
+.variable-value {
+  color: #ffffff;
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 14px;
+  text-align: right;
+  padding: 2px 4px;
+}
+
+/* 滑动条重新设计 */
+.slider-container {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  flex: 1;
+  min-width: 120px;
+}
+
+.slider-track {
+  position: relative;
+  flex: 1;
+  height: 20px;
   background: transparent;
-  border-radius: 0;
-  border-left: none;
-  transition: color 0.2s ease, opacity 0.3s ease, transform 0.3s ease;
-  opacity: 0;
-  transform: translateY(5px);
-  animation: resultAppear 0.4s ease 0.2s forwards;
+  min-width: 80px;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
 }
 
-@keyframes resultAppear {
-  from {
-    opacity: 0;
-    transform: translateY(5px);
-  }
-  to {
-    opacity: 1;
-    transform: translateY(0);
-  }
-}
-
-/* 输出变量区样式 */
-.text-node-outputs {
-  padding: 0px;
-  margin: 0px;
-  font-size: 10px;
-  color: rgba(160, 236, 255, 0.7);
-  background: transparent;
-  transition: opacity 0.3s ease, transform 0.3s ease;
-  opacity: 0;
-  transform: translateY(5px);
-  animation: outputsAppear 0.4s ease 0.2s forwards;
-}
-
-@keyframes outputsAppear {
-  from {
-    opacity: 0;
-    transform: translateY(5px);
-  }
-  to {
-    opacity: 1;
-    transform: translateY(0);
-  }
-}
-
-.output-variable {
-  margin: 2px 0;
-  line-height: 1.5;
-}
-
-.output-label {
-  color: rgba(100, 200, 255, 0.6);
-  font-weight: 500;
-}
-
-.output-value {
-  color: rgba(188, 242, 255, 0.9);
-  font-weight: 600;
-}
-
-/* Console.log 输出区样式 */
-.text-node-logs {
-  padding: 0px;
-  margin: 0px;
-  font-size: 10px;
-  color: rgba(160, 236, 255, 0.7);
-  background: transparent;
-  transition: opacity 0.3s ease, transform 0.3s ease;
-  opacity: 0;
-  transform: translateY(5px);
-  animation: logsAppear 0.4s ease 0.2s forwards;
-}
-
-@keyframes logsAppear {
-  from {
-    opacity: 0;
-    transform: translateY(5px);
-  }
-  to {
-    opacity: 1;
-    transform: translateY(0);
-  }
-}
-
-.log-entry {
-  margin: 1px 0;
-  line-height: 1.4;
-  color: rgba(188, 242, 255, 0.8);
-}
-
-.text-node-handle {
-  width: 100%;
-  height: 100%;
+.slider-track::before {
+  content: '';
   position: absolute;
-  top: 0;
   left: 0;
-  right: 0;
-  bottom: 0;
-  border: none;
+  top: 50%;
+  transform: translateY(-50%);
+  width: 100%;
+  height: 4px;
+  background: #091c33;
   border-radius: 0;
-  opacity: 0;
-  background: transparent;
-  transform: none;
-  transition: opacity 0.2s ease;
+  transition: background-color 0.2s ease;
 }
 
-.hide-handle {
+.slider-track:hover::before {
+  background: #0a2040;
+}
+
+.slider-progress {
+  position: absolute;
+  left: 0;
+  top: 50%;
+  transform: translateY(-50%);
+  height: 4px;
+  background: #014a64;
+  border-radius: 0;
+  transition: width 0.1s ease;
   pointer-events: none;
 }
 
-/* 执行状态指示器 - 顶部显示 */
-.text-node-status-top {
-  padding: 0px;
-  margin: 0px 0px 2px 0px;
-  font-size: 8px;
-  color: rgba(255, 193, 7, 0.8);
-  background: transparent;
-  line-height: 1.2;
-  transition: opacity 0.2s ease;
+.slider-input {
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
   opacity: 0;
-  animation: statusTopAppear 0.2s ease forwards;
-}
-
-@keyframes statusTopAppear {
-  from {
-    opacity: 0;
-    transform: translateY(-2px);
-  }
-  to {
-    opacity: 1;
-    transform: translateY(0);
-  }
-}
-
-/* 错误信息样式 */
-.text-node-error {
-  padding: 0px;
-  margin: 0px;
-  font-size: 10px;
-  color: rgba(255, 99, 99, 0.8);
-  background: transparent;
-  transition: opacity 0.3s ease, transform 0.3s ease;
-  opacity: 0;
-  transform: translateY(5px);
-  animation: errorAppear 0.4s ease 0.2s forwards;
-}
-
-@keyframes errorAppear {
-  from {
-    opacity: 0;
-    transform: translateY(5px);
-  }
-  to {
-    opacity: 1;
-    transform: translateY(0);
-  }
-}
-
-.text-node-error .error-summary {
   cursor: pointer;
-  transition: color 0.2s ease;
+  -webkit-appearance: none;
+  appearance: none;
+  margin: 0;
+  background: transparent;
+  z-index: 10;
+}
+
+/* 确保滑动条可以拖动 */
+.slider-input::-webkit-slider-thumb {
+  -webkit-appearance: none;
+  appearance: none;
+  width: 12px;
+  height: 12px;
+  background: #7de1ea;
+  border-radius: 0;
+  cursor: grab;
+  border: 1px solid #014a64;
+  position: relative;
+  z-index: 11;
+  opacity: 1;
+  pointer-events: auto;
+}
+
+.slider-input:active::-webkit-slider-thumb {
+  cursor: grabbing;
+  background: #ffffff;
+}
+
+.slider-input::-moz-range-thumb {
+  width: 12px;
+  height: 12px;
+  background: #7de1ea;
+  border-radius: 0;
+  cursor: grab;
+  border: 1px solid #014a64;
+  position: relative;
+  z-index: 11;
+  -moz-appearance: none;
+  appearance: none;
+}
+
+.slider-input:active::-moz-range-thumb {
+  cursor: grabbing;
+  background: #ffffff;
+}
+
+/* 滑动条数值显示 */
+.variable-value {
+  color: #ffffff;
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 14px;
+  text-align: center;
+  padding: 2px 6px;
+  min-width: 30px;
+  flex-shrink: 0;
+  border: 1px solid transparent;
+  cursor: pointer;
+  transition: border-color 0.2s ease;
+}
+
+.variable-value:hover {
+  border-color: #7de1ea;
+  background: rgba(125, 225, 234, 0.1);
+}
+
+/* 输入框容器 */
+.text-input-container {
+  flex: 1;
+  min-width: 80px;
   display: flex;
   align-items: center;
-  justify-content: space-between;
 }
 
-.text-node-error .error-summary:hover {
-  color: rgba(255, 99, 99, 1);
-}
-
-.text-node-error .error-details {
-  font-family: 'JetBrains Mono', monospace;
-  font-size: 9px;
-  line-height: 1.3;
-  margin-top: 4px;
-  padding: 4px;
-  background: rgba(255, 99, 99, 0.1);
-  border: 1px solid rgba(255, 99, 99, 0.2);
-  border-radius: 2px;
-  white-space: pre-wrap;
-  word-break: break-word;
-  max-height: 150px;
-  overflow-y: auto;
-}
-
-.text-node-error .error-details::-webkit-scrollbar {
-  width: 4px;
-}
-
-.text-node-error .error-details::-webkit-scrollbar-track {
+/* 输入框重新设计 - 优化宽度适应 */
+.text-input {
   background: transparent;
+  border: none;
+  border-bottom: 1px solid #091c33;
+  color: #ffffff;
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 14px;
+  padding: 2px 4px;
+  outline: none;
+  width: 100%; /* 改为100%以更好适应容器宽度 */
+  min-width: 80px; /* 降低最小宽度 */
+  box-sizing: border-box;
 }
 
-.text-node-error .error-details::-webkit-scrollbar-thumb {
-  background: rgba(255, 99, 99, 0.3);
-  border-radius: 2px;
+.text-input:focus {
+  border-bottom-color: #7de1ea;
 }
 
-.text-node-error .error-details::-webkit-scrollbar-thumb:hover {
-  background: rgba(255, 99, 99, 0.5);
+.text-input::placeholder {
+  color: rgba(125, 225, 234, 0.5);
+}
+
+/* 开关重新设计 */
+.toggle-container {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  justify-content: flex-end;
+  min-width: 80px;
+}
+
+.toggle-switch {
+  position: relative;
+  width: 58px;
+  height: 22px;
+  background: #091c33;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: #ffffff;
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 14px;
+  font-weight: bold;
+  overflow: hidden;
+}
+
+.toggle-switch.active {
+  background: #091c33;
+}
+
+.toggle-knob {
+  position: absolute;
+  top: 0;
+  width: 29px;
+  height: 22px;
+  background: #014a64;
+  transition: left 0.3s ease;
+  z-index: 1;
+}
+
+.toggle-switch:not(.active) .toggle-knob {
+  left: 0;
+}
+
+.toggle-switch.active .toggle-knob {
+  left: 29px;
+}
+
+/* T/F文字显示在左右半边，分别居中 */
+.toggle-switch::before {
+  content: 'F';
+  position: absolute;
+  left: 0;
+  width: 29px;
+  height: 100%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: #ffffff;
+  font-size: 14px;
+  font-weight: bold;
+  z-index: 2;
+  transition: opacity 0.3s ease;
+}
+
+.toggle-switch::after {
+  content: 'T';
+  position: absolute;
+  right: 0;
+  width: 29px;
+  height: 100%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: #ffffff;
+  font-size: 14px;
+  font-weight: bold;
+  z-index: 2;
+  transition: opacity 0.3s ease;
+}
+
+.toggle-switch:not(.active)::before {
+  opacity: 1;
+}
+
+.toggle-switch:not(.active)::after {
+  opacity: 0.3;
+}
+
+.toggle-switch.active::before {
+  opacity: 0.3;
+}
+
+.toggle-switch.active::after {
+  opacity: 1;
+}
+
+.toggle-text {
+  color: #ffffff;
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 14px;
+  margin-left: 8px;
+}
+
+/* 输出变量样式重写 */
+.output-variable {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  margin: 5px 0;
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 14px;
+  flex-wrap: wrap;
+}
+
+.output-variable-name {
+  color: #ffffff;
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 14px;
+  margin-right: 10px;
+  flex: 0 0 auto;
+}
+
+.output-variable-value {
+  color: #ffffff;
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 14px;
+  text-align: right;
+  flex: 1 1 auto;
+  min-width: 0;
+}
+
+.output-variable-type {
+  color: #7de1ea;
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 14px;
+}
+
+/* 当变量名过长时，值换行 */
+.output-variable.wrapped {
+  flex-direction: column;
+  align-items: flex-start;
+}
+
+.output-variable.wrapped .output-variable-value {
+  text-align: right;
+  width: 100%;
+  margin-top: 2px;
+}
+
+/* 隐藏原有的分割线和动画 */
+.text-node-divider {
+  display: none;
+}
+
+.text-node-result {
+  display: none;
+}
+
+.text-node-outputs {
+  display: none;
+}
+
+.text-node-logs {
+  display: none;
+}
+
+.text-node-status-top {
+  display: none;
+}
+
+.text-node-error {
+  display: none;
+}
+
+/* 隐藏原有的句柄 */
+.text-node-handle {
+  display: none;
+}
+
+.hide-handle {
+  display: none;
+}
+
+/* 滑动条设置面板样式 */
+.slider-settings-panel {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  padding: 8px;
+  background: rgba(9, 28, 51, 0.8);
+  border: 1px solid #014a64;
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 14px;
+}
+
+.slider-settings-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 14px;
+}
+
+.slider-settings-input {
+  background: transparent;
+  border: none;
+  border-bottom: 1px solid #091c33;
+  color: #ffffff;
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 14px;
+  padding: 2px 0;
+  width: 60px;
+  text-align: center;
+}
+
+.slider-settings-input:focus {
+  border-bottom-color: #7de1ea;
+  outline: none;
+}
+
+/* 日志区域样式 */
+.text-node-logs-section {
+  display: block;
+}
+
+.log-container {
+  max-height: 120px;
+  overflow-y: auto;
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 14px;
+}
+
+.log-entry {
+  color: #ffffff;
+  margin: 2px 0;
+  padding: 2px 0;
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 14px;
+  line-height: 1.4;
+  white-space: pre-wrap;
+}
+
+.log-entry.error {
+  color: #ff6b6b;
+}
+
+.log-entry.warning {
+  color: #feca57;
+}
+
+.log-entry.info {
+  color: #7de1ea;
 }

@@ -1,100 +1,43 @@
 .toolbar {
-  position: absolute;
-  top: 10px;
-  left: 10px;
-  z-index: 10;
-  display: flex;
-  flex-direction: column;
-  background-color: white;
-  border-radius: 4px;
-  box-shadow: 0 2px 5px rgba(0, 0, 0, 0.1);
-  padding: 5px;
-  opacity: 0;
-  transform: translateX(-20px);
-  animation: toolbarSlideIn 0.4s ease 0.2s forwards;
-}
-
-@keyframes toolbarSlideIn {
-  from {
-    opacity: 0;
-    transform: translateX(-20px);
-  }
-  to {
-    opacity: 1;
-    transform: translateX(0);
-  }
+  display: none; /* 完全隐藏工具栏 */
 }
 
 .toolbar-button {
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  width: 36px;
-  height: 36px;
-  margin: 2px 0;
-  border: none;
-  background-color: transparent;
-  border-radius: 4px;
-  cursor: pointer;
-  color: #555;
-  transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
-  transform: scale(1);
-  position: relative;
-  overflow: hidden;
+  display: none;
 }
 
 .toolbar-button::before {
-  content: '';
-  position: absolute;
-  top: 50%;
-  left: 50%;
-  width: 0;
-  height: 0;
-  background-color: rgba(24, 144, 255, 0.1);
-  border-radius: 50%;
-  transform: translate(-50%, -50%);
-  transition: width 0.3s ease, height 0.3s ease;
+  display: none;
 }
 
 .toolbar-button:hover {
-  background-color: #f0f0f0;
-  transform: scale(1.05);
+  display: none;
 }
 
 .toolbar-button:hover::before {
-  width: 32px;
-  height: 32px;
+  display: none;
 }
 
 .toolbar-button.active {
-  background-color: #e6f7ff;
-  color: #1890ff;
-  transform: scale(1.1);
-  box-shadow: 0 2px 8px rgba(24, 144, 255, 0.3);
+  display: none;
 }
 
 .toolbar-button.active::before {
-  width: 32px;
-  height: 32px;
-  background-color: rgba(24, 144, 255, 0.2);
+  display: none;
 }
 
 .toolbar-button:active {
-  transform: scale(0.95);
+  display: none;
 }
 
 .toolbar-button svg {
-  width: 20px;
-  height: 20px;
-  transition: transform 0.2s ease;
-  position: relative;
-  z-index: 1;
+  display: none;
 }
 
 .toolbar-button:hover svg {
-  transform: scale(1.1);
+  display: none;
 }
 
 .toolbar-button.active svg {
-  transform: scale(1.2);
+  display: none;
 }

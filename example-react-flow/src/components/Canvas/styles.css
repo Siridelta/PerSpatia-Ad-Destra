@@ -7,7 +7,7 @@
   overflow: hidden;
   opacity: 0;
   animation: canvasFadeIn 0.6s ease 0.1s forwards;
-  background: #0A0C12;
+  background: #000000;
 }
 
 @keyframes canvasFadeIn {
@@ -38,7 +38,7 @@
 
 /* 自定义边样式 */
 .react-flow__edge-path {
-  stroke: rgba(255, 255, 255, 0.30);
+  stroke: rgba(125, 225, 234, 0.4);
   stroke-width: 1;
   stroke-dasharray: 1 6;
   animation: dashdraw1 0.7s linear infinite;
@@ -63,7 +63,7 @@
 }
 
 .react-flow__edge:hover .react-flow__edge-path {
-  stroke: rgba(255, 255, 255, 0.5);
+  stroke: rgba(125, 225, 234, 0.7);
   stroke-width: 2;
 }
 
@@ -81,8 +81,8 @@
 
 /* 选择框动画 */
 .react-flow__nodesselection-rect {
-  stroke: rgba(100, 200, 255, 0.7);
-  fill: rgba(100, 200, 255, 0.1);
+  stroke: rgba(125, 225, 234, 0.8);
+  fill: rgba(125, 225, 234, 0.1);
   stroke-width: 1;
   stroke-dasharray: 3 3;
   animation: selectionDash 1s linear infinite;
@@ -96,8 +96,8 @@
 
 /* 节点创建预览框动画 */
 .node-preview-rect {
-  stroke: rgba(160, 236, 255, 0.8);
-  fill: rgba(160, 236, 255, 0.05);
+  stroke: rgba(125, 225, 234, 0.9);
+  fill: rgba(125, 225, 234, 0.08);
   stroke-width: 1;
   stroke-dasharray: 4 4;
   animation: previewPulse 1.5s ease-in-out infinite;
@@ -114,21 +114,9 @@
   }
 }
 
+/* 隐藏状态栏 */
 .status-bar {
-  position: fixed;
-  bottom: 0;
-  left: 0;
-  right: 0;
-  height: 32px;
-  background: rgba(9, 10, 16, 0.95);
-  border-top: 1px solid rgba(100, 200, 255, 0.2);
-  color: rgba(160, 236, 255, 0.8);
-  font-size: 12px;
-  display: flex;
-  align-items: center;
-  padding: 0 16px;
-  z-index: 1000;
-  backdrop-filter: blur(8px);
+  display: none;
 }
 
 .text-mode .react-flow__pane {
@@ -148,60 +136,21 @@
   cursor: crosshair;
 }
 
-/* 工具栏样式 */
+/* 隐藏工具栏 */
 .toolbar {
-  position: absolute;
-  top: 20px;
-  left: 20px;
-  z-index: 1000;
-  display: flex;
-  gap: 8px;
-  background: rgba(20, 25, 35, 0.8);
-  padding: 8px;
-  border-radius: 8px;
-  border: 1px solid rgba(100, 200, 255, 0.2);
-  backdrop-filter: blur(10px);
+  display: none;
 }
 
 .tool-button {
-  background: rgba(255, 255, 255, 0.1);
-  border: 1px solid rgba(255, 255, 255, 0.2);
-  border-radius: 4px;
-  padding: 8px 12px;
-  cursor: pointer;
-  color: #fff;
-  font-size: 12px;
-  transition: all 0.2s ease;
-  min-width: 60px;
-  text-align: center;
+  display: none;
 }
 
 .tool-button:hover {
-  background: rgba(255, 255, 255, 0.15);
-  border-color: rgba(100, 200, 255, 0.4);
+  display: none;
 }
 
 .tool-button.active {
-  background: rgba(100, 200, 255, 0.2);
-  border-color: rgba(100, 200, 255, 0.6);
-  color: rgba(100, 200, 255, 1);
-}
-
-/* 状态栏样式 */
-.status-bar {
-  position: absolute;
-  bottom: 20px;
-  left: 20px;
-  right: 20px;
-  z-index: 1000;
-  background: rgba(20, 25, 35, 0.8);
-  padding: 8px 16px;
-  border-radius: 6px;
-  border: 1px solid rgba(100, 200, 255, 0.2);
-  backdrop-filter: blur(10px);
-  color: rgba(255, 255, 255, 0.8);
-  font-size: 11px;
-  text-align: center;
+  display: none;
 }
 
 /* 连接线样式 */
@@ -210,12 +159,12 @@
 }
 
 .react-flow__edge.selected .react-flow__edge-path {
-  stroke: rgba(100, 200, 255, 0.8) !important;
+  stroke: rgba(125, 225, 234, 0.9) !important;
   stroke-width: 2px !important;
 }
 
 .react-flow__edge:hover .react-flow__edge-path {
-  stroke: rgba(100, 200, 255, 0.6) !important;
+  stroke: rgba(125, 225, 234, 0.7) !important;
   stroke-width: 1.5px !important;
 }
 

@@ -1,39 +1,20 @@
 import React, { useState, useCallback, useEffect, useRef } from 'react';
-import { Handle, Position, NodeProps, Node, NodeResizeControl, useReactFlow } from '@xyflow/react';
+import { Handle, Position, NodeProps, Node, useReactFlow } from '@xyflow/react';
 import './styles.css';
-import { juliaApi, JuliaVariableInfo } from '../../services/juliaApi';
-import VariableControls from '../VariableControls';
+import { jsExecutor, ControlInfo, ExecutionResult } from '../../services/jsExecutor';
 
 export type TextNodeData = {
   label: string;
   result?: string;
   initialEditing?: boolean;
-  variables?: VariableInfo[];
+  controls?: ControlInfo[];
   showControls?: boolean;
-  outputs?: string[];
+  outputs?: Record<string, any>;
   consoleLogs?: string[];
   constants?: Record<string, any>; // 存储计算的常量值
 };
 
-export interface VariableInfo {
-  name: string;
-  type: 'number' | 'string' | 'boolean' | 'range' | 'unknown';
-  value: any;
-  defaultValue: any;
-  constraints?: {
-    min?: number;
-    max?: number;
-    step?: number;
-    options?: string[];
-  };
-  isUserDefined: boolean; // 区分手动标记和自动检测
-}
-
 export type TextNodeType = Node<TextNodeData, 'text'>;
-
-// 宽度上下限常量
-const TEXT_NODE_MIN_WIDTH = 150;
-const TEXT_NODE_MAX_WIDTH = 800;
 
 // 工具函数：将光标定位到指定页面坐标（x, y）处
 function placeCaretAtPoint(x: number, y: number) {
@@ -55,47 +36,43 @@ function placeCaretAtPoint(x: number, y: number) {
   return false;
 }
 
-// 转换Julia变量信息到本地格式
-function convertJuliaVariable(juliaVar: JuliaVariableInfo): VariableInfo {
-  let value = juliaVar.value;
-  let defaultValue = juliaVar.default_value;
-  
-  // 确保数值类型的变量值是数字类型
-  if (juliaVar.type === 'number' || juliaVar.type === 'range') {
-    value = typeof value === 'string' ? parseFloat(value) : value;
-    defaultValue = typeof defaultValue === 'string' ? parseFloat(defaultValue) : defaultValue;
-    
-    // 如果转换失败，使用默认值
-    if (isNaN(value)) value = 0;
-    if (isNaN(defaultValue)) defaultValue = 0;
-  }
-  
-  return {
-    name: juliaVar.name,
-    type: juliaVar.type,
-    value: value,
-    defaultValue: defaultValue,
-    constraints: juliaVar.constraints,
-    isUserDefined: juliaVar.is_user_defined,
-  };
-}
-
 const TextNode: React.FC<NodeProps<TextNodeType>> = ({ id, data, selected }) => {
   const [isEditing, setIsEditing] = useState(false);
   const [text, setText] = useState(data.label || '');
+  const [showSections, setShowSections] = useState(true); // 控制卡片显示/隐藏
 
   // React Flow 实例，用于更新节点数据
   const { setNodes, getNodes, getEdges } = useReactFlow();
 
   // 变量相关状态
-  const [variables, setVariables] = useState<VariableInfo[]>(data.variables || []);
-  const [outputs, setOutputs] = useState<string[]>(data.outputs || []);
-  const [constants, setConstants] = useState<Record<string, any>>(data.constants || {});
-  const [consoleLogs, setConsoleLogs] = useState<string[]>([]);
+  const [controls, setControls] = useState<ControlInfo[]>(data.controls || []);
+  const [outputs, setOutputs] = useState<Record<string, any>>(data.outputs || {});
+  const [consoleLogs, setConsoleLogs] = useState<string[]>(data.consoleLogs || []);
   const [isExecuting, setIsExecuting] = useState(false);
-  const [executionError, setExecutionError] = useState<string | null>(null);
-  const [errorDetails, setErrorDetails] = useState<string | null>(null);
-  const [showErrorDetails, setShowErrorDetails] = useState(false);
+  
+  // 控件值状态
+  const [controlValues, setControlValues] = useState<Record<string, any>>({});
+  
+  // 滑动条编辑状态
+  const [editingSlider, setEditingSlider] = useState<string | null>(null);
+  const [sliderSettings, setSliderSettings] = useState<{
+    min: number;
+    max: number;
+    step: number;
+  }>({ min: 0, max: 100, step: 1 });
+
+  // 初始化控件值
+  useEffect(() => {
+    const initialValues: Record<string, any> = {};
+    controls.forEach(control => {
+      if (controlValues[control.name] === undefined) {
+        initialValues[control.name] = control.value ?? control.defaultValue;
+      }
+    });
+    if (Object.keys(initialValues).length > 0) {
+      setControlValues(prev => ({ ...prev, ...initialValues }));
+    }
+  }, [controls, controlValues]);
 
   // 初始化时需要通过 useEffect 来进行一次 isEditing 的状态切换，这样才能触发编辑态 textarea 的自动聚焦。
   useEffect(() => {
@@ -116,10 +93,10 @@ const TextNode: React.FC<NodeProps<TextNodeType>> = ({ id, data, selected }) => 
     
     for (const edge of incomingEdges) {
       const sourceNode = nodes.find(node => node.id === edge.source);
-      if (sourceNode && sourceNode.data && sourceNode.data.constants) {
-        // 从源节点的常量中获取所有值
-        const sourceConstants = sourceNode.data.constants as Record<string, any>;
-        Object.assign(connectedData, sourceConstants);
+      if (sourceNode && sourceNode.data && sourceNode.data.outputs) {
+        // 从源节点的输出中获取所有值
+        const sourceOutputs = sourceNode.data.outputs as Record<string, any>;
+        Object.assign(connectedData, sourceOutputs);
       }
     }
     
@@ -127,7 +104,7 @@ const TextNode: React.FC<NodeProps<TextNodeType>> = ({ id, data, selected }) => 
     return connectedData;
   }, [id, getNodes, getEdges]);
 
-  // 执行Julia代码
+  // 执行JS代码
   const executeCode = useCallback(async (code: string, inputValues: Record<string, any> = {}) => {
     if (!code.trim()) return;
     
@@ -137,11 +114,8 @@ const TextNode: React.FC<NodeProps<TextNodeType>> = ({ id, data, selected }) => 
       return;
     }
 
-    console.log('执行Julia代码:', code, '输入值:', inputValues);
+    console.log('执行JS代码:', code, '输入值:', inputValues);
     setIsExecuting(true);
-    setExecutionError(null);
-    setErrorDetails(null);
-    setShowErrorDetails(false);
 
     try {
       // 获取所有连接节点的输出数据
@@ -152,93 +126,31 @@ const TextNode: React.FC<NodeProps<TextNodeType>> = ({ id, data, selected }) => 
       
       console.log('所有输入值（包括连接数据）:', allInputValues);
       
-      const result = await juliaApi.evaluateCode(code, allInputValues);
+      const result = await jsExecutor.executeCode(code, allInputValues);
       
       if (result.success) {
-        // 更新变量信息，但保留用户手动设置的值
-        const newVariables = result.variables.map(convertJuliaVariable);
+        // 更新控件信息
+        setControls(result.controls);
         
-        // 保留当前用户设置的值，只更新结构信息
-        setVariables(prev => {
-          const updated = newVariables.map(newVar => {
-            const existingVar = prev.find(v => v.name === newVar.name);
-            if (existingVar && existingVar.isUserDefined) {
-              // 保留用户设置的值，但更新其他属性（如约束条件）
-              return {
-                ...newVar,
-                value: existingVar.value // 保留用户设置的值
-              };
-            }
-            return newVar;
-          });
-          
-          // 只有当变量数组真正发生变化时才更新
-          if (JSON.stringify(updated) !== JSON.stringify(prev)) {
-            return updated;
-          }
-          return prev; // 无变化时返回原数组，避免重渲染
-        });
-        
-        // 更新输出变量名
-        setOutputs(prev => {
-          if (JSON.stringify(result.output_names) !== JSON.stringify(prev)) {
-            return result.output_names;
-          }
-          return prev;
-        });
-        
-        // 更新常量值
-        setConstants(prev => {
-          if (JSON.stringify(result.constants) !== JSON.stringify(prev)) {
-            return result.constants;
-          }
-          return prev;
-        });
+        // 更新输出
+        setOutputs(result.outputs);
         
         // 更新日志
-        setConsoleLogs(prev => {
-          if (JSON.stringify(result.logs) !== JSON.stringify(prev)) {
-            return result.logs;
-          }
-          return prev;
-        });
+        setConsoleLogs(result.logs);
         
-        // 同步到React Flow节点数据，保留用户设置的变量值
+        // 同步到React Flow节点数据
         setNodes((nodes) =>
           nodes.map((node) => {
             if (node.id === id) {
-              const updatedVariables = newVariables.map(newVar => {
-                const existingVar = variables.find(v => v.name === newVar.name);
-                if (existingVar && existingVar.isUserDefined) {
-                  return {
-                    ...newVar,
-                    value: existingVar.value
-                  };
-                }
-                return newVar;
-              });
-              
-              // 检查是否真的需要更新
-              const currentData = node.data;
-              const needsUpdate = (
-                JSON.stringify(updatedVariables) !== JSON.stringify(currentData.variables) ||
-                JSON.stringify(result.output_names) !== JSON.stringify(currentData.outputs) ||
-                JSON.stringify(result.constants) !== JSON.stringify(currentData.constants) ||
-                JSON.stringify(result.logs) !== JSON.stringify(currentData.consoleLogs)
-              );
-              
-              if (needsUpdate) {
-                return { 
-                  ...node, 
-                  data: { 
-                    ...node.data, 
-                    variables: updatedVariables,
-                    outputs: result.output_names,
-                    constants: result.constants,
-                    consoleLogs: result.logs
-                  } 
-                };
-              }
+              return { 
+                ...node, 
+                data: { 
+                  ...node.data, 
+                  controls: result.controls,
+                  outputs: result.outputs,
+                  consoleLogs: result.logs
+                } 
+              };
             }
             return node;
           })
@@ -246,51 +158,14 @@ const TextNode: React.FC<NodeProps<TextNodeType>> = ({ id, data, selected }) => 
         
         console.log('代码执行成功:', result);
       } else {
-        console.error('代码执行失败:', result.error_message);
-        setExecutionError(result.error_message);
-        setErrorDetails(result.error_details);
+        console.error('代码执行失败:', result.error);
       }
     } catch (error) {
-      console.error('Julia API调用失败:', error);
-      setExecutionError(error instanceof Error ? error.message : '未知错误');
-      setErrorDetails(null);
+      console.error('JS代码执行失败:', error);
     } finally {
       setIsExecuting(false);
     }
-  }, [id, setNodes]);
-
-  // 获取连接到此节点的输入值（单个变量版本，保持兼容性）
-  const getInputFromConnectedNodes = useCallback((inputName: string) => {
-    const connectedData = getConnectedNodeData();
-    return connectedData[inputName] || null;
-  }, [getConnectedNodeData]);
-
-  // 处理变量约束参数变化
-  const handleVariableConstraintsChange = useCallback((name: string, constraints: { min: number; max: number; step: number }) => {
-    console.log('TextNode收到约束更改:', name, constraints);
-    
-    setVariables(prev => {
-      const updated = prev.map(v => 
-        v.name === name ? { 
-          ...v, 
-          constraints,
-          // 确保当前值在新的范围内
-          value: Math.max(constraints.min, Math.min(constraints.max, v.value))
-        } : v
-      );
-      
-      // 同步到React Flow节点数据
-      setNodes((nodes) =>
-        nodes.map((node) =>
-          node.id === id
-            ? { ...node, data: { ...node.data, variables: updated } }
-            : node
-        )
-      );
-      
-      return updated;
-    });
-  }, [id, setNodes]);
+  }, [id, setNodes, isExecuting, getConnectedNodeData]);
 
   // 记录最近一次点击事件，用于进入编辑态时定位光标
   const lastPointerDown = useRef<{ x: number; y: number } | null>(null);
@@ -411,85 +286,30 @@ const TextNode: React.FC<NodeProps<TextNodeType>> = ({ id, data, selected }) => 
     }
   }, [isEditing]);
 
-  // 获取变量的当前值（用于显示输出）
-  const getVariableValue = useCallback((varName: string) => {
-    console.log('获取变量值:', varName, '常量列表:', constants);
-    
-    // 先查找本地变量
-    const variable = variables.find(v => v.name === varName);
-    if (variable) {
-      console.log('找到本地变量:', variable);
-      return variable.value !== undefined ? String(variable.value) : '0';
-    }
-    
-    // 查找计算出的常量
-    if (constants[varName] !== undefined) {
-      console.log('找到常量值:', constants[varName]);
-      return String(constants[varName]);
-    }
-    
-    // 如果本地没有找到，尝试从连接的节点获取
-    const connectedValue = getInputFromConnectedNodes(varName);
-    if (connectedValue !== null) {
-      console.log('找到连接变量值:', connectedValue);
-      return String(connectedValue);
-    }
-    
-    console.log('变量未找到，返回默认值');
-    return '未定义';
-  }, [variables, constants, getInputFromConnectedNodes]);
-
-  // 当变量列表更新时，更新输出显示
+  // 当变量列表更新时，更新输出显示和日志
   useEffect(() => {
-    console.log('变量列表更新:', variables);
+    console.log('变量列表更新:', controls);
     console.log('输出列表:', outputs);
-    console.log('常量列表:', constants);
-  }, [variables, outputs, constants]);
-
-  // 处理代码复制
-  const handleCopyCode = useCallback(async () => {
-    try {
-      await navigator.clipboard.writeText(text);
-      // 这里可以添加复制成功提示
-      console.log('代码已复制到剪贴板');
-    } catch (err) {
-      console.error('复制失败:', err);
+    
+    // 如果data中有日志但本地状态没有，同步一下
+    if (data.consoleLogs && data.consoleLogs.length > 0 && consoleLogs.length === 0) {
+      setConsoleLogs(data.consoleLogs);
     }
-  }, [text]);
+  }, [controls, outputs, consoleLogs, data.consoleLogs]);
 
   // 当代码变化时，重新解析和执行
   useEffect(() => {
     if (!isEditing && text) {
       // 添加延迟执行，避免频繁请求
       const timeoutId = setTimeout(() => {
-        // 构建输入变量值的映射
-        const inputValues: Record<string, any> = {};
-        
-        // 添加用户定义的变量值（来自控件）
-        variables.forEach(variable => {
-          if (variable.isUserDefined) {
-            inputValues[variable.name] = variable.value;
-          }
-        });
+        // 构建输入变量值的映射，使用控件的当前值
+        const inputValues: Record<string, any> = { ...controlValues };
         
         // 获取连接节点数据
         const connectedData = getConnectedNodeData();
         
         // 添加从连接节点传来的值
-        variables.forEach(variable => {
-          if (!variable.isUserDefined) {
-            const connectedValue = connectedData[variable.name];
-            if (connectedValue !== null && connectedValue !== undefined) {
-              // 确保数值类型的变量值是数字类型
-              if (variable.type === 'number' || variable.type === 'range') {
-                const numValue = typeof connectedValue === 'string' ? parseFloat(connectedValue) : connectedValue;
-                inputValues[variable.name] = isNaN(numValue) ? variable.defaultValue : numValue;
-              } else {
-                inputValues[variable.name] = connectedValue;
-              }
-            }
-          }
-        });
+        Object.assign(inputValues, connectedData);
         
         // 执行代码
         executeCode(text, inputValues);
@@ -497,61 +317,267 @@ const TextNode: React.FC<NodeProps<TextNodeType>> = ({ id, data, selected }) => 
       
       return () => clearTimeout(timeoutId);
     }
-  }, [text, isEditing]); // 只依赖text和isEditing，避免循环执行
+  }, [text, isEditing, controlValues, executeCode, getConnectedNodeData]);
 
   // 当变量值变化时，重新执行代码
   const handleVariableChange = useCallback((name: string, value: any) => {
-    setVariables(prev => {
-      const updated = prev.map(v => 
-        v.name === name ? { ...v, value } : v
-      );
+    setControlValues(prev => {
+      const updated = { ...prev, [name]: value };
       
       // 同步到React Flow节点数据
       setNodes((nodes) =>
         nodes.map((node) =>
           node.id === id
-            ? { ...node, data: { ...node.data, variables: updated } }
+            ? { 
+                ...node, 
+                data: { 
+                  ...node.data, 
+                  // 更新控件值到控件信息中
+                  controls: controls.map(c => 
+                    c.name === name ? { ...c, value } : c
+                  )
+                } 
+              }
             : node
         )
       );
       
-      // 延迟重新执行代码，避免频繁执行
+      // 延迟重新执行代码
       setTimeout(() => {
-        // 重新执行代码
-        const inputValues: Record<string, any> = {};
-        
-        // 获取连接节点数据
+        const inputValues = { ...updated };
         const connectedData = getConnectedNodeData();
-        
-        // 添加用户定义的变量值（来自控件）
-        updated.forEach(variable => {
-          if (variable.isUserDefined) {
-            inputValues[variable.name] = variable.value;
-          }
-        });
-        
-        // 添加从连接节点传来的值
-        updated.forEach(variable => {
-          if (!variable.isUserDefined) {
-            const connectedValue = connectedData[variable.name];
-            if (connectedValue !== null && connectedValue !== undefined) {
-              // 确保数值类型的变量值是数字类型
-              if (variable.type === 'number' || variable.type === 'range') {
-                const numValue = typeof connectedValue === 'string' ? parseFloat(connectedValue) : connectedValue;
-                inputValues[variable.name] = isNaN(numValue) ? variable.defaultValue : numValue;
-              } else {
-                inputValues[variable.name] = connectedValue;
-              }
-            }
-          }
-        });
-        
+        Object.assign(inputValues, connectedData);
         executeCode(text, inputValues);
-      }, 100); // 100ms延迟，避免频繁执行
+      }, 100);
       
       return updated;
     });
-  }, [id, setNodes, text, executeCode, getConnectedNodeData]);
+  }, [id, setNodes, text, executeCode, getConnectedNodeData, controls]);
+
+  // 渲染开关控件的函数
+  const renderToggleControl = (control: ControlInfo) => {
+    const currentValue = controlValues[control.name] ?? control.defaultValue;
+    const isActive = Boolean(currentValue);
+    
+    // 处理开关点击
+    const handleToggleClick = (e: React.MouseEvent) => {
+      e.stopPropagation();
+      handleVariableChange(control.name, !currentValue);
+    };
+    
+    return (
+      <div className="toggle-container nodrag">
+        <div 
+          className={`toggle-switch ${isActive ? 'active' : ''}`}
+          onClick={handleToggleClick}
+        >
+          <div className="toggle-knob"></div>
+        </div>
+        <span className="toggle-text">{isActive ? 'true' : 'false'}</span>
+      </div>
+    );
+  };
+
+  // 渲染滑动条控件的函数
+  const renderSliderControl = (control: ControlInfo) => {
+    const min = control.min ?? 0;
+    const max = control.max ?? 100;
+    const step = control.step ?? 1;
+    const currentValue = controlValues[control.name] ?? control.defaultValue ?? 0;
+    const progress = ((currentValue - min) / (max - min)) * 100;
+    
+    // 检查是否正在编辑此滑动条的设置
+    const isEditingThis = editingSlider === control.name;
+    
+    // 处理数值点击 - 切换到设置界面
+    const handleValueClick = (e: React.MouseEvent) => {
+      e.preventDefault();
+      e.stopPropagation();
+      if (isEditingThis) {
+        // 如果正在编辑，恢复为滑动条
+        setEditingSlider(null);
+      } else {
+        // 进入编辑模式
+        setEditingSlider(control.name);
+        setSliderSettings({ min, max, step });
+      }
+    };
+    
+    // 处理数值右键清空
+    const handleValueRightClick = (e: React.MouseEvent) => {
+      e.preventDefault();
+      e.stopPropagation();
+      handleVariableChange(control.name, control.defaultValue || 0);
+    };
+
+    // 应用滑动条设置
+    const applySliderSettings = () => {
+      // 更新控件配置
+      setControls(prev => prev.map(c => 
+        c.name === control.name 
+          ? { ...c, min: sliderSettings.min, max: sliderSettings.max, step: sliderSettings.step }
+          : c
+      ));
+      
+      // 确保当前值在新范围内
+      const newValue = Math.max(sliderSettings.min, Math.min(sliderSettings.max, currentValue));
+      if (newValue !== currentValue) {
+        handleVariableChange(control.name, newValue);
+      }
+      
+      setEditingSlider(null);
+    };
+
+    // 处理滑动条输入变化
+    const handleSliderChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+      e.stopPropagation();
+      const newValue = parseFloat(e.target.value);
+      handleVariableChange(control.name, newValue);
+    };
+
+    // 处理鼠标按下事件，防止拖动冲突
+    const handleSliderMouseDown = (e: React.MouseEvent) => {
+      e.stopPropagation();
+    };
+
+    // 如果正在编辑设置，显示设置面板
+    if (isEditingThis) {
+      return (
+        <div className="slider-settings-panel nodrag">
+          <div className="slider-settings-row">
+            <span>最小</span>
+            <input
+              type="number"
+              value={sliderSettings.min}
+              onChange={(e) => setSliderSettings(prev => ({ ...prev, min: parseFloat(e.target.value) || 0 }))}
+              className="slider-settings-input"
+              placeholder="0"
+            />
+            <span>-</span>
+            <input
+              type="number"
+              value={sliderSettings.max}
+              onChange={(e) => setSliderSettings(prev => ({ ...prev, max: parseFloat(e.target.value) || 100 }))}
+              className="slider-settings-input"
+              placeholder="100"
+            />
+            <span>最大</span>
+          </div>
+          <div className="slider-settings-row">
+            <span>步长</span>
+            <input
+              type="number"
+              value={sliderSettings.step}
+              onChange={(e) => setSliderSettings(prev => ({ ...prev, step: parseFloat(e.target.value) || 1 }))}
+              className="slider-settings-input"
+              placeholder="1"
+            />
+            <button
+              onClick={applySliderSettings}
+              style={{
+                background: '#014a64',
+                color: '#ffffff',
+                border: 'none',
+                padding: '4px 8px',
+                cursor: 'pointer',
+                fontFamily: 'JetBrains Mono, monospace',
+                fontSize: '14px'
+              }}
+            >
+              确定
+            </button>
+          </div>
+        </div>
+      );
+    }
+
+    // 正常的滑动条显示
+    return (
+      <div className="slider-container nodrag">
+        <div className="slider-track" onMouseDown={handleSliderMouseDown}>
+          <div 
+            className="slider-progress" 
+            style={{ width: `${progress}%` }}
+          ></div>
+          <input
+            type="range"
+            min={min}
+            max={max}
+            step={step}
+            value={currentValue}
+            onChange={handleSliderChange}
+            onMouseDown={handleSliderMouseDown}
+            className="slider-input"
+          />
+        </div>
+        <span 
+          className="variable-value"
+          onClick={handleValueClick}
+          onContextMenu={handleValueRightClick}
+          style={{ cursor: 'pointer' }}
+          title="左键设置范围，右键重置"
+        >
+          {currentValue}
+        </span>
+      </div>
+    );
+  };
+
+  // 渲染文本输入控件的函数
+  const renderTextControl = (control: ControlInfo) => {
+    const currentValue = controlValues[control.name] ?? control.defaultValue ?? '';
+    
+    // 处理文本框右键清空
+    const handleTextRightClick = (e: React.MouseEvent<HTMLInputElement>) => {
+      e.preventDefault();
+      e.stopPropagation();
+      handleVariableChange(control.name, control.defaultValue || '');
+    };
+
+    // 处理文本框变化
+    const handleTextChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+      e.stopPropagation();
+      handleVariableChange(control.name, e.target.value);
+    };
+
+    return (
+      <div className="text-input-container nodrag">
+        <input
+          type="text"
+          value={currentValue}
+          onChange={handleTextChange}
+          onContextMenu={handleTextRightClick}
+          className="text-input"
+          placeholder="输入文本..."
+          title="右键清空"
+        />
+      </div>
+    );
+  };
+
+  // 渲染输出变量的函数
+  const renderOutput = (outputName: string, index: number) => {
+    const value = outputs[outputName]; // 直接从outputs获取值
+    const valueStr = String(value);
+    const type = typeof value;
+    const nameLength = outputName.length;
+    const shouldWrap = nameLength > 10; // 如果变量名超过10个字符，换行显示
+    
+    return (
+      <div key={index} className={`output-variable ${shouldWrap ? 'wrapped' : ''}`}>
+        <span className="output-variable-name">{outputName}</span>
+        <div className="output-variable-value">
+          <span className="output-variable-type">{type}: </span>
+          {valueStr}
+        </div>
+      </div>
+    );
+  };
+
+  // 新增：处理Code标签点击事件
+  const handleCodeLabelClick = () => {
+    setShowSections(!showSections);
+  };
 
   return (
     <div
@@ -563,192 +589,99 @@ const TextNode: React.FC<NodeProps<TextNodeType>> = ({ id, data, selected }) => 
         cursor: 'text',
       }}
     >
-      {/* 左侧宽度调整控制 */}
-      <NodeResizeControl
-        position="left"
-        resizeDirection='horizontal'
-        minWidth={TEXT_NODE_MIN_WIDTH}
-        maxWidth={TEXT_NODE_MAX_WIDTH}
-        style={{
-          position: 'absolute',
-          left: 0,
-          top: '50%',
-          width: 8,
-          height: '100%',
-          background: 'transparent',
-          cursor: 'ew-resize',
-          zIndex: 10,
-          border: 'none',
-        }}
-      />
-      {/* 右侧宽度调整控制 */}
-      <NodeResizeControl
-        position="right"
-        resizeDirection='horizontal'
-        minWidth={TEXT_NODE_MIN_WIDTH}
-        maxWidth={TEXT_NODE_MAX_WIDTH}
-        style={{
-          position: 'absolute',
-          right: 0,
-          top: '50%',
-          width: 8,
-          height: '100%',
-          background: 'transparent',
-          cursor: 'ew-resize',
-          zIndex: 10,
-          border: 'none',
-        }}
-      />
-      {/* 节点内容 */}
-      {/* 执行状态指示器 - 移到代码区顶部 */}
-      {!isEditing && isExecuting && (
-        <div className="text-node-status-top code-font">
-          ⏳ 执行中...
+      {/* 代码区域 */}
+      <div className="text-node-section text-node-code-section">
+        <div 
+          className="section-label clickable" 
+          onClick={handleCodeLabelClick}
+          style={{ cursor: 'pointer' }}
+          title="点击显示/隐藏其他区域"
+        >
+          Code
         </div>
-      )}
-      
-      {isEditing ? (
-        <div
-          className="text-node-editor nodrag code-font"
-          key="text"
-          contentEditable
-          ref={editorRef}
-          suppressContentEditableWarning
-          onInput={handleDivInput}
-          onBlur={exitEdit}
-          onKeyDown={handleDivKeyDown}
-          style={{ width: '100%', boxSizing: 'border-box', minHeight: '1em', outline: 'none', whiteSpace: 'pre-wrap', wordBreak: 'break-all', cursor: 'text' }}
-          spellCheck={false}
-        />
-      ) : (
-        <div key="display" className="text-node-content code-font" style={{ width: '100%', boxSizing: 'border-box', position: 'relative' }}>
-          {text && (
-            <button 
-              className="copy-code-btn"
-              onClick={handleCopyCode}
-              title="复制代码"
-              style={{
-                position: 'absolute',
-                top: '4px',
-                right: '4px',
-                background: 'rgba(0,0,0,0.1)',
-                border: 'none',
-                borderRadius: '3px',
-                padding: '2px 6px',
-                fontSize: '12px',
-                color: '#fff',
-                cursor: 'pointer',
-                opacity: 0.6,
-                zIndex: 10
-              }}
-              onMouseEnter={(e) => e.currentTarget.style.opacity = '1'}
-              onMouseLeave={(e) => e.currentTarget.style.opacity = '0.6'}
-            >
-              📋
-            </button>
-          )}
-          {text ? (
-            <pre>{text}</pre>
-          ) : (
-            <pre style={{ color: 'rgba(160, 236, 255, 0.35)' }}>// 在此输入Julia代码</pre>
-          )}
-        </div>
-      )}
-      
-      {/* 只在非编辑模式下显示结果 */}
-      {!isEditing && data.result && (
-        <>
-          <div className="text-node-divider" />
-          <div className="text-node-result code-font">
-            {data.result}
-          </div>
-        </>
-      )}
-      
-      {/* 只在非编辑模式下显示错误信息 */}
-      {!isEditing && executionError && (
-        <>
-          <div className="text-node-divider" />
-          <div className="text-node-error code-font">
-            <div 
-              className="error-summary" 
-              onClick={() => errorDetails && setShowErrorDetails(!showErrorDetails)}
-              style={{ 
-                cursor: errorDetails ? 'pointer' : 'default'
-              }}
-            >
-              <span>❌ {executionError}</span>
-              {errorDetails && (
-                <span style={{ 
-                  fontSize: '9px', 
-                  color: 'rgba(255, 99, 99, 0.6)',
-                  marginLeft: '8px'
-                }}>
-                  {showErrorDetails ? '▼' : '▶'}
-                </span>
-              )}
-            </div>
-            {errorDetails && showErrorDetails && (
-              <div className="error-details">
-                {errorDetails}
-              </div>
+        {isEditing ? (
+          <div
+            className="text-node-editor nodrag"
+            key="text"
+            contentEditable
+            ref={editorRef}
+            suppressContentEditableWarning
+            onInput={handleDivInput}
+            onBlur={exitEdit}
+            onKeyDown={handleDivKeyDown}
+            style={{ 
+              width: '100%', 
+              boxSizing: 'border-box', 
+              minHeight: '1em', 
+              outline: 'none', 
+              whiteSpace: 'pre-wrap', 
+              wordBreak: 'break-all', 
+              cursor: 'text' 
+            }}
+            spellCheck={false}
+          />
+        ) : (
+          <div key="display" className="text-node-content" style={{ width: '100%', boxSizing: 'border-box' }}>
+            {text ? (
+              <pre>{text}</pre>
+            ) : (
+              <pre style={{ color: 'rgba(125, 225, 234, 0.4)' }}>// 在此输入JS代码</pre>
             )}
           </div>
-        </>
+        )}
+      </div>
+
+      {/* 输入区域 - 只在有变量控件时显示 */}
+      {!isEditing && showSections && controls.length > 0 && (data.showControls !== false) && (
+        <div className="text-node-section text-node-inputs-section">
+          <div className="section-label">Inputs</div>
+          {controls.map((control, index) => (
+            <div key={index} className="variable-control">
+              <span className="variable-label">{control.name}</span>
+              {control.type === 'switch' && renderToggleControl(control)}
+              {control.type === 'slider' && renderSliderControl(control)}
+              {control.type === 'input' && renderTextControl(control)}
+            </div>
+          ))}
+        </div>
       )}
-      
-      {/* 输出变量区 */}
-      {!isEditing && outputs.length > 0 && (
-        <>
-          <div className="text-node-divider" />
-          <div className="text-node-outputs code-font">
-            {outputs.map((output, index) => (
-              <div key={index} className="output-variable">
-                <span className="output-label">@output</span> {output}: <span className="output-value">{getVariableValue(output)}</span>
-              </div>
-            ))}
-          </div>
-        </>
-      )}
-      
-      {/* Console.log 输出区 - 移到输出和控件之间 */}
-      {!isEditing && consoleLogs.length > 0 && (
-        <>
-          <div className="text-node-divider" />
-          <div className="text-node-logs code-font">
+
+      {/* 日志区域 - 在输入区域下面，输出区域上面 */}
+      {!isEditing && showSections && consoleLogs.length > 0 && (
+        <div className="text-node-section text-node-logs-section">
+          <div className="section-label">Logs</div>
+          <div className="log-container">
             {consoleLogs.map((log, index) => (
               <div key={index} className="log-entry">
                 {log}
               </div>
             ))}
           </div>
-        </>
+        </div>
       )}
-      
-      {/* 变量控件区 */}
-      {!isEditing && variables.length > 0 && (data.showControls !== false) && (
-        <VariableControls
-          variables={variables}
-          onVariableChange={handleVariableChange}
-          onVariableConstraintsChange={handleVariableConstraintsChange}
-          className="nodrag"
-        />
+
+      {/* 输出区域 - 只在有输出时显示 */}
+      {!isEditing && showSections && Object.keys(outputs).length > 0 && (
+        <div className="text-node-section text-node-outputs-section">
+          <div className="section-label">Outputs</div>
+          {Object.keys(outputs).map((output, index) => renderOutput(output, index))}
+        </div>
       )}
-      
-      {/* 始终隐藏 handle，因为已移除连接功能 */}
+
+      {/* 连接句柄（隐藏） */}
       <Handle
         type="source"
         position={Position.Right}
         id="main"
         className="text-node-handle hide-handle"
-        isConnectable={false}
+        isConnectable={true}
       />
       <Handle
         type="target"
         position={Position.Left}
         id="main"
         className="text-node-handle hide-handle"
-        isConnectable={false}
+        isConnectable={true}
         isConnectableStart={false}
       />
     </div>
