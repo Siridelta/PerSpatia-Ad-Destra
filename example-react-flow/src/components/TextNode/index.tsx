@@ -1,7 +1,10 @@
 import React, { useState, useCallback, useEffect, useRef } from 'react';
-import { Handle, Position, NodeProps, Node, useReactFlow } from '@xyflow/react';
+import { Handle, Position, NodeProps, Node, useReactFlow, NodeResizeControl } from '@xyflow/react';
 import './styles.css';
-import { jsExecutor, ControlInfo, ExecutionResult } from '../../services/jsExecutor';
+import '../../styles/syntax-highlighting.css';
+import { jsExecutor, ControlInfo } from '../../services/jsExecutor';
+import Prism from 'prismjs';
+import 'prismjs/components/prism-javascript';
 
 export type TextNodeData = {
   label: string;
@@ -12,6 +15,15 @@ export type TextNodeData = {
   outputs?: Record<string, any>;
   consoleLogs?: string[];
   constants?: Record<string, any>; // 存储计算的常量值
+  width?: number; // 添加宽度支持
+  height?: number; // 添加高度支持
+  nodeName?: string; // 节点名称
+  isCollapsed?: boolean; // 是否完全折叠
+  hiddenSections?: {
+    inputs?: boolean;
+    outputs?: boolean;
+    logs?: boolean;
+  }; // 隐藏的区域
 };
 
 export type TextNodeType = Node<TextNodeData, 'text'>;
@@ -40,9 +52,114 @@ const TextNode: React.FC<NodeProps<TextNodeType>> = ({ id, data, selected }) => 
   const [isEditing, setIsEditing] = useState(false);
   const [text, setText] = useState(data.label || '');
   const [showSections, setShowSections] = useState(true); // 控制卡片显示/隐藏
-
+  const [isEditingName, setIsEditingName] = useState(false); // 是否在编辑节点名称
+  const [nodeName, setNodeName] = useState(data.nodeName || '未命名节点');
+  
+  // 动画状态管理
+  const [animatingOut, setAnimatingOut] = useState<{
+    inputs?: boolean;
+    outputs?: boolean;
+    logs?: boolean;
+  }>({});
+  
   // React Flow 实例，用于更新节点数据
   const { setNodes, getNodes, getEdges } = useReactFlow();
+
+  // 编辑器元素引用
+  const textElementRef = useRef<HTMLDivElement>(null);
+  const nameInputRef = useRef<HTMLInputElement>(null);
+
+  // 从data中获取节点宽度，移除最大宽度限制
+  const nodeWidth = data.width || 'auto';
+  const nodeHeight = data.height || 'auto';
+
+  // 隐藏状态
+  const isCollapsed = data.isCollapsed || false;
+  const hiddenSections = data.hiddenSections || {};
+
+  /**
+   * 生成语法高亮的HTML
+   * @param code 要高亮的代码
+   * @returns 高亮后的HTML字符串
+   */
+  const generateHighlightedCode = useCallback((code: string): string => {
+    if (!code.trim()) return '';
+    
+    try {
+      // 直接使用Prism进行语法高亮，不需要手动转义
+      const highlighted = Prism.highlight(code, Prism.languages.javascript, 'javascript');
+      return highlighted;
+    } catch (error) {
+      console.warn('语法高亮失败:', error);
+      // 回退到转义后的纯文本
+      return code
+        .replace(/&/g, '&amp;')
+        .replace(/</g, '&lt;')
+        .replace(/>/g, '&gt;')
+        .replace(/"/g, '&quot;')
+        .replace(/'/g, '&#39;');
+    }
+  }, []);
+
+  /**
+   * 自动调整编辑器尺寸以适应内容
+   */
+  const adjustEditorSize = useCallback(() => {
+    if (!textElementRef.current) return;
+    
+    const editor = textElementRef.current;
+    const container = editor.parentElement;
+    const highlightDisplay = container?.querySelector('.syntax-highlight-display') as HTMLElement;
+    const nodeContainer = container?.closest('.text-node') as HTMLElement;
+    
+    if (!container || !highlightDisplay || !nodeContainer) return;
+    
+    // 重置高度以获取真实的scrollHeight
+    editor.style.height = 'auto';
+    highlightDisplay.style.height = 'auto';
+    container.style.height = 'auto';
+    
+    // 计算所需高度（至少100px）
+    const scrollHeight = Math.max(editor.scrollHeight, 100);
+    const newHeight = `${scrollHeight}px`;
+    
+    // 设置高度
+    editor.style.height = newHeight;
+    highlightDisplay.style.height = newHeight;
+    container.style.height = newHeight;
+    
+    // 计算内容所需的宽度
+    // 创建一个临时元素来测量文本宽度
+    const tempElement = document.createElement('pre');
+    tempElement.style.fontFamily = 'JetBrains Mono, monospace';
+    tempElement.style.fontSize = '14px';
+    tempElement.style.lineHeight = '1.5';
+    tempElement.style.whiteSpace = 'pre';
+    tempElement.style.position = 'absolute';
+    tempElement.style.visibility = 'hidden';
+    tempElement.style.padding = '8px';
+    tempElement.style.top = '-9999px';
+    tempElement.style.left = '-9999px';
+    tempElement.textContent = text || '// 在此输入JS代码';
+    
+    document.body.appendChild(tempElement);
+    const contentWidth = tempElement.offsetWidth;
+    document.body.removeChild(tempElement);
+    
+    // 计算节点所需的最小宽度（内容宽度 + padding + margin）
+    const minNodeWidth = Math.max(contentWidth + 60, 300); // 60px for padding and margins
+    
+    // 设置节点容器的宽度
+    nodeContainer.style.width = `${minNodeWidth}px`;
+    
+    console.log('调整编辑器尺寸:', {
+      contentWidth,
+      minNodeWidth,
+      scrollHeight,
+      newHeight,
+      text: text?.substring(0, 50) + '...'
+    });
+  }, [text]);
 
   // 变量相关状态
   const [controls, setControls] = useState<ControlInfo[]>(data.controls || []);
@@ -103,6 +220,42 @@ const TextNode: React.FC<NodeProps<TextNodeType>> = ({ id, data, selected }) => 
     console.log('从连接节点获取的数据:', connectedData);
     return connectedData;
   }, [id, getNodes, getEdges]);
+
+  /**
+   * 调整显示模式下的节点宽度
+   */
+  const adjustDisplayWidth = useCallback(() => {
+    const nodeContainer = document.querySelector(`[data-id="${id}"] .text-node`) as HTMLElement;
+    if (!nodeContainer || !text) return;
+    
+    // 创建临时元素测量文本宽度
+    const tempElement = document.createElement('pre');
+    tempElement.style.fontFamily = 'JetBrains Mono, monospace';
+    tempElement.style.fontSize = '14px';
+    tempElement.style.lineHeight = '1.5';
+    tempElement.style.whiteSpace = 'pre';
+    tempElement.style.position = 'absolute';
+    tempElement.style.visibility = 'hidden';
+    tempElement.style.top = '-9999px';
+    tempElement.style.left = '-9999px';
+    tempElement.textContent = text;
+    
+    document.body.appendChild(tempElement);
+    const contentWidth = tempElement.offsetWidth;
+    document.body.removeChild(tempElement);
+    
+    // 计算节点所需的最小宽度
+    const minNodeWidth = Math.max(contentWidth + 60, 300);
+    
+    // 设置节点容器的宽度
+    nodeContainer.style.width = `${minNodeWidth}px`;
+    
+    console.log('调整显示宽度:', {
+      contentWidth,
+      minNodeWidth,
+      text: text?.substring(0, 50) + '...'
+    });
+  }, [text, id]);
 
   // 执行JS代码
   const executeCode = useCallback(async (code: string, inputValues: Record<string, any> = {}) => {
@@ -176,21 +329,41 @@ const TextNode: React.FC<NodeProps<TextNodeType>> = ({ id, data, selected }) => 
   // 记录编辑器是否已经初始化内容
   const editorInitialized = useRef(false);
 
-  // 处理文本变化（contentEditable div）
-  const handleDivInput = useCallback((e: React.FormEvent<HTMLDivElement>) => {
+  // 处理文本变化（编辑器）
+  const handleSyntaxEditorInput = useCallback((e: React.FormEvent<HTMLDivElement>) => {
     isUserInputting.current = true;
-    setText(e.currentTarget.innerText);
+    const currentCode = e.currentTarget.innerText;
+    setText(currentCode);
+    
+    // 实时更新语法高亮显示层
+    const highlightDisplay = e.currentTarget.parentElement?.querySelector('.syntax-highlight-display') as HTMLElement;
+    if (highlightDisplay) {
+      highlightDisplay.innerHTML = generateHighlightedCode(currentCode);
+    }
+    
+    // 自动调整编辑器高度
+    setTimeout(() => {
+      adjustEditorSize();
+    }, 0);
+    
+    // 延迟执行代码，避免过于频繁的执行
+    setTimeout(() => {
+      const valuesSnapshot = { ...controlValues };
+      executeCode(currentCode, valuesSnapshot);
+    }, 300);
+    
     // 短暂延迟后重置标志，避免其他操作被误认为用户输入
     setTimeout(() => {
       isUserInputting.current = false;
     }, 100);
-  }, []);
-
-  // contentEditable div的ref，用于聚焦
-  const editorRef = useRef<HTMLDivElement>(null);
+  }, [controls, controlValues, executeCode, generateHighlightedCode, adjustEditorSize]);
 
   // 退出编辑状态的复用逻辑
   const exitEdit = useCallback(() => {
+    // 从编辑器元素获取最新代码
+    const finalCode = textElementRef.current?.innerText || text;
+    setText(finalCode);
+    
     setIsEditing(false);
     isUserInputting.current = false; // 退出编辑时重置标志
     editorInitialized.current = false; // 重置初始化标志
@@ -203,7 +376,7 @@ const TextNode: React.FC<NodeProps<TextNodeType>> = ({ id, data, selected }) => 
               ...node, 
               data: { 
                 ...node.data, 
-                label: text,
+                label: finalCode, // 使用从编辑器获取的代码
                 initialEditing: undefined
               } 
             }
@@ -215,13 +388,24 @@ const TextNode: React.FC<NodeProps<TextNodeType>> = ({ id, data, selected }) => 
   // 自动聚焦到编辑器
   useEffect(() => {
     // 只有在刚进入编辑模式且用户没有正在输入时才重新定位光标
-    if (isEditing && editorRef.current && !isUserInputting.current) {
-      const editorElement = editorRef.current;
+    if (isEditing && textElementRef.current && !isUserInputting.current) {
+      const editorElement = textElementRef.current;
       
       // 首先设置内容（只在编辑器刚初始化时或内容确实不匹配时）
       if (!editorInitialized.current || editorElement.innerText !== text) {
         editorElement.innerText = text;
         editorInitialized.current = true;
+        
+        // 初始化语法高亮
+        const highlightDisplay = editorElement.parentElement?.querySelector('.syntax-highlight-display') as HTMLElement;
+        if (highlightDisplay) {
+          highlightDisplay.innerHTML = generateHighlightedCode(text);
+        }
+        
+        // 调整编辑器高度
+        setTimeout(() => {
+          adjustEditorSize();
+        }, 0);
       }
       
       // 聚焦元素
@@ -258,7 +442,7 @@ const TextNode: React.FC<NodeProps<TextNodeType>> = ({ id, data, selected }) => 
         }, 10);
       }
     }
-  }, [isEditing, text]); // 添加text依赖，但只在必要时设置内容
+  }, [isEditing, text, generateHighlightedCode, adjustEditorSize]); // 添加新的依赖项
 
   // 处理键盘事件
   const handleDivKeyDown = useCallback((e: React.KeyboardEvent<HTMLDivElement>) => {
@@ -300,6 +484,11 @@ const TextNode: React.FC<NodeProps<TextNodeType>> = ({ id, data, selected }) => 
   // 当代码变化时，重新解析和执行
   useEffect(() => {
     if (!isEditing && text) {
+      // 调整显示模式下的宽度
+      setTimeout(() => {
+        adjustDisplayWidth();
+      }, 100);
+      
       // 添加延迟执行，避免频繁请求
       const timeoutId = setTimeout(() => {
         // 构建输入变量值的映射，使用控件的当前值
@@ -317,7 +506,7 @@ const TextNode: React.FC<NodeProps<TextNodeType>> = ({ id, data, selected }) => 
       
       return () => clearTimeout(timeoutId);
     }
-  }, [text, isEditing, controlValues, executeCode, getConnectedNodeData]);
+  }, [text, isEditing, controlValues, executeCode, getConnectedNodeData, adjustDisplayWidth]);
 
   // 当变量值变化时，重新执行代码
   const handleVariableChange = useCallback((name: string, value: any) => {
@@ -579,64 +768,361 @@ const TextNode: React.FC<NodeProps<TextNodeType>> = ({ id, data, selected }) => 
     setShowSections(!showSections);
   };
 
+  // 更新节点数据的通用函数
+  const updateNodeData = useCallback((updates: Partial<TextNodeData>) => {
+    setNodes((nodes) =>
+      nodes.map((node) =>
+        node.id === id
+          ? { ...node, data: { ...node.data, ...updates } }
+          : node
+      )
+    );
+  }, [id, setNodes]);
+
+  // 处理节点名称编辑
+  const handleNameEdit = useCallback(() => {
+    setIsEditingName(true);
+    setTimeout(() => {
+      nameInputRef.current?.focus();
+      nameInputRef.current?.select();
+    }, 0);
+  }, []);
+
+  const handleNameSubmit = useCallback(() => {
+    setIsEditingName(false);
+    updateNodeData({ nodeName });
+  }, [nodeName, updateNodeData]);
+
+  const handleNameKeyDown = useCallback((e: React.KeyboardEvent) => {
+    if (e.key === 'Enter') {
+      handleNameSubmit();
+    } else if (e.key === 'Escape') {
+      setNodeName(data.nodeName || '未命名节点');
+      setIsEditingName(false);
+    }
+  }, [handleNameSubmit, data.nodeName]);
+
+  // 切换折叠状态
+  const toggleCollapse = useCallback(() => {
+    updateNodeData({ isCollapsed: !isCollapsed });
+  }, [isCollapsed, updateNodeData]);
+
+  // 切换隐藏指定区域
+  const toggleHideSection = useCallback((section: 'inputs' | 'outputs' | 'logs') => {
+    const isCurrentlyVisible = !hiddenSections[section];
+    
+    if (isCurrentlyVisible) {
+      // 如果当前可见，要隐藏：先播放退出动画，然后隐藏
+      setAnimatingOut(prev => ({ ...prev, [section]: true }));
+      
+      // 动画完成后隐藏区域
+      setTimeout(() => {
+        const newHiddenSections = {
+          ...hiddenSections,
+          [section]: true
+        };
+        updateNodeData({ hiddenSections: newHiddenSections });
+        setAnimatingOut(prev => ({ ...prev, [section]: false }));
+      }, 300); // 动画持续时间
+    } else {
+      // 如果当前隐藏，要显示：直接显示并播放进入动画
+      const newHiddenSections = {
+        ...hiddenSections,
+        [section]: false
+      };
+      updateNodeData({ hiddenSections: newHiddenSections });
+    }
+  }, [hiddenSections, updateNodeData]);
+
+  // 恢复输入默认值
+  const resetInputsToDefault = useCallback(() => {
+    const defaultValues: Record<string, any> = {};
+    controls.forEach(control => {
+      defaultValues[control.name] = control.defaultValue;
+    });
+    setControlValues(defaultValues);
+    // 触发代码重新执行
+    if (text.trim()) {
+      executeCode(text, defaultValues);
+    }
+  }, [controls, text]);
+
+  // 复制代码到剪贴板
+  const copyCode = useCallback(async () => {
+    try {
+      await navigator.clipboard.writeText(text);
+      // 可以添加一个提示消息
+    } catch (err) {
+      console.error('复制代码失败:', err);
+    }
+  }, [text]);
+
+  // 获取输入变量信息用于折叠状态显示
+  const getInputVariablesInfo = useCallback(() => {
+    return controls.map(control => ({
+      name: control.name,
+      type: control.type,
+      value: controlValues[control.name] ?? control.defaultValue
+    }));
+  }, [controls, controlValues]);
+
+  // 获取输出变量信息用于折叠状态显示
+  const getOutputVariablesInfo = useCallback(() => {
+    return Object.entries(outputs).map(([name, value]) => ({
+      name,
+      type: typeof value,
+      value
+    }));
+  }, [outputs]);
+
   return (
     <div
-      className={`text-node${selected ? ' selected' : ''}`}
-      onDoubleClick={handleDoubleClick}
+      className={`text-node${selected ? ' selected' : ''}${isCollapsed ? ' collapsed' : ''}`}
+      onDoubleClick={isCollapsed ? undefined : handleDoubleClick}
       style={{
-        width: '100%',
+        // 只在用户手动设置了宽度时才应用，否则让CSS的max-content生效
+        ...(nodeWidth !== 'auto' && { width: `${nodeWidth}px` }),
+        height: nodeHeight,
         boxSizing: 'border-box',
-        cursor: 'text',
+        cursor: isCollapsed ? 'default' : 'text',
+        minWidth: isCollapsed ? '200px' : '300px',
       }}
     >
-      {/* 代码区域 */}
-      <div className="text-node-section text-node-code-section">
-        <div 
-          className="section-label clickable" 
-          onClick={handleCodeLabelClick}
-          style={{ cursor: 'pointer' }}
-          title="点击显示/隐藏其他区域"
-        >
-          Code
+      {/* 节点头部 - 名称和控制图标 */}
+      <div className="text-node-header">
+        <div className="text-node-name-section">
+          {isEditingName ? (
+            <input
+              ref={nameInputRef}
+              className="text-node-name-input"
+              value={nodeName}
+              onChange={(e) => setNodeName(e.target.value)}
+              onBlur={handleNameSubmit}
+              onKeyDown={handleNameKeyDown}
+            />
+          ) : (
+            <div
+              className="text-node-name"
+              onDoubleClick={isCollapsed ? toggleCollapse : handleNameEdit}
+              onClick={isCollapsed ? toggleCollapse : undefined}
+              style={{ 
+                textAlign: isCollapsed ? 'center' : 'left',
+                cursor: isCollapsed ? 'pointer' : 'pointer'
+              }}
+              title={isCollapsed ? '点击展开节点' : '双击编辑名称'}
+            >
+              {nodeName}
+            </div>
+          )}
         </div>
-        {isEditing ? (
-          <div
-            className="text-node-editor nodrag"
-            key="text"
-            contentEditable
-            ref={editorRef}
-            suppressContentEditableWarning
-            onInput={handleDivInput}
-            onBlur={exitEdit}
-            onKeyDown={handleDivKeyDown}
-            style={{ 
-              width: '100%', 
-              boxSizing: 'border-box', 
-              minHeight: '1em', 
-              outline: 'none', 
-              whiteSpace: 'pre-wrap', 
-              wordBreak: 'break-all', 
-              cursor: 'text' 
-            }}
-            spellCheck={false}
-          />
+        
+        {isCollapsed ? (
+          // 折叠状态下显示展开按钮
+          <div className="text-node-controls">
+            <button
+              className="control-button"
+              onClick={toggleCollapse}
+              title="展开节点"
+            >
+              <svg viewBox="0 0 24 24" width="16" height="16">
+                <path fill="currentColor" d="M7,14L12,9L17,14H7Z" />
+              </svg>
+            </button>
+          </div>
         ) : (
-          <div key="display" className="text-node-content" style={{ width: '100%', boxSizing: 'border-box' }}>
-            {text ? (
-              <pre>{text}</pre>
-            ) : (
-              <pre style={{ color: 'rgba(125, 225, 234, 0.4)' }}>// 在此输入JS代码</pre>
-            )}
+          // 非折叠状态下显示所有控制按钮
+          <div className="text-node-controls">
+            <button
+              className="control-button"
+              onClick={() => toggleHideSection('inputs')}
+              title={hiddenSections.inputs ? '显示输入' : '隐藏输入'}
+            >
+              <svg viewBox="0 0 24 24" width="16" height="16">
+                <path fill="currentColor" d="M19,13H13V19H11V13H5V11H11V5H13V11H19V13Z" />
+              </svg>
+            </button>
+            <button
+              className="control-button"
+              onClick={() => toggleHideSection('outputs')}
+              title={hiddenSections.outputs ? '显示输出' : '隐藏输出'}
+            >
+              <svg viewBox="0 0 24 24" width="16" height="16">
+                <path fill="currentColor" d="M19,13H5V11H19V13Z" />
+              </svg>
+            </button>
+            <button
+              className="control-button"
+              onClick={() => toggleHideSection('logs')}
+              title={hiddenSections.logs ? '显示日志' : '隐藏日志'}
+            >
+              <svg viewBox="0 0 24 24" width="16" height="16">
+                <path fill="currentColor" d="M14,2H6A2,2 0 0,0 4,4V20A2,2 0 0,0 6,22H18A2,2 0 0,0 20,20V8L14,2M18,20H6V4H13V9H18V20Z" />
+              </svg>
+            </button>
+            <button
+              className="control-button"
+              onClick={toggleCollapse}
+              title="完全隐藏"
+            >
+              <svg viewBox="0 0 24 24" width="16" height="16">
+                <path fill="currentColor" d="M19,6.41L17.59,5L12,10.59L6.41,5L5,6.41L10.59,12L5,17.59L6.41,19L12,13.41L17.59,19L19,17.59L13.41,12L19,6.41Z" />
+              </svg>
+            </button>
           </div>
         )}
       </div>
 
-      {/* 输入区域 - 只在有变量控件时显示 */}
-      {!isEditing && showSections && controls.length > 0 && (data.showControls !== false) && (
-        <div className="text-node-section text-node-inputs-section">
-          <div className="section-label">Inputs</div>
+      {/* 折叠状态显示 */}
+      {isCollapsed && (
+        <div className="collapsed-info animate-fade-in-up">
+          {/* 输入变量 */}
+          {getInputVariablesInfo().length > 0 && (
+            <div className="collapsed-section">
+              <div className="collapsed-label">输入:</div>
+              {getInputVariablesInfo().map((input, index) => (
+                <div key={index} className="collapsed-variable">
+                  <span className="var-name">{input.name}</span>
+                  <span className="var-type">({input.type})</span>
+                </div>
+              ))}
+            </div>
+          )}
+          
+          {/* 输出变量 */}
+          {getOutputVariablesInfo().length > 0 && (
+            <div className="collapsed-section">
+              <div className="collapsed-label">输出:</div>
+              {getOutputVariablesInfo().map((output, index) => (
+                <div key={index} className="collapsed-variable">
+                  <span className="var-name">{output.name}</span>
+                  <span className="var-type">({output.type})</span>
+                </div>
+              ))}
+            </div>
+          )}
+          
+          {/* 复制代码按钮 */}
+          <button 
+            className="copy-code-btn"
+            onClick={copyCode}
+            title="复制代码"
+          >
+            复制代码
+          </button>
+        </div>
+      )}
+
+      {/* 代码区域 - 只在非折叠状态显示 */}
+      {!isCollapsed && (
+        <div className="text-node-section text-node-code-section animate-fade-in-up">
+          {isEditing ? (
+            <div 
+              className="syntax-highlight-container nodrag" 
+              key="syntax-editor"
+            >
+              {/* 语法高亮显示层 */}
+              <pre 
+                className="syntax-highlight-display"
+                dangerouslySetInnerHTML={{
+                  __html: generateHighlightedCode(text)
+                }}
+                style={{
+                  position: 'absolute',
+                  top: 0,
+                  left: 0,
+                  fontFamily: 'JetBrains Mono, monospace',
+                  fontSize: '14px',
+                  lineHeight: '1.5',
+                  margin: 0,
+                  padding: '8px',
+                  whiteSpace: 'pre', // 改为pre，保持代码格式但允许宽度扩展
+                  background: 'transparent',
+                  border: 'none',
+                  outline: 'none',
+                  overflow: 'visible', // 保持visible
+                  pointerEvents: 'none',
+                  zIndex: 1,
+                  boxSizing: 'border-box'
+                }}
+              />
+              {/* 可编辑文本层 */}
+              <div
+                className="text-node-editor"
+                contentEditable
+                ref={textElementRef}
+                suppressContentEditableWarning
+                onInput={handleSyntaxEditorInput}
+                onBlur={exitEdit}
+                onKeyDown={handleDivKeyDown}
+                style={{ 
+                  position: 'absolute',
+                  top: 0,
+                  left: 0,
+                  fontFamily: 'JetBrains Mono, monospace',
+                  fontSize: '14px',
+                  lineHeight: '1.5',
+                  margin: 0,
+                  padding: '8px',
+                  whiteSpace: 'pre', // 改为pre，保持代码格式但允许宽度扩展
+                  background: 'transparent',
+                  border: 'none',
+                  outline: 'none',
+                  color: 'transparent',
+                  caretColor: '#7dd3fc',
+                  zIndex: 2,
+                  boxSizing: 'border-box',
+                  cursor: 'text',
+                  overflow: 'visible', // 保持visible
+                  resize: 'none'
+                }}
+                spellCheck={false}
+              />
+            </div>
+          ) : (
+            <div key="display" className="text-node-content" style={{ width: 'auto', boxSizing: 'border-box' }}>
+              {text ? (
+                <pre 
+                  className="syntax-highlighted-code"
+                  dangerouslySetInnerHTML={{
+                    __html: generateHighlightedCode(text)
+                  }}
+                  style={{
+                    fontFamily: 'JetBrains Mono, monospace',
+                    fontSize: '14px',
+                    lineHeight: '1.5',
+                    margin: 0,
+                    padding: 0,
+                    whiteSpace: 'pre', // 改为pre，保持代码格式但允许宽度扩展
+                    overflow: 'visible' // 保持visible
+                  }}
+                />
+              ) : (
+                <pre style={{ 
+                  color: 'rgba(125, 225, 234, 0.4)',
+                  fontFamily: 'JetBrains Mono, monospace',
+                  fontSize: '14px',
+                  lineHeight: '1.5',
+                  margin: 0,
+                  padding: 0
+                }}>// 在此输入JS代码</pre>
+              )}
+            </div>
+          )}
+        </div>
+      )}
+
+      {/* 输入区域 - 只在有变量控件时显示且未隐藏 */}
+      {!isEditing && !isCollapsed && (!hiddenSections.inputs || animatingOut.inputs) && controls.length > 0 && (data.showControls !== false) && (
+        <div className={`text-node-section text-node-inputs-section ${animatingOut.inputs ? 'animate-fade-out-down' : 'animate-fade-in-up'}`}>
+          <div 
+            className="section-label clickable" 
+            onClick={resetInputsToDefault}
+            title="点击重置所有输入为默认值"
+          >
+            Inputs
+          </div>
           {controls.map((control, index) => (
-            <div key={index} className="variable-control">
+            <div key={index} className={`variable-control ${animatingOut.inputs ? 'animate-fade-out-left' : 'animate-fade-in-left'}`} style={{ animationDelay: `${index * 0.1}s` }}>
               <span className="variable-label">{control.name}</span>
               {control.type === 'switch' && renderToggleControl(control)}
               {control.type === 'slider' && renderSliderControl(control)}
@@ -647,12 +1133,12 @@ const TextNode: React.FC<NodeProps<TextNodeType>> = ({ id, data, selected }) => 
       )}
 
       {/* 日志区域 - 在输入区域下面，输出区域上面 */}
-      {!isEditing && showSections && consoleLogs.length > 0 && (
-        <div className="text-node-section text-node-logs-section">
+      {!isEditing && !isCollapsed && (!hiddenSections.logs || animatingOut.logs) && consoleLogs.length > 0 && (
+        <div className={`text-node-section text-node-logs-section ${animatingOut.logs ? 'animate-fade-out-down' : 'animate-fade-in-up'}`}>
           <div className="section-label">Logs</div>
           <div className="log-container">
             {consoleLogs.map((log, index) => (
-              <div key={index} className="log-entry">
+              <div key={index} className={`log-entry ${animatingOut.logs ? 'animate-fade-out-left' : 'animate-fade-in-left'}`} style={{ animationDelay: `${index * 0.05}s` }}>
                 {log}
               </div>
             ))}
@@ -660,11 +1146,15 @@ const TextNode: React.FC<NodeProps<TextNodeType>> = ({ id, data, selected }) => 
         </div>
       )}
 
-      {/* 输出区域 - 只在有输出时显示 */}
-      {!isEditing && showSections && Object.keys(outputs).length > 0 && (
-        <div className="text-node-section text-node-outputs-section">
+      {/* 输出区域 - 只在有输出时显示且未隐藏 */}
+      {!isEditing && !isCollapsed && (!hiddenSections.outputs || animatingOut.outputs) && Object.keys(outputs).length > 0 && (
+        <div className={`text-node-section text-node-outputs-section ${animatingOut.outputs ? 'animate-fade-out-down' : 'animate-fade-in-up'}`}>
           <div className="section-label">Outputs</div>
-          {Object.keys(outputs).map((output, index) => renderOutput(output, index))}
+          {Object.keys(outputs).map((output, index) => (
+            <div key={index} className={`${animatingOut.outputs ? 'animate-fade-out-right' : 'animate-fade-in-right'}`} style={{ animationDelay: `${index * 0.1}s` }}>
+              {renderOutput(output, index)}
+            </div>
+          ))}
         </div>
       )}
 
@@ -684,6 +1174,27 @@ const TextNode: React.FC<NodeProps<TextNodeType>> = ({ id, data, selected }) => 
         isConnectable={true}
         isConnectableStart={false}
       />
+      
+      {/* 节点宽度调整控制 - 仅在选中且非折叠时显示 */}
+      {selected && !isCollapsed && (
+        <>
+          <NodeResizeControl
+            style={{
+              background: 'transparent',
+              border: 'none',
+              width: '8px',
+              height: '100%',
+              borderRadius: 0,
+            }}
+            minWidth={200}
+            resizeDirection="horizontal"
+            onResize={(event, data) => {
+              // 更新节点数据中的宽度
+              updateNodeData({ width: data.width });
+            }}
+          />
+        </>
+      )}
     </div>
   );
 };

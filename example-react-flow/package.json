@@ -12,9 +12,11 @@
   "dependencies": {
     "@fontsource/jetbrains-mono": "^5.2.5",
     "@fontsource/noto-sans-sc": "^5.2.5",
+    "@types/prismjs": "^1.26.5",
     "@xyflow/react": "^12.6.0",
     "immer": "^10.1.1",
     "lodash": "^4.17.21",
+    "prismjs": "^1.30.0",
     "react": "^19.0.0",
     "react-dom": "^19.0.0",
     "zustand": "^5.0.3"

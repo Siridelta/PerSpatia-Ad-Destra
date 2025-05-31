@@ -26,8 +26,9 @@ const initialNodes: Node[] = [
     id: '1', 
     position: { x: 400, y: 20 }, 
     data: { 
-      label: '@slidebar(0, 100, 1, 50) x\n@slidebar(0, 100, 1, 30) y\nconst sum = x + y;\nconst product = x * y;\n@log "计算结果: sum=" * string(sum)\n@log "product=" * string(product)\n@output sum\n@output product', 
-      result: '结果计算中...' 
+      label: 'let speed = node_input(new Slider(50, 0, 100, 1));\nlet name = node_input(new InputBox("测试"));\nlet enabled = node_input(new Switch(true));\n\nlet result = speed * 2;\nnode_output(result);\nconsole.log("速度:", speed, "名称:", name, "启用:", enabled);', 
+      result: '结果计算中...',
+      width: 500
     }, 
     type: 'textNode' 
   },
@@ -35,8 +36,9 @@ const initialNodes: Node[] = [
     id: '2', 
     position: { x: 100, y: 250 }, 
     data: { 
-      label: '# sum 和 product 将从连接的节点自动获取\nconst average = (sum + product) / 2;\nconst ratio = product / sum;\n@log "平均值: " * string(average)\n@log "比值: " * string(ratio)\n@output average\n@output ratio', 
-      result: 'average计算中...' 
+      label: '// result 将从连接的节点自动获取\nlet doubled = result * 2;\nlet message = `结果的两倍是: ${doubled}`;\nnode_output(doubled);\nconsole.log(message);', 
+      result: 'doubled计算中...',
+      width: 400
     }, 
     type: 'textNode' 
   },
@@ -44,8 +46,9 @@ const initialNodes: Node[] = [
     id: '3', 
     position: { x: 700, y: 250 }, 
     data: { 
-      label: '@inputbox("Hello World") message\n@log message\n@log "消息长度: " * string(length(message))\n@output message', 
-      result: '消息处理中...' 
+      label: 'let message = node_input(new InputBox("Hello World"));\nlet length = message.length;\nnode_output(message);\nconsole.log("消息:", message, "长度:", length);', 
+      result: '消息处理中...',
+      width: 450
     }, 
     type: 'textNode' 
   },
@@ -56,7 +59,7 @@ const initialEdges: Edge[] = [
 ];
 
 const Canvas: React.FC = () => {
-  // 尝试从 localStorage 恢复初始状态
+  // 尝试从 localStorage 恢复初始状态，但如果没有保存的数据就使用新的初始节点
   const persisted = loadCanvasState();
   const [nodes, setNodes, onNodesChange] = useNodesState(persisted?.nodes || initialNodes);
   const [edges, setEdges, onEdgesChange] = useEdgesState(persisted?.edges || initialEdges);
@@ -128,7 +131,11 @@ const Canvas: React.FC = () => {
     id: `node-${Date.now()}`,
     type: 'textNode',
     position,
-    data: { label: '', initialEditing: true },
+    data: { 
+      label: '', 
+      initialEditing: true,
+      width: 400  // 默认宽度
+    },
   }), []);
 
   // 处理画布空白点击事件

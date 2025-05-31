@@ -175,3 +175,17 @@
   fill: none !important;
   cursor: pointer !important;
 }
+
+/* React Flow 节点默认样式覆盖 - 移除宽度限制 */
+.react-flow__node {
+  width: auto !important;
+  max-width: none !important;
+  min-width: auto !important;
+}
+
+/* 确保我们的自定义节点可以自由设置宽度 */
+.react-flow__node[data-type="textNode"] {
+  width: auto !important;
+  max-width: none !important;
+  min-width: auto !important;
+}

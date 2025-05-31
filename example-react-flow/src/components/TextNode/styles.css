@@ -1,15 +1,17 @@
-/* 节点容器 - 不再是单一矩形，而是多个矩形的容器 */
+/* 节点容器 - 确保能根据内容扩展 */
 .text-node {
-  position: relative;
-  display: flex;
+  position: relative; /* 确保可以包含绝对定位的子元素 */
+  display: flex; /* 恢复为flex，但配置不同的属性 */
   flex-direction: column;
-  gap: 0;
-  min-width: 200px;
+  min-width: 300px; /* 增加最小宽度 */
+  width: fit-content; /* 改回fit-content，让容器根据内容扩展 */
   font-family: 'JetBrains Mono', monospace;
   font-size: 14px;
   background: transparent;
   border: none;
   transition: transform 0.2s ease;
+  max-width: none; /* 移除最大宽度限制，允许充分扩展 */
+  padding-top: 20px; /* 为浮动头部留出空间 */
 }
 
 .text-node.selected,
@@ -21,16 +23,264 @@
   transform: scale(1.005);
 }
 
-/* 矩形区域通用样式 */
+/* 节点头部样式 - 改为浮动标签风格 */
+.text-node-header {
+  position: absolute;
+  top: -13px;
+  left: -4px;
+  background: transparent;
+  color: #7de1ea;
+  padding: 2px 8px;
+  font-size: 16px;
+  font-weight: 600;
+  font-family: 'JetBrains Mono', monospace;
+  z-index: 10;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  width: calc(100% + 8px); /* 覆盖整个卡片宽度 */
+  box-sizing: border-box;
+}
+
+.text-node-name-section {
+  flex: 1;
+  min-width: 0;
+}
+
+.text-node-name {
+  color: #7de1ea;
+  font-size: 16px;
+  font-weight: 600;
+  font-family: 'JetBrains Mono', monospace;
+  cursor: pointer;
+  padding: 0; /* 移除内边距 */
+  border-radius: 0; /* 确保无圆角 */
+  transition: color 0.2s ease;
+}
+
+.text-node-name:hover {
+  color: #ffffff;
+}
+
+.text-node-name-input {
+  background: transparent;
+  border: 1px solid #7de1ea;
+  color: #7de1ea;
+  font-size: 16px;
+  font-weight: 600;
+  font-family: 'JetBrains Mono', monospace;
+  padding: 2px 4px;
+  border-radius: 0; /* 确保无圆角 */
+  outline: none;
+  width: 100%;
+  box-sizing: border-box;
+}
+
+.text-node-name-input:focus {
+  border-color: #ffffff;
+  box-shadow: 0 0 0 1px rgba(125, 225, 234, 0.3);
+}
+
+/* 控制按钮区域 */
+.text-node-controls {
+  display: flex;
+  align-items: center;
+  gap: 8px; /* 一致的间距 */
+  margin-left: 16px; /* 与名称保持距离 */
+}
+
+.control-button {
+  background: transparent;
+  border: 1px solid rgba(125, 225, 234, 0.3);
+  color: #7de1ea;
+  padding: 4px; /* 减小尺寸 */
+  cursor: pointer;
+  border-radius: 0; /* 方形设计 */
+  transition: all 0.2s ease;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 24px; /* 减小尺寸 */
+  height: 24px; /* 减小尺寸 */
+}
+
+.control-button:hover {
+  background: rgba(125, 225, 234, 0.1);
+  border-color: #7de1ea;
+  color: #ffffff;
+}
+
+.control-button:active {
+  background: rgba(125, 225, 234, 0.2);
+  transform: scale(0.95);
+}
+
+.control-button svg {
+  width: 14px; /* 减小图标尺寸 */
+  height: 14px;
+}
+
+/* 折叠状态样式 */
+.text-node.collapsed {
+  min-width: 200px;
+  width: fit-content; /* 折叠状态也使用fit-content */
+}
+
+.collapsed-info {
+  padding: 15px;
+  background: rgba(9, 14, 28, 0.5);
+  border: none; /* 移除边框保持风格一致 */
+  text-align: center;
+  border-radius: 0; /* 确保无圆角 */
+}
+
+.collapsed-section {
+  margin: 10px 0;
+}
+
+.collapsed-label {
+  color: #7de1ea;
+  font-size: 14px;
+  font-weight: 600;
+  margin-bottom: 5px;
+}
+
+.collapsed-variable {
+  display: inline-block;
+  margin: 2px 8px;
+  font-size: 12px;
+}
+
+.var-name {
+  color: #ffffff;
+  font-weight: 600;
+}
+
+.var-type {
+  color: rgba(125, 225, 234, 0.7);
+  font-style: italic;
+}
+
+.copy-code-btn {
+  background: transparent;
+  border: 1px solid rgba(125, 225, 234, 0.3);
+  color: #7de1ea;
+  padding: 8px 16px;
+  cursor: pointer;
+  border-radius: 0;
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 12px;
+  margin-top: 10px;
+  transition: all 0.2s ease;
+}
+
+.copy-code-btn:hover {
+  background: rgba(125, 225, 234, 0.1);
+  border-color: #7de1ea;
+  color: #ffffff;
+}
+
+/* 动画效果 */
+@keyframes fadeInUp {
+  from {
+    opacity: 0;
+    transform: translateY(10px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+@keyframes fadeOutDown {
+  from {
+    opacity: 1;
+    transform: translateY(0);
+  }
+  to {
+    opacity: 0;
+    transform: translateY(-10px);
+  }
+}
+
+@keyframes fadeInLeft {
+  from {
+    opacity: 0;
+    transform: translateX(-10px);
+  }
+  to {
+    opacity: 1;
+    transform: translateX(0);
+  }
+}
+
+@keyframes fadeOutLeft {
+  from {
+    opacity: 1;
+    transform: translateX(0);
+  }
+  to {
+    opacity: 0;
+    transform: translateX(-10px);
+  }
+}
+
+@keyframes fadeInRight {
+  from {
+    opacity: 0;
+    transform: translateX(10px);
+  }
+  to {
+    opacity: 1;
+    transform: translateX(0);
+  }
+}
+
+@keyframes fadeOutRight {
+  from {
+    opacity: 1;
+    transform: translateX(0);
+  }
+  to {
+    opacity: 0;
+    transform: translateX(10px);
+  }
+}
+
+.animate-fade-in-up {
+  animation: fadeInUp 0.3s ease-out;
+}
+
+.animate-fade-out-down {
+  animation: fadeOutDown 0.3s ease-out;
+}
+
+.animate-fade-in-left {
+  animation: fadeInLeft 0.3s ease-out;
+}
+
+.animate-fade-out-left {
+  animation: fadeOutLeft 0.3s ease-out;
+}
+
+.animate-fade-in-right {
+  animation: fadeInRight 0.3s ease-out;
+}
+
+.animate-fade-out-right {
+  animation: fadeOutRight 0.3s ease-out;
+}
+
+/* 矩形区域通用样式 - 确保不限制宽度 */
 .text-node-section {
   position: relative;
   background: rgba(9, 14, 28, 0.5);
   padding: 10px;
   margin-bottom: 2px;
-  border: none;
+  border: none; /* 移除描边 */
   min-height: 20px;
-  width: 100%;
   box-sizing: border-box;
+  display: block; /* 确保是块级元素 */
 }
 
 .text-node-section:last-child {
@@ -49,6 +299,28 @@
   font-weight: 600;
   font-family: 'JetBrains Mono', monospace;
   z-index: 10;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+/* 重置按钮样式 */
+.reset-inputs-btn {
+  background: transparent;
+  border: 1px solid rgba(125, 225, 234, 0.3);
+  color: #7de1ea;
+  padding: 2px 8px;
+  cursor: pointer;
+  border-radius: 0;
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 12px;
+  transition: all 0.2s ease;
+}
+
+.reset-inputs-btn:hover {
+  background: rgba(125, 225, 234, 0.1);
+  border-color: #7de1ea;
+  color: #ffffff;
 }
 
 /* 可点击标签的样式 */
@@ -61,14 +333,14 @@
   transform: scale(1.05);
 }
 
-/* 代码区域 */
+/* 代码区域 - 允许内容扩展 */
 .text-node-code-section {
   display: block;
   padding: 15px;
+  box-sizing: border-box;
 }
 
 .text-node-content {
-  width: 100%;
   min-height: 1em;
   color: #ffffff;
   font-size: 14px;
@@ -76,6 +348,8 @@
   background: transparent;
   border: none;
   font-family: 'JetBrains Mono', monospace;
+  box-sizing: border-box;
+  display: block; /* 确保是块级元素 */
 }
 
 .text-node-content pre {
@@ -85,12 +359,15 @@
   font-family: 'JetBrains Mono', monospace;
   font-size: 14px;
   line-height: 1.4;
-  white-space: pre-wrap;
-  word-break: break-all;
+  white-space: pre; /* 改为pre，保持代码格式但允许宽度扩展 */
+  overflow: visible; /* 允许溢出，触发容器扩展 */
+  box-sizing: border-box;
+  display: inline; /* 让pre表现为内联，这样能推动容器宽度 */
 }
 
 .text-node-editor {
   width: 100%;
+  max-width: none; /* 移除最大宽度限制 */
   min-height: 1em;
   color: #ffffff;
   font-size: 14px;
@@ -103,6 +380,62 @@
   margin: 0;
   font-family: 'JetBrains Mono', monospace;
   font-variant-ligatures: none;
+  box-sizing: border-box;
+}
+
+/* 语法高亮容器样式 - 关键：不使用绝对定位 */
+.syntax-highlight-container {
+  position: relative;
+  display: block;
+  min-height: 100px;
+  background: transparent;
+  box-sizing: border-box;
+  width: auto; /* 让容器自动扩展 */
+}
+
+.syntax-highlight-display {
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0; /* 添加right: 0，让显示层填满容器 */
+  height: auto;
+  min-height: 100px;
+  background: transparent;
+  border: none;
+  outline: none;
+  pointer-events: none;
+  box-sizing: border-box;
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 14px;
+  line-height: 1.5;
+  margin: 0;
+  padding: 8px;
+  white-space: pre; /* 保持pre格式 */
+  overflow: visible; /* 允许溢出 */
+}
+
+.syntax-highlight-container .text-node-editor {
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0; /* 添加right: 0，让编辑器填满容器 */
+  height: auto;
+  min-height: 100px;
+  color: transparent;
+  caret-color: #7dd3fc;
+  z-index: 2;
+  resize: none;
+  white-space: pre; /* 保持pre格式 */
+  overflow: visible; /* 允许溢出 */
+  background: transparent;
+  border: none;
+  outline: none;
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 14px;
+  line-height: 1.5;
+  margin: 0;
+  padding: 8px;
+  box-sizing: border-box;
 }
 
 .text-node-editor::placeholder {

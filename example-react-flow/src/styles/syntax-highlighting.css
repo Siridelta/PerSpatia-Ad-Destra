@@ -1,0 +1,261 @@
+/* 语法高亮样式 - 极简未来感设计 */
+
+/* 重置 Prism 默认样式 */
+pre[class*="language-"],
+code[class*="language-"] {
+  color: #ffffff !important;
+  background: transparent !important;
+  text-shadow: none !important;
+  font-family: 'JetBrains Mono', 'Consolas', 'Monaco', monospace !important;
+  font-size: 14px !important;
+  line-height: 1.5 !important;
+  direction: ltr !important;
+  text-align: left !important;
+  white-space: pre !important;
+  word-spacing: normal !important;
+  word-break: normal !important;
+  word-wrap: normal !important;
+  tab-size: 2 !important;
+  hyphens: none !important;
+  border: none !important;
+  padding: 0 !important;
+  margin: 0 !important;
+}
+
+/* 语法高亮 Token 样式 */
+.token.comment,
+.token.prolog,
+.token.doctype,
+.token.cdata {
+  color: rgba(125, 211, 252, 0.6) !important; /* 淡蓝色注释 */
+  font-style: italic !important;
+}
+
+.token.punctuation {
+  color: rgba(255, 255, 255, 0.8) !important; /* 半透明白色标点 */
+}
+
+.token.property,
+.token.tag,
+.token.boolean,
+.token.number,
+.token.constant,
+.token.symbol,
+.token.deleted {
+  color: #7dd3fc !important; /* 天蓝色 */
+}
+
+.token.selector,
+.token.attr-name,
+.token.string,
+.token.char,
+.token.builtin,
+.token.inserted {
+  color: #86efac !important; /* 淡绿色 */
+}
+
+.token.operator,
+.token.entity,
+.token.url {
+  color: #fbbf24 !important; /* 金黄色 */
+  background: transparent !important;
+}
+
+.token.atrule,
+.token.attr-value,
+.token.keyword {
+  color: #c084fc !important; /* 紫色关键字 */
+  font-weight: 500 !important;
+}
+
+.token.function,
+.token.class-name {
+  color: #f472b6 !important; /* 粉色函数名 */
+  font-weight: 500 !important;
+}
+
+.token.regex,
+.token.important,
+.token.variable {
+  color: #fb7185 !important; /* 红色正则和变量 */
+}
+
+.token.important,
+.token.bold {
+  font-weight: 600 !important;
+}
+
+.token.italic {
+  font-style: italic !important;
+}
+
+.token.entity {
+  cursor: help !important;
+}
+
+/* 特殊处理一些 JavaScript 特定的 token */
+.token.template-string {
+  color: #86efac !important; /* 模板字符串 */
+}
+
+.token.template-punctuation {
+  color: #fbbf24 !important; /* 模板字符串标点 */
+}
+
+.token.this,
+.token.super {
+  color: #f59e0b !important; /* this 和 super 关键字 */
+  font-weight: 500 !important;
+}
+
+.token.null,
+.token.undefined {
+  color: #ef4444 !important; /* null 和 undefined */
+  font-style: italic !important;
+}
+
+/* 语法高亮容器样式 */
+.syntax-highlight-container {
+  position: relative;
+  width: 100%;
+  height: 100%;
+  min-height: 40px;
+  background: transparent;
+  border-radius: 0; /* 保持方形美学 */
+  overflow: hidden;
+}
+
+/* 编辑器样式 */
+.syntax-highlight-editor {
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+  background: transparent;
+  border: none;
+  outline: none;
+  resize: none;
+  color: transparent !important;
+  caret-color: #7dd3fc;
+  z-index: 2;
+  font-family: 'JetBrains Mono', 'Consolas', 'Monaco', monospace;
+  font-size: 14px;
+  line-height: 1.5;
+  padding: 8px;
+  margin: 0;
+  white-space: pre-wrap;
+  word-wrap: break-word;
+  box-sizing: border-box;
+  overflow: auto;
+  tab-size: 2;
+}
+
+/* 高亮显示层样式 */
+.syntax-highlight-display {
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+  background: transparent;
+  z-index: 1;
+  pointer-events: none;
+  font-family: 'JetBrains Mono', 'Consolas', 'Monaco', monospace;
+  font-size: 14px;
+  line-height: 1.5;
+  padding: 8px;
+  margin: 0;
+  white-space: pre-wrap;
+  word-wrap: break-word;
+  box-sizing: border-box;
+  overflow: auto;
+  tab-size: 2;
+}
+
+/* 占位符样式 */
+.syntax-highlight-placeholder {
+  position: absolute;
+  top: 8px;
+  left: 8px;
+  color: rgba(125, 211, 252, 0.4);
+  font-family: 'JetBrains Mono', 'Consolas', 'Monaco', monospace;
+  font-size: 14px;
+  line-height: 1.5;
+  pointer-events: none;
+  z-index: 1;
+}
+
+/* 隐藏默认的选择背景，使用自定义颜色 */
+.syntax-highlight-editor::selection {
+  background: rgba(125, 211, 252, 0.3);
+}
+
+.syntax-highlight-editor::-moz-selection {
+  background: rgba(125, 211, 252, 0.3);
+}
+
+/* 滚动条样式 */
+.syntax-highlight-editor::-webkit-scrollbar,
+.syntax-highlight-display::-webkit-scrollbar {
+  width: 6px;
+  height: 6px;
+}
+
+.syntax-highlight-editor::-webkit-scrollbar-track,
+.syntax-highlight-display::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+.syntax-highlight-editor::-webkit-scrollbar-thumb,
+.syntax-highlight-display::-webkit-scrollbar-thumb {
+  background: rgba(125, 211, 252, 0.3);
+  border-radius: 0; /* 保持方形风格 */
+}
+
+.syntax-highlight-editor::-webkit-scrollbar-thumb:hover,
+.syntax-highlight-display::-webkit-scrollbar-thumb:hover {
+  background: rgba(125, 211, 252, 0.5);
+}
+
+/* 确保在不同主题下的一致性 */
+.dark .syntax-highlight-container {
+  color: #ffffff;
+}
+
+.light .syntax-highlight-container {
+  color: #000000;
+}
+
+/* 错误高亮 */
+.token.error {
+  color: #ef4444 !important;
+  background: rgba(239, 68, 68, 0.1) !important;
+}
+
+/* 禁用拼写检查标记 */
+.syntax-highlight-editor {
+  -webkit-text-decoration-skip: none;
+  text-decoration-skip: none;
+  -webkit-text-decoration-line: none;
+  text-decoration-line: none;
+}
+
+/* 动画效果 */
+.syntax-highlight-container {
+  transition: all 0.2s ease-in-out;
+}
+
+/* 聚焦状态 */
+.syntax-highlight-container:focus-within {
+  transform: none; /* 移除变换，保持简洁 */
+}
+
+/* 兼容性修复 */
+.syntax-highlight-editor[contenteditable="true"] {
+  -webkit-user-modify: read-write-plaintext-only;
+}
+
+.syntax-highlight-editor[contenteditable="plaintext-only"] {
+  -webkit-user-modify: read-write-plaintext-only;
+} 
