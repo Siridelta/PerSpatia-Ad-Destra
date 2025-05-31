@@ -290,11 +290,11 @@
 /* 区域标签样式 */
 .section-label {
   position: absolute;
-  top: -13px;
-  left: -4px;
+  top: -11px;
+  left: 4px;
   background: transparent;
   color: #7de1ea;
-  padding: 2px 8px;
+  padding: 0;
   font-size: 14px;
   font-weight: 600;
   font-family: 'JetBrains Mono', monospace;
@@ -867,11 +867,10 @@
 
 .log-entry {
   color: #ffffff;
-  margin: 2px 0;
-  padding: 2px 0;
+  margin: 5px 0;
   font-family: 'JetBrains Mono', monospace;
   font-size: 14px;
-  line-height: 1.4;
+  /* line-height: 1.4; */
   white-space: pre-wrap;
 }
 

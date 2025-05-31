@@ -1119,7 +1119,7 @@ const TextNode: React.FC<NodeProps<TextNodeType>> = ({ id, data, selected }) => 
             onClick={resetInputsToDefault}
             title="点击重置所有输入为默认值"
           >
-            Inputs
+            [ Inputs ]
           </div>
           {controls.map((control, index) => (
             <div key={index} className={`variable-control ${animatingOut.inputs ? 'animate-fade-out-left' : 'animate-fade-in-left'}`} style={{ animationDelay: `${index * 0.1}s` }}>
@@ -1135,7 +1135,7 @@ const TextNode: React.FC<NodeProps<TextNodeType>> = ({ id, data, selected }) => 
       {/* 日志区域 - 在输入区域下面，输出区域上面 */}
       {!isEditing && !isCollapsed && (!hiddenSections.logs || animatingOut.logs) && consoleLogs.length > 0 && (
         <div className={`text-node-section text-node-logs-section ${animatingOut.logs ? 'animate-fade-out-down' : 'animate-fade-in-up'}`}>
-          <div className="section-label">Logs</div>
+          <div className="section-label">[ Logs ]</div>
           <div className="log-container">
             {consoleLogs.map((log, index) => (
               <div key={index} className={`log-entry ${animatingOut.logs ? 'animate-fade-out-left' : 'animate-fade-in-left'}`} style={{ animationDelay: `${index * 0.05}s` }}>
@@ -1149,7 +1149,7 @@ const TextNode: React.FC<NodeProps<TextNodeType>> = ({ id, data, selected }) => 
       {/* 输出区域 - 只在有输出时显示且未隐藏 */}
       {!isEditing && !isCollapsed && (!hiddenSections.outputs || animatingOut.outputs) && Object.keys(outputs).length > 0 && (
         <div className={`text-node-section text-node-outputs-section ${animatingOut.outputs ? 'animate-fade-out-down' : 'animate-fade-in-up'}`}>
-          <div className="section-label">Outputs</div>
+          <div className="section-label">[ Outputs ]</div>
           {Object.keys(outputs).map((output, index) => (
             <div key={index} className={`${animatingOut.outputs ? 'animate-fade-out-right' : 'animate-fade-in-right'}`} style={{ animationDelay: `${index * 0.1}s` }}>
               {renderOutput(output, index)}
