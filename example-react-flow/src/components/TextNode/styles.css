@@ -344,12 +344,14 @@
   min-height: 1em;
   color: #ffffff;
   font-size: 14px;
-  line-height: 1.4;
+  line-height: 1.5;
   background: transparent;
   border: none;
   font-family: 'JetBrains Mono', monospace;
   box-sizing: border-box;
   display: block; /* 确保是块级元素 */
+  padding: 8px;
+  margin: 0;
 }
 
 .text-node-content pre {
@@ -358,11 +360,12 @@
   color: #ffffff;
   font-family: 'JetBrains Mono', monospace;
   font-size: 14px;
-  line-height: 1.4;
+  line-height: 1.5;
   white-space: pre; /* 改为pre，保持代码格式但允许宽度扩展 */
   overflow: visible; /* 允许溢出，触发容器扩展 */
   box-sizing: border-box;
   display: inline; /* 让pre表现为内联，这样能推动容器宽度 */
+  padding: 0;
 }
 
 .text-node-editor {
@@ -371,7 +374,7 @@
   min-height: 1em;
   color: #ffffff;
   font-size: 14px;
-  line-height: 1.4;
+  line-height: 1.5;
   border: none;
   outline: none;
   resize: none;
@@ -391,6 +394,7 @@
   background: transparent;
   box-sizing: border-box;
   width: auto; /* 让容器自动扩展 */
+  padding: 8px;
 }
 
 .syntax-highlight-display {
@@ -885,4 +889,181 @@
 
 .log-entry.info {
   color: #7de1ea;
+}
+
+/* 错误和警告区域 */
+.text-node-errors-section {
+  margin-bottom: 2px;
+  padding: 0; /* 不需要内边距，因为每个卡片都有自己的padding */
+  background: transparent; /* 确保容器本身透明 */
+  display: flex;
+  flex-direction: column;
+}
+
+/* 错误卡片样式 - 恢复指定的背景色 */
+.error-card {
+  background: rgba(28, 9, 9, 0.5); /* #1c0909 with 0.5 opacity */
+  border: none; /* 移除边框 */
+  margin: 2px 0; /* 减少间距，与其他区域保持一致 */
+  padding: 10px;
+  position: relative; /* 为标签定位提供参考 */
+  box-sizing: border-box;
+}
+
+.error-header {
+  position: absolute;
+  top: -13px;
+  left: -4px;
+  background: transparent;
+  color: #d90000;
+  padding: 2px 8px;
+  font-size: 14px;
+  font-weight: 600;
+  font-family: 'JetBrains Mono', monospace;
+  z-index: 10;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  width: calc(100% + 8px);
+  box-sizing: border-box;
+}
+
+.error-label {
+  color: #d90000;
+  font-weight: 600;
+  font-size: 14px;
+  text-transform: uppercase;
+  letter-spacing: 1px;
+}
+
+.error-location {
+  color: rgba(217, 0, 0, 0.7);
+  font-size: 12px;
+  margin-left: auto; /* 右对齐 */
+}
+
+.error-message {
+  color: #ffffff;
+  margin-bottom: 8px;
+  word-wrap: break-word;
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 14px;
+  padding-top: 8px; /* 为标签留出空间 */
+  line-height: 1.5;
+}
+
+.error-stack {
+  border-top: 1px solid rgba(217, 0, 0, 0.3);
+  padding-top: 8px;
+  margin-top: 8px;
+}
+
+.error-stack details {
+  color: rgba(217, 0, 0, 0.8);
+}
+
+.error-stack summary {
+  cursor: pointer;
+  font-size: 12px;
+  margin-bottom: 4px;
+}
+
+.error-stack summary:hover {
+  color: #d90000;
+}
+
+.error-stack pre {
+  background: rgba(0, 0, 0, 0.3);
+  border: 1px solid rgba(217, 0, 0, 0.2);
+  border-radius: 0;
+  padding: 8px;
+  margin: 4px 0 0 0;
+  font-size: 11px;
+  color: rgba(255, 255, 255, 0.8);
+  overflow-x: auto;
+  white-space: pre-wrap;
+}
+
+/* 警告卡片样式 - 恢复指定的背景色 */
+.warning-card {
+  background: rgba(28, 25, 9, 0.5); /* #1c1909 with 0.5 opacity */
+  border: none; /* 移除边框 */
+  margin: 2px 0; /* 减少间距，与其他区域保持一致 */
+  padding: 10px;
+  position: relative; /* 为标签定位提供参考 */
+  box-sizing: border-box;
+}
+
+.warning-header {
+  position: absolute;
+  top: -13px;
+  left: -4px;
+  background: transparent;
+  color: #d9b500;
+  padding: 2px 8px;
+  font-size: 14px;
+  font-weight: 600;
+  font-family: 'JetBrains Mono', monospace;
+  z-index: 10;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  width: calc(100% + 8px);
+  box-sizing: border-box;
+}
+
+.warning-label {
+  color: #d9b500;
+  font-weight: 600;
+  font-size: 14px;
+  text-transform: uppercase;
+  letter-spacing: 1px;
+}
+
+.warning-location {
+  color: rgba(217, 181, 0, 0.7);
+  font-size: 12px;
+  margin-left: auto; /* 右对齐 */
+}
+
+.warning-message {
+  color: #ffffff;
+  margin-bottom: 8px;
+  word-wrap: break-word;
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 14px;
+  padding-top: 8px; /* 为标签留出空间 */
+  line-height: 1.5;
+}
+
+.warning-stack {
+  border-top: 1px solid rgba(217, 181, 0, 0.3);
+  padding-top: 8px;
+  margin-top: 8px;
+}
+
+.warning-stack details {
+  color: rgba(217, 181, 0, 0.8);
+}
+
+.warning-stack summary {
+  cursor: pointer;
+  font-size: 12px;
+  margin-bottom: 4px;
+}
+
+.warning-stack summary:hover {
+  color: #d9b500;
+}
+
+.warning-stack pre {
+  background: rgba(0, 0, 0, 0.3);
+  border: 1px solid rgba(217, 181, 0, 0.2);
+  border-radius: 0;
+  padding: 8px;
+  margin: 4px 0 0 0;
+  font-size: 11px;
+  color: rgba(255, 255, 255, 0.8);
+  overflow-x: auto;
+  white-space: pre-wrap;
 }

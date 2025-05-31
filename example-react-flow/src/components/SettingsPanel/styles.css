@@ -1,0 +1,412 @@
+/* 设置面板遮罩层 - 修改为不覆盖整个屏幕 */
+.settings-panel-overlay {
+  position: fixed;
+  top: 0;
+  left: 0;
+  width: 420px; /* 固定宽度，不覆盖整个屏幕 */
+  bottom: 0;
+  background: transparent; /* 移除半透明背景 */
+  z-index: 1500; /* 降低层级，避免影响React Flow */
+  display: flex;
+  align-items: center;
+  justify-content: flex-start;
+  padding-left: 20px;
+  pointer-events: none; /* 让遮罩层不阻止事件 */
+  outline: none; /* 移除浏览器默认outline */
+}
+
+/* 设置面板主体 - 修复布局问题 */
+.settings-panel {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  min-width: 380px;
+  width: fit-content;
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 14px; /* 保持原来的基础字号 */
+  background: transparent;
+  border: none;
+  transition: transform 0.2s ease;
+  max-width: none;
+  padding-top: 25px; /* 增加顶部空间，避免头部被截断 */
+  max-height: 80vh; /* 减小最大高度，避免滚动条 */
+  overflow-y: auto;
+  pointer-events: auto;
+  animation: slideInFromLeft 0.3s ease-out;
+  outline: none; /* 移除浏览器默认outline */
+}
+
+@keyframes slideInFromLeft {
+  from {
+    transform: translateX(-100%);
+    opacity: 0;
+  }
+  to {
+    transform: translateX(0);
+    opacity: 1;
+  }
+}
+
+/* 面板头部 - 修复定位 */
+.settings-panel-header {
+  position: absolute;
+  top: -8px; /* 调整位置，避免被截断 */
+  left: -4px;
+  background: transparent;
+  color: #7de1ea;
+  padding: 2px 8px;
+  font-size: 16px; /* 保持原来的标题字号 */
+  font-weight: 600;
+  font-family: 'JetBrains Mono', monospace;
+  z-index: 10;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  width: calc(100% + 8px);
+  box-sizing: border-box;
+  min-height: 20px; /* 确保有足够高度 */
+}
+
+.settings-title {
+  color: #7de1ea;
+  font-size: 16px; /* 保持原来的标题字号 */
+  font-weight: 600;
+  margin: 0;
+  font-family: 'JetBrains Mono', monospace;
+  flex: 1;
+}
+
+.close-button {
+  background: transparent;
+  border: 1px solid rgba(125, 225, 234, 0.3);
+  color: #7de1ea;
+  padding: 4px;
+  cursor: pointer;
+  border-radius: 0; /* 方形美学 */
+  transition: all 0.2s ease;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 24px; /* 恢复按钮尺寸 */
+  height: 24px; /* 恢复按钮尺寸 */
+  margin-left: 16px;
+}
+
+.close-button:hover {
+  background: rgba(125, 225, 234, 0.1);
+  border-color: #7de1ea;
+  color: #ffffff;
+}
+
+.close-button svg {
+  width: 16px; /* 恢复图标尺寸 */
+  height: 16px; /* 恢复图标尺寸 */
+}
+
+/* 设置区域 - 完全复用text-node-section */
+.settings-section {
+  position: relative;
+  background: rgba(9, 14, 28, 0.5);
+  padding: 10px;
+  margin-bottom: 2px;
+  border: none;
+  min-height: 20px;
+  box-sizing: border-box;
+  display: block;
+}
+
+.settings-section:last-child {
+  margin-bottom: 0;
+}
+
+/* 区域标签 - 调整字体大小 */
+.section-label {
+  position: absolute;
+  top: -13px;
+  left: -4px;
+  background: transparent;
+  color: #7de1ea;
+  padding: 2px 8px;
+  font-size: 14px; /* 保持原来的区域标签字号 */
+  font-weight: 600;
+  font-family: 'JetBrains Mono', monospace;
+  z-index: 10;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+/* 颜色设置组 */
+.color-setting-group,
+.font-setting-group {
+  display: flex;
+  flex-direction: column;
+  gap: 5px; /* 与variable-control一致 */
+}
+
+/* 颜色设置行 - 复用variable-control */
+.color-setting-row,
+.font-setting-row {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin: 5px 0;
+  font-size: 14px; /* 保持行的基础字号 */
+  font-family: 'JetBrains Mono', monospace;
+  gap: 12px;
+}
+
+/* 标签 - 复用variable-label */
+.color-label,
+.font-label {
+  color: #ffffff;
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 18px; /* 增大4px，从14px改为18px - 这些是内容标签 */
+  min-width: 60px;
+  flex-shrink: 0;
+}
+
+/* 颜色输入容器 */
+.color-input-container {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  flex: 1;
+  min-width: 120px;
+}
+
+/* 颜色选择器 */
+.color-input {
+  width: 30px;
+  height: 20px;
+  border: 1px solid #091c33;
+  border-radius: 0;
+  background: transparent;
+  cursor: pointer;
+  padding: 0;
+  transition: border-color 0.2s ease;
+}
+
+.color-input:hover {
+  border-color: #7de1ea;
+}
+
+/* 颜色文本输入 - 复用text-input */
+.color-text-input {
+  background: transparent;
+  border: none;
+  border-bottom: 1px solid #091c33;
+  color: #ffffff;
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 14px; /* 保持输入框字号 */
+  padding: 2px 4px;
+  outline: none;
+  flex: 1;
+  min-width: 80px;
+  box-sizing: border-box;
+}
+
+.color-text-input:focus {
+  border-bottom-color: #7de1ea;
+}
+
+.color-text-input::placeholder {
+  color: rgba(125, 225, 234, 0.5);
+}
+
+/* 字体选择 */
+.font-select {
+  background: transparent;
+  border: none;
+  border-bottom: 1px solid #091c33;
+  color: #ffffff;
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 14px; /* 保持选择框字号 */
+  padding: 2px 4px;
+  outline: none;
+  flex: 1;
+  min-width: 80px;
+  box-sizing: border-box;
+  cursor: pointer;
+}
+
+.font-select:focus {
+  border-bottom-color: #7de1ea;
+}
+
+.font-select option {
+  background: #090e1c;
+  color: #ffffff;
+  padding: 8px;
+}
+
+/* 复用TextNode的滑动条样式 */
+.slider-container {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  flex: 1;
+  min-width: 120px;
+}
+
+.slider-track {
+  position: relative;
+  flex: 1;
+  height: 20px;
+  background: transparent;
+  min-width: 80px;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+}
+
+.slider-track::before {
+  content: '';
+  position: absolute;
+  left: 0;
+  top: 50%;
+  transform: translateY(-50%);
+  width: 100%;
+  height: 4px;
+  background: #091c33;
+  border-radius: 0;
+  transition: background-color 0.2s ease;
+}
+
+.slider-track:hover::before {
+  background: #0a2040;
+}
+
+.slider-progress {
+  position: absolute;
+  left: 0;
+  top: 50%;
+  transform: translateY(-50%);
+  height: 4px;
+  background: #014a64;
+  border-radius: 0;
+  transition: width 0.1s ease;
+  pointer-events: none;
+}
+
+.slider-input {
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+  opacity: 0;
+  cursor: pointer;
+  -webkit-appearance: none;
+  appearance: none;
+  margin: 0;
+  background: transparent;
+  z-index: 10;
+}
+
+.slider-input::-webkit-slider-thumb {
+  -webkit-appearance: none;
+  appearance: none;
+  width: 12px;
+  height: 12px;
+  background: #7de1ea;
+  border-radius: 0;
+  cursor: grab;
+  border: 1px solid #014a64;
+  position: relative;
+  z-index: 11;
+  opacity: 1;
+  pointer-events: auto;
+}
+
+.slider-input:active::-webkit-slider-thumb {
+  cursor: grabbing;
+  background: #ffffff;
+}
+
+.slider-input::-moz-range-thumb {
+  width: 12px;
+  height: 12px;
+  background: #7de1ea;
+  border-radius: 0;
+  cursor: grab;
+  border: 1px solid #014a64;
+  position: relative;
+  z-index: 11;
+  -moz-appearance: none;
+  appearance: none;
+}
+
+.slider-input:active::-moz-range-thumb {
+  cursor: grabbing;
+  background: #ffffff;
+}
+
+/* 数值显示 - 复用variable-value */
+.variable-value {
+  color: #ffffff;
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 14px; /* 保持数值显示字号 */
+  text-align: center;
+  padding: 2px 6px;
+  min-width: 30px;
+  flex-shrink: 0;
+  border: 1px solid transparent;
+  cursor: pointer;
+  transition: border-color 0.2s ease;
+}
+
+.variable-value:hover {
+  border-color: #7de1ea;
+  background: rgba(125, 225, 234, 0.1);
+}
+
+/* 操作按钮区域 - 复用reset-inputs-btn */
+.settings-actions {
+  position: relative;
+  background: rgba(9, 14, 28, 0.5);
+  padding: 10px;
+  margin-bottom: 2px;
+  border: none;
+  min-height: 20px;
+  box-sizing: border-box;
+  display: flex;
+  justify-content: center;
+}
+
+.reset-button {
+  background: transparent;
+  border: 1px solid rgba(125, 225, 234, 0.3);
+  color: #7de1ea;
+  padding: 2px 8px;
+  cursor: pointer;
+  border-radius: 0;
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 12px; /* 保持按钮字号 */
+  transition: all 0.2s ease;
+}
+
+.reset-button:hover {
+  background: rgba(125, 225, 234, 0.1);
+  border-color: #7de1ea;
+  color: #ffffff;
+}
+
+/* 滚动条样式 */
+.settings-panel::-webkit-scrollbar {
+  width: 6px;
+}
+
+.settings-panel::-webkit-scrollbar-track {
+  background: rgba(125, 225, 234, 0.1);
+  border-radius: 0;
+}
+
+.settings-panel::-webkit-scrollbar-thumb {
+  background: rgba(125, 225, 234, 0.3);
+  border-radius: 0;
+}
+
+.settings-panel::-webkit-scrollbar-thumb:hover {
+  background: rgba(125, 225, 234, 0.5);
+} 

@@ -23,7 +23,20 @@ export type TextNodeData = {
     inputs?: boolean;
     outputs?: boolean;
     logs?: boolean;
+    errors?: boolean;
   }; // 隐藏的区域
+  errors?: Array<{
+    message: string;
+    line?: number;
+    column?: number;
+    stack?: string;
+  }>; // 错误信息数组
+  warnings?: Array<{
+    message: string;
+    line?: number;
+    column?: number;
+    stack?: string;
+  }>; // 警告信息数组
 };
 
 export type TextNodeType = Node<TextNodeData, 'text'>;
@@ -60,6 +73,7 @@ const TextNode: React.FC<NodeProps<TextNodeType>> = ({ id, data, selected }) => 
     inputs?: boolean;
     outputs?: boolean;
     logs?: boolean;
+    errors?: boolean; // 添加错误区域动画状态
   }>({});
   
   // React Flow 实例，用于更新节点数据
@@ -167,6 +181,20 @@ const TextNode: React.FC<NodeProps<TextNodeType>> = ({ id, data, selected }) => 
   const [consoleLogs, setConsoleLogs] = useState<string[]>(data.consoleLogs || []);
   const [isExecuting, setIsExecuting] = useState(false);
   
+  // 错误和警告状态
+  const [errors, setErrors] = useState<Array<{
+    message: string;
+    line?: number;
+    column?: number;
+    stack?: string;
+  }>>(data.errors || []);
+  const [warnings, setWarnings] = useState<Array<{
+    message: string;
+    line?: number;
+    column?: number;
+    stack?: string;
+  }>>(data.warnings || []);
+  
   // 控件值状态
   const [controlValues, setControlValues] = useState<Record<string, any>>({});
   
@@ -259,7 +287,18 @@ const TextNode: React.FC<NodeProps<TextNodeType>> = ({ id, data, selected }) => 
 
   // 执行JS代码
   const executeCode = useCallback(async (code: string, inputValues: Record<string, any> = {}) => {
-    if (!code.trim()) return;
+    if (!code.trim()) {
+      // 清空错误状态时添加淡出动画
+      if (errors.length > 0 || warnings.length > 0) {
+        setAnimatingOut(prev => ({ ...prev, errors: true }));
+        setTimeout(() => {
+          setErrors([]);
+          setWarnings([]);
+          setAnimatingOut(prev => ({ ...prev, errors: false }));
+        }, 300);
+      }
+      return;
+    }
     
     // 如果正在执行，跳过新的执行请求
     if (isExecuting) {
@@ -291,6 +330,20 @@ const TextNode: React.FC<NodeProps<TextNodeType>> = ({ id, data, selected }) => 
         // 更新日志
         setConsoleLogs(result.logs);
         
+        // 清空错误和警告时添加淡出动画
+        if (errors.length > 0 || warnings.length > 0) {
+          setAnimatingOut(prev => ({ ...prev, errors: true }));
+          setTimeout(() => {
+            setErrors([]);
+            setWarnings([]);
+            setAnimatingOut(prev => ({ ...prev, errors: false }));
+          }, 300);
+        } else {
+          // 如果之前没有错误，直接清空
+          setErrors([]);
+          setWarnings([]);
+        }
+        
         // 同步到React Flow节点数据
         setNodes((nodes) =>
           nodes.map((node) => {
@@ -301,7 +354,9 @@ const TextNode: React.FC<NodeProps<TextNodeType>> = ({ id, data, selected }) => 
                   ...node.data, 
                   controls: result.controls,
                   outputs: result.outputs,
-                  consoleLogs: result.logs
+                  consoleLogs: result.logs,
+                  errors: [],
+                  warnings: []
                 } 
               };
             }
@@ -311,14 +366,58 @@ const TextNode: React.FC<NodeProps<TextNodeType>> = ({ id, data, selected }) => 
         
         console.log('代码执行成功:', result);
       } else {
-        console.error('代码执行失败:', result.error);
+        console.error('代码执行失败:', result.errors);
+        
+        // 更新错误状态
+        const sortedErrors = (result.errors || []).sort((a: any, b: any) => (a.line || 0) - (b.line || 0));
+        setErrors(sortedErrors);
+        setWarnings(result.warnings || []);
+        
+        // 同步到React Flow节点数据
+        setNodes((nodes) =>
+          nodes.map((node) => {
+            if (node.id === id) {
+              return { 
+                ...node, 
+                data: { 
+                  ...node.data, 
+                  errors: sortedErrors,
+                  warnings: result.warnings || []
+                } 
+              };
+            }
+            return node;
+          })
+        );
       }
     } catch (error) {
       console.error('JS代码执行失败:', error);
+      const errorInfo = {
+        message: error instanceof Error ? error.message : String(error),
+        stack: error instanceof Error ? error.stack : undefined
+      };
+      setErrors([errorInfo]);
+      
+      // 同步到React Flow节点数据
+      setNodes((nodes) =>
+        nodes.map((node) => {
+          if (node.id === id) {
+            return { 
+              ...node, 
+              data: { 
+                ...node.data, 
+                errors: [errorInfo],
+                warnings: []
+              } 
+            };
+          }
+          return node;
+        })
+      );
     } finally {
       setIsExecuting(false);
     }
-  }, [id, setNodes, isExecuting, getConnectedNodeData]);
+  }, [id, setNodes, isExecuting, getConnectedNodeData, errors.length, warnings.length]);
 
   // 记录最近一次点击事件，用于进入编辑态时定位光标
   const lastPointerDown = useRef<{ x: number; y: number } | null>(null);
@@ -507,6 +606,36 @@ const TextNode: React.FC<NodeProps<TextNodeType>> = ({ id, data, selected }) => 
       return () => clearTimeout(timeoutId);
     }
   }, [text, isEditing, controlValues, executeCode, getConnectedNodeData, adjustDisplayWidth]);
+
+  // 监听上游节点更新事件
+  useEffect(() => {
+    const handleUpstreamChange = (event: CustomEvent) => {
+      const { nodeId, sourceNodeId, timestamp, reason } = event.detail;
+      
+      // 检查是否是当前节点需要更新
+      if (nodeId === id) {
+        console.log(`节点 ${id} 收到上游节点 ${sourceNodeId} 的更新通知，原因: ${reason || 'data-change'}，时间戳: ${timestamp}`);
+        
+        // 重新执行代码
+        if (text.trim()) {
+          const inputValues: Record<string, any> = { ...controlValues };
+          const connectedData = getConnectedNodeData();
+          Object.assign(inputValues, connectedData);
+          
+          console.log(`节点 ${id} 开始重新执行代码，输入数据:`, inputValues);
+          executeCode(text, inputValues);
+        }
+      }
+    };
+
+    // 添加事件监听器
+    document.addEventListener('node-upstream-changed', handleUpstreamChange as EventListener);
+    
+    // 清理事件监听器
+    return () => {
+      document.removeEventListener('node-upstream-changed', handleUpstreamChange as EventListener);
+    };
+  }, [id, text, controlValues, executeCode, getConnectedNodeData]);
 
   // 当变量值变化时，重新执行代码
   const handleVariableChange = useCallback((name: string, value: any) => {
@@ -763,6 +892,62 @@ const TextNode: React.FC<NodeProps<TextNodeType>> = ({ id, data, selected }) => 
     );
   };
 
+  // 渲染错误卡片
+  const renderErrorCard = (error: {
+    message: string;
+    line?: number;
+    column?: number;
+    stack?: string;
+  }, index: number) => {
+    return (
+      <div key={index} className="error-card animate-fade-in-up" style={{ animationDelay: `${index * 0.1}s` }}>
+        <div className="error-header">
+          <span className="error-label">Error</span>
+          {error.line && (
+            <span className="error-location">行 {error.line}{error.column ? `:${error.column}` : ''}</span>
+          )}
+        </div>
+        <div className="error-message">{error.message}</div>
+        {error.stack && (
+          <div className="error-stack">
+            <details>
+              <summary>栈追踪</summary>
+              <pre>{error.stack}</pre>
+            </details>
+          </div>
+        )}
+      </div>
+    );
+  };
+
+  // 渲染警告卡片  
+  const renderWarningCard = (warning: {
+    message: string;
+    line?: number;
+    column?: number;
+    stack?: string;
+  }, index: number) => {
+    return (
+      <div key={index} className="warning-card animate-fade-in-up" style={{ animationDelay: `${index * 0.1}s` }}>
+        <div className="warning-header">
+          <span className="warning-label">Warning</span>
+          {warning.line && (
+            <span className="warning-location">行 {warning.line}{warning.column ? `:${warning.column}` : ''}</span>
+          )}
+        </div>
+        <div className="warning-message">{warning.message}</div>
+        {warning.stack && (
+          <div className="warning-stack">
+            <details>
+              <summary>栈追踪</summary>
+              <pre>{warning.stack}</pre>
+            </details>
+          </div>
+        )}
+      </div>
+    );
+  };
+
   // 新增：处理Code标签点击事件
   const handleCodeLabelClick = () => {
     setShowSections(!showSections);
@@ -808,7 +993,7 @@ const TextNode: React.FC<NodeProps<TextNodeType>> = ({ id, data, selected }) => 
   }, [isCollapsed, updateNodeData]);
 
   // 切换隐藏指定区域
-  const toggleHideSection = useCallback((section: 'inputs' | 'outputs' | 'logs') => {
+  const toggleHideSection = useCallback((section: 'inputs' | 'outputs' | 'logs' | 'errors') => {
     const isCurrentlyVisible = !hiddenSections[section];
     
     if (isCurrentlyVisible) {
@@ -957,6 +1142,15 @@ const TextNode: React.FC<NodeProps<TextNodeType>> = ({ id, data, selected }) => 
             >
               <svg viewBox="0 0 24 24" width="16" height="16">
                 <path fill="currentColor" d="M14,2H6A2,2 0 0,0 4,4V20A2,2 0 0,0 6,22H18A2,2 0 0,0 20,20V8L14,2M18,20H6V4H13V9H18V20Z" />
+              </svg>
+            </button>
+            <button
+              className="control-button"
+              onClick={() => toggleHideSection('errors')}
+              title={hiddenSections.errors ? '显示错误' : '隐藏错误'}
+            >
+              <svg viewBox="0 0 24 24" width="16" height="16">
+                <path fill="currentColor" d="M13,13H11V7H13M11,15H13V17H11M15.73,3H8.27L3,8.27V15.73L8.27,21H15.73L21,15.73V8.27L15.73,3Z" />
               </svg>
             </button>
             <button
@@ -1111,8 +1305,27 @@ const TextNode: React.FC<NodeProps<TextNodeType>> = ({ id, data, selected }) => 
         </div>
       )}
 
+      {/* 错误和警告区域 - 在代码区域下面，输入区域上面 */}
+      {!isCollapsed && ((errors.length > 0 || warnings.length > 0) || animatingOut.errors) && (
+        <div className={`text-node-errors-section ${animatingOut.errors ? 'animate-fade-out-down' : 'animate-fade-in-up'}`}>
+          {/* 错误卡片 - 按行号排序 */}
+          {errors.sort((a, b) => (a.line || 0) - (b.line || 0)).map((error, index) => (
+            <div key={index} className={`${animatingOut.errors ? 'animate-fade-out-left' : ''}`} style={{ animationDelay: `${index * 0.1}s` }}>
+              {renderErrorCard(error, index)}
+            </div>
+          ))}
+          
+          {/* 警告卡片 - 按行号排序 */}
+          {warnings.sort((a, b) => (a.line || 0) - (b.line || 0)).map((warning, index) => (
+            <div key={index + errors.length} className={`${animatingOut.errors ? 'animate-fade-out-left' : ''}`} style={{ animationDelay: `${(index + errors.length) * 0.1}s` }}>
+              {renderWarningCard(warning, index)}
+            </div>
+          ))}
+        </div>
+      )}
+
       {/* 输入区域 - 只在有变量控件时显示且未隐藏 */}
-      {!isEditing && !isCollapsed && (!hiddenSections.inputs || animatingOut.inputs) && controls.length > 0 && (data.showControls !== false) && (
+      {!isCollapsed && (!hiddenSections.inputs || animatingOut.inputs) && controls.length > 0 && (data.showControls !== false) && (
         <div className={`text-node-section text-node-inputs-section ${animatingOut.inputs ? 'animate-fade-out-down' : 'animate-fade-in-up'}`}>
           <div 
             className="section-label clickable" 
@@ -1133,7 +1346,7 @@ const TextNode: React.FC<NodeProps<TextNodeType>> = ({ id, data, selected }) => 
       )}
 
       {/* 日志区域 - 在输入区域下面，输出区域上面 */}
-      {!isEditing && !isCollapsed && (!hiddenSections.logs || animatingOut.logs) && consoleLogs.length > 0 && (
+      {!isCollapsed && (!hiddenSections.logs || animatingOut.logs) && consoleLogs.length > 0 && (
         <div className={`text-node-section text-node-logs-section ${animatingOut.logs ? 'animate-fade-out-down' : 'animate-fade-in-up'}`}>
           <div className="section-label">Logs</div>
           <div className="log-container">
@@ -1147,7 +1360,7 @@ const TextNode: React.FC<NodeProps<TextNodeType>> = ({ id, data, selected }) => 
       )}
 
       {/* 输出区域 - 只在有输出时显示且未隐藏 */}
-      {!isEditing && !isCollapsed && (!hiddenSections.outputs || animatingOut.outputs) && Object.keys(outputs).length > 0 && (
+      {!isCollapsed && (!hiddenSections.outputs || animatingOut.outputs) && Object.keys(outputs).length > 0 && (
         <div className={`text-node-section text-node-outputs-section ${animatingOut.outputs ? 'animate-fade-out-down' : 'animate-fade-in-up'}`}>
           <div className="section-label">Outputs</div>
           {Object.keys(outputs).map((output, index) => (

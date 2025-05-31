@@ -1,0 +1,275 @@
+/* 底部工具栏容器 - 恢复原样式 */
+.bottom-toolbar {
+  position: fixed;
+  bottom: 20px;
+  left: 50%;
+  transform: translateX(-50%);
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  background: transparent; /* 移除背景 */
+  border: none; /* 移除边框 */
+  border-radius: 0; /* 方形美学 */
+  padding: 12px 20px;
+  font-family: 'JetBrains Mono', monospace;
+  z-index: 1000;
+  backdrop-filter: none; /* 移除模糊效果 */
+  min-width: 300px;
+  box-shadow: none; /* 移除阴影 */
+  pointer-events: none; /* 让工具栏容器不干扰鼠标事件 */
+}
+
+/* 模式选择器 */
+.mode-selector {
+  display: flex;
+  gap: 8px;
+  pointer-events: auto; /* 恢复子元素的鼠标事件 */
+}
+
+/* 导入导出功能区 */
+.import-export-section {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  pointer-events: auto;
+}
+
+/* 设置区域 */
+.settings-section {
+  pointer-events: auto;
+  margin-left: 16px;
+}
+
+/* 模式按钮样式 - 恢复原样式 */
+.mode-button {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  background: rgba(9, 14, 28, 0.9); /* 给按钮添加背景 */
+  border: 1px solid rgba(125, 225, 234, 0.3);
+  color: #7de1ea;
+  padding: 8px 12px;
+  cursor: pointer;
+  border-radius: 0; /* 方形美学 */
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 13px;
+  font-weight: 500;
+  transition: all 0.2s ease;
+  min-width: 80px;
+  justify-content: center;
+  backdrop-filter: blur(8px); /* 按钮级别的模糊 */
+}
+
+.mode-button:hover {
+  background: rgba(125, 225, 234, 0.1);
+  border-color: #7de1ea;
+  color: #ffffff;
+  transform: translateY(-1px);
+}
+
+.mode-button.active {
+  background: rgba(125, 225, 234, 0.2);
+  border-color: #7de1ea;
+  color: #ffffff;
+  box-shadow: 0 0 8px rgba(125, 225, 234, 0.3);
+}
+
+.mode-button.active:hover {
+  background: rgba(125, 225, 234, 0.25);
+  transform: translateY(-1px);
+}
+
+/* 连接模式特殊状态 */
+.mode-button.connecting {
+  background: rgba(255, 165, 0, 0.2) !important; /* 橙色背景表示正在连接 */
+  border-color: #ffa500 !important;
+  color: #ffa500 !important;
+  animation: pulse-connecting 1.5s infinite;
+}
+
+.mode-button.connecting:hover {
+  background: rgba(255, 165, 0, 0.3) !important;
+  border-color: #ffa500 !important;
+  color: #ffffff !important;
+}
+
+@keyframes pulse-connecting {
+  0% {
+    box-shadow: 0 0 8px rgba(255, 165, 0, 0.3);
+  }
+  50% {
+    box-shadow: 0 0 16px rgba(255, 165, 0, 0.6);
+  }
+  100% {
+    box-shadow: 0 0 8px rgba(255, 165, 0, 0.3);
+  }
+}
+
+.mode-button svg {
+  flex-shrink: 0;
+}
+
+.mode-button span {
+  white-space: nowrap;
+}
+
+/* 工具按钮样式 - 使用相同样式 */
+.utility-button {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  background: rgba(9, 14, 28, 0.9);
+  border: 1px solid rgba(125, 225, 234, 0.3);
+  color: #7de1ea;
+  padding: 8px 12px;
+  cursor: pointer;
+  border-radius: 0;
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 13px;
+  font-weight: 500;
+  transition: all 0.2s ease;
+  min-width: 80px;
+  justify-content: center;
+  backdrop-filter: blur(8px);
+}
+
+.utility-button:hover {
+  background: rgba(125, 225, 234, 0.1);
+  border-color: #7de1ea;
+  color: #ffffff;
+  transform: translateY(-1px);
+}
+
+.utility-button svg {
+  flex-shrink: 0;
+}
+
+.utility-button span {
+  white-space: nowrap;
+}
+
+/* 设置按钮样式 - 恢复原样式 */
+.settings-button {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  background: rgba(9, 14, 28, 0.9); /* 给按钮添加背景 */
+  border: 1px solid rgba(125, 225, 234, 0.3);
+  color: #7de1ea;
+  padding: 8px 12px;
+  cursor: pointer;
+  border-radius: 0; /* 方形美学 */
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 13px;
+  font-weight: 500;
+  transition: all 0.2s ease;
+  min-width: 80px;
+  justify-content: center;
+  backdrop-filter: blur(8px); /* 按钮级别的模糊 */
+}
+
+.settings-button:hover {
+  background: rgba(125, 225, 234, 0.1);
+  border-color: #7de1ea;
+  color: #ffffff;
+  transform: translateY(-1px);
+}
+
+.settings-button:active {
+  background: rgba(125, 225, 234, 0.2);
+  transform: translateY(0);
+}
+
+.settings-button svg {
+  flex-shrink: 0;
+}
+
+.settings-button span {
+  white-space: nowrap;
+}
+
+/* 下拉菜单容器 */
+.import-dropdown {
+  position: relative;
+}
+
+/* 下拉触发按钮 */
+.dropdown-trigger {
+  position: relative;
+}
+
+.dropdown-trigger .dropdown-arrow {
+  margin-left: 4px;
+  transition: transform 0.2s ease;
+}
+
+/* 下拉菜单 */
+.import-dropdown-menu {
+  position: absolute;
+  bottom: 100%;
+  left: 0;
+  margin-bottom: 8px;
+  background: rgba(9, 14, 28, 0.95);
+  border: 1px solid rgba(125, 225, 234, 0.3);
+  min-width: 140px;
+  opacity: 0;
+  visibility: hidden;
+  transform: translateY(10px);
+  transition: all 0.2s ease;
+  backdrop-filter: blur(8px);
+}
+
+/* 显示下拉菜单 */
+.import-dropdown:hover .import-dropdown-menu {
+  opacity: 1;
+  visibility: visible;
+  transform: translateY(0);
+}
+
+.import-dropdown:hover .dropdown-trigger .dropdown-arrow {
+  transform: rotate(180deg);
+}
+
+/* 下拉菜单项 */
+.dropdown-item {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  width: 100%;
+  padding: 8px 12px;
+  background: transparent;
+  color: #7de1ea;
+  border: none;
+  cursor: pointer;
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 13px;
+  text-align: left;
+  transition: all 0.2s ease;
+}
+
+.dropdown-item:hover {
+  background: rgba(125, 225, 234, 0.2);
+  color: #ffffff;
+}
+
+/* 响应式调整 */
+@media (max-width: 480px) {
+  .bottom-toolbar {
+    min-width: 280px;
+    padding: 10px 16px;
+  }
+  
+  .mode-button,
+  .utility-button,
+  .settings-button {
+    padding: 6px 10px;
+    font-size: 12px;
+    min-width: 70px;
+  }
+  
+  .mode-button span,
+  .utility-button span,
+  .settings-button span {
+    display: none; /* 小屏幕隐藏文字，只显示图标 */
+  }
+} 
