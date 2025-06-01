@@ -64,7 +64,6 @@ function placeCaretAtPoint(x: number, y: number) {
 const TextNode: React.FC<NodeProps<TextNodeType>> = ({ id, data, selected }) => {
   const [isEditing, setIsEditing] = useState(false);
   const [text, setText] = useState(data.label || '');
-  const [showSections, setShowSections] = useState(true); // 控制卡片显示/隐藏
   const [isEditingName, setIsEditingName] = useState(false); // 是否在编辑节点名称
   const [nodeName, setNodeName] = useState(data.nodeName || '未命名节点');
   
@@ -948,11 +947,6 @@ const TextNode: React.FC<NodeProps<TextNodeType>> = ({ id, data, selected }) => 
     );
   };
 
-  // 新增：处理Code标签点击事件
-  const handleCodeLabelClick = () => {
-    setShowSections(!showSections);
-  };
-
   // 更新节点数据的通用函数
   const updateNodeData = useCallback((updates: Partial<TextNodeData>) => {
     setNodes((nodes) =>
@@ -1401,7 +1395,7 @@ const TextNode: React.FC<NodeProps<TextNodeType>> = ({ id, data, selected }) => 
             }}
             minWidth={200}
             resizeDirection="horizontal"
-            onResize={(event, data) => {
+            onResize={(_event, data) => {
               // 更新节点数据中的宽度
               updateNodeData({ width: data.width });
             }}
