@@ -3,6 +3,7 @@ import { Handle, Position, NodeProps, Node, useReactFlow, NodeResizeControl } fr
 import './styles.css';
 import '../../styles/syntax-highlighting.css';
 import { jsExecutor, ControlInfo } from '../../services/jsExecutor';
+import { useToolStore } from '../../store/toolStore';
 import Prism from 'prismjs';
 import 'prismjs/components/prism-javascript';
 
@@ -66,6 +67,9 @@ const TextNode: React.FC<NodeProps<TextNodeType>> = ({ id, data, selected }) => 
   const [text, setText] = useState(data.label || '');
   const [isEditingName, setIsEditingName] = useState(false); // 是否在编辑节点名称
   const [nodeName, setNodeName] = useState(data.nodeName || '未命名节点');
+  
+  // 获取当前工具状态
+  const activeTool = useToolStore((state) => state.activeTool);
   
   // 动画状态管理
   const [animatingOut, setAnimatingOut] = useState<{
@@ -690,7 +694,12 @@ const TextNode: React.FC<NodeProps<TextNodeType>> = ({ id, data, selected }) => 
         >
           <div className="toggle-knob"></div>
         </div>
-        <span className="toggle-text">{isActive ? 'true' : 'false'}</span>
+        <span 
+          className="toggle-text" 
+          style={{ color: isActive ? '#28d900' : '#d90000' }}
+        >
+          {isActive ? 'true' : 'false'}
+        </span>
       </div>
     );
   };
@@ -757,6 +766,12 @@ const TextNode: React.FC<NodeProps<TextNodeType>> = ({ id, data, selected }) => 
       e.stopPropagation();
     };
 
+    // 处理滑动条释放，移除焦点以恢复键盘响应
+    const handleSliderMouseUp = (e: React.MouseEvent) => {
+      e.stopPropagation();
+      (e.target as HTMLElement).blur(); // 移除焦点，恢复键盘响应
+    };
+
     // 如果正在编辑设置，显示设置面板
     if (isEditingThis) {
       return (
@@ -811,31 +826,62 @@ const TextNode: React.FC<NodeProps<TextNodeType>> = ({ id, data, selected }) => 
     // 正常的滑动条显示
     return (
       <div className="slider-container nodrag">
-        <div className="slider-track" onMouseDown={handleSliderMouseDown}>
-          <div 
-            className="slider-progress" 
-            style={{ width: `${progress}%` }}
-          ></div>
-          <input
-            type="range"
-            min={min}
-            max={max}
-            step={step}
-            value={currentValue}
-            onChange={handleSliderChange}
-            onMouseDown={handleSliderMouseDown}
-            className="slider-input"
-          />
+        {/* 显示：最小值 {滑动条} 最大值 值 */}
+        <div className="slider-layout">
+          <span 
+            className="slider-min-value"
+            onClick={handleValueClick}
+            style={{ cursor: 'pointer', color: '#7de1ea', margin: '0 8px' }}
+            title="点击设置范围"
+          >
+            {min}
+          </span>
+          <div className="slider-track-wrapper">
+            <div className="slider-track" onMouseDown={handleSliderMouseDown} onMouseUp={handleSliderMouseUp}>
+              <div 
+                className="slider-progress" 
+                style={{ width: `${progress}%` }}
+              ></div>
+              <input
+                type="range"
+                min={min}
+                max={max}
+                step={step}
+                value={currentValue}
+                onChange={handleSliderChange}
+                onMouseDown={handleSliderMouseDown}
+                onMouseUp={handleSliderMouseUp}
+                className="slider-input"
+              />
+            </div>
+          </div>
+          <span 
+            className="slider-max-value"
+            onClick={handleValueClick}
+            style={{ cursor: 'pointer', color: '#7de1ea', margin: '0 8px' }}
+            title="点击设置范围"
+          >
+            {max}
+          </span>
+          <span 
+            className="slider-current-value"
+            onClick={(e) => {
+              e.preventDefault();
+              e.stopPropagation();
+              // TODO: 实现直接设置数值的功能
+              const newValue = prompt(`设置 ${control.name} 的值:`, String(currentValue));
+              if (newValue !== null && !isNaN(Number(newValue))) {
+                const numValue = Math.max(min, Math.min(max, Number(newValue)));
+                handleVariableChange(control.name, numValue);
+              }
+            }}
+            onContextMenu={handleValueRightClick}
+            style={{ cursor: 'pointer', color: '#7de1ea' }}
+            title="左键直接设置值，右键重置"
+          >
+            {currentValue}
+          </span>
         </div>
-        <span 
-          className="variable-value"
-          onClick={handleValueClick}
-          onContextMenu={handleValueRightClick}
-          style={{ cursor: 'pointer' }}
-          title="左键设置范围，右键重置"
-        >
-          {currentValue}
-        </span>
       </div>
     );
   };
@@ -877,15 +923,15 @@ const TextNode: React.FC<NodeProps<TextNodeType>> = ({ id, data, selected }) => 
     const value = outputs[outputName]; // 直接从outputs获取值
     const valueStr = String(value);
     const type = typeof value;
-    const nameLength = outputName.length;
-    const shouldWrap = nameLength > 10; // 如果变量名超过10个字符，换行显示
     
     return (
-      <div key={index} className={`output-variable ${shouldWrap ? 'wrapped' : ''}`}>
-        <span className="output-variable-name">{outputName}</span>
-        <div className="output-variable-value">
-          <span className="output-variable-type">{type}: </span>
-          {valueStr}
+      <div key={index} className="output-variable">
+        <div className="output-left">
+          <span className="output-variable-name" style={{ color: '#ffffff' }}>{outputName}</span>
+          <span className="output-variable-type" style={{ color: '#091c33' }}>:{type}</span>
+        </div>
+        <div className="output-right">
+          <span className="output-variable-value" style={{ color: '#7de1ea' }}>{valueStr}</span>
         </div>
       </div>
     );
@@ -1223,7 +1269,7 @@ const TextNode: React.FC<NodeProps<TextNodeType>> = ({ id, data, selected }) => 
                   lineHeight: '1.5',
                   margin: 0,
                   padding: '8px',
-                  whiteSpace: 'pre', // 改为pre，保持代码格式但允许宽度扩展
+                  whiteSpace: 'pre-wrap', // 改为pre-wrap，支持自动换行
                   background: 'transparent',
                   border: 'none',
                   outline: 'none',
@@ -1251,7 +1297,7 @@ const TextNode: React.FC<NodeProps<TextNodeType>> = ({ id, data, selected }) => 
                   lineHeight: '1.5',
                   margin: 0,
                   padding: '8px',
-                  whiteSpace: 'pre', // 改为pre，保持代码格式但允许宽度扩展
+                  whiteSpace: 'pre-wrap', // 改为pre-wrap，支持自动换行
                   background: 'transparent',
                   border: 'none',
                   outline: 'none',
@@ -1280,7 +1326,7 @@ const TextNode: React.FC<NodeProps<TextNodeType>> = ({ id, data, selected }) => 
                     lineHeight: '1.5',
                     margin: 0,
                     padding: 0,
-                    whiteSpace: 'pre', // 改为pre，保持代码格式但允许宽度扩展
+                    whiteSpace: 'pre-wrap', // 改为pre-wrap，支持自动换行
                     overflow: 'visible' // 保持visible
                   }}
                 />
@@ -1365,26 +1411,48 @@ const TextNode: React.FC<NodeProps<TextNodeType>> = ({ id, data, selected }) => 
         </div>
       )}
 
-      {/* 连接句柄（隐藏） */}
+      {/* 连接句柄 - 禁用拖动，只允许点击连接 */}
       <Handle
         type="source"
         position={Position.Right}
         id="main"
-        className="text-node-handle hide-handle"
-        isConnectable={true}
+        className="text-node-handle"
+        isConnectable={activeTool === 'connect'}
+        isConnectableStart={false} // 禁用拖动开始连接
+        style={{
+          width: '100%',
+          height: '100%',
+          background: 'transparent',
+          border: 'none',
+          borderRadius: 0,
+          right: '-50%',
+          transform: 'translateX(50%)',
+          pointerEvents: 'none' // 禁用所有鼠标事件，防止拖动
+        }}
       />
       <Handle
         type="target"
         position={Position.Left}
         id="main"
-        className="text-node-handle hide-handle"
-        isConnectable={true}
-        isConnectableStart={false}
+        className="text-node-handle"
+        isConnectable={activeTool === 'connect'}
+        isConnectableStart={false} // 禁用拖动开始连接
+        style={{
+          width: '100%',
+          height: '100%',
+          background: 'transparent',
+          border: 'none',
+          borderRadius: 0,
+          left: '-50%',
+          transform: 'translateX(-50%)',
+          pointerEvents: 'none' // 禁用所有鼠标事件，防止拖动
+        }}
       />
       
       {/* 节点宽度调整控制 - 仅在选中且非折叠时显示 */}
       {selected && !isCollapsed && (
         <>
+          {/* 左侧调整控制 */}
           <NodeResizeControl
             style={{
               background: 'transparent',
@@ -1392,9 +1460,29 @@ const TextNode: React.FC<NodeProps<TextNodeType>> = ({ id, data, selected }) => 
               width: '8px',
               height: '100%',
               borderRadius: 0,
+              left: '-4px',
+              cursor: 'ew-resize'
             }}
+            position="left"
             minWidth={200}
-            resizeDirection="horizontal"
+            onResize={(_event, data) => {
+              // 更新节点数据中的宽度
+              updateNodeData({ width: data.width });
+            }}
+          />
+          {/* 右侧调整控制 */}
+          <NodeResizeControl
+            style={{
+              background: 'transparent',
+              border: 'none',
+              width: '8px',
+              height: '100%',
+              borderRadius: 0,
+              right: '-4px',
+              cursor: 'ew-resize'
+            }}
+            position="right"
+            minWidth={200}
             onResize={(_event, data) => {
               // 更新节点数据中的宽度
               updateNodeData({ width: data.width });

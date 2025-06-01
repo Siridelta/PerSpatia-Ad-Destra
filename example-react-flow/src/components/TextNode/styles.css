@@ -361,7 +361,7 @@
   font-family: 'JetBrains Mono', monospace;
   font-size: 14px;
   line-height: 1.5;
-  white-space: pre; /* 改为pre，保持代码格式但允许宽度扩展 */
+  white-space: pre-wrap; /* 改为pre-wrap，支持自动换行 */
   overflow: visible; /* 允许溢出，触发容器扩展 */
   box-sizing: border-box;
   display: inline; /* 让pre表现为内联，这样能推动容器宽度 */
@@ -414,7 +414,7 @@
   line-height: 1.5;
   margin: 0;
   padding: 8px;
-  white-space: pre; /* 保持pre格式 */
+  white-space: pre-wrap; /* 改为pre-wrap支持换行 */
   overflow: visible; /* 允许溢出 */
 }
 
@@ -429,7 +429,7 @@
   caret-color: #7dd3fc;
   z-index: 2;
   resize: none;
-  white-space: pre; /* 保持pre格式 */
+  white-space: pre-wrap; /* 改为pre-wrap支持换行 */
   overflow: visible; /* 允许溢出 */
   background: transparent;
   border: none;
@@ -812,11 +812,19 @@
   display: none;
 }
 
-/* 隐藏原有的句柄 */
+/* 连接句柄样式 */
 .text-node-handle {
-  display: none;
+  opacity: 0; /* 默认隐藏 */
+  transition: opacity 0.2s ease;
+  z-index: 5;
 }
 
+/* 连接模式下显示句柄 */
+.connect-mode .text-node-handle {
+  opacity: 1;
+}
+
+/* 移除hide-handle类的定义 */
 .hide-handle {
   display: none;
 }
@@ -1066,4 +1074,79 @@
   color: rgba(255, 255, 255, 0.8);
   overflow-x: auto;
   white-space: pre-wrap;
+}
+
+/* 滑动条新布局样式 */
+.slider-layout {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: nowrap;
+  width: 100%; /* 确保占满宽度 */
+}
+
+.slider-variable-name {
+  font-weight: 600;
+  min-width: 60px;
+  display: none; /* 隐藏变量名，因为外层已经显示了 */
+}
+
+.slider-track-wrapper {
+  flex: 1;
+  min-width: 100px;
+  max-width: none; /* 移除最大宽度限制 */
+}
+
+.slider-min-value,
+.slider-max-value,
+.slider-current-value {
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 14px;
+  user-select: none;
+  transition: color 0.2s ease;
+}
+
+.slider-min-value:hover,
+.slider-max-value:hover,
+.slider-current-value:hover {
+  color: #ffffff !important;
+}
+
+/* 输出变量新布局样式 */
+.output-variable {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 1px 0; /* 原来是8px，减去7px变为1px */
+  border-bottom: 1px solid rgba(125, 225, 234, 0.1);
+}
+
+.output-variable:last-child {
+  border-bottom: none;
+}
+
+.output-left {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+}
+
+.output-right {
+  flex-shrink: 0;
+  text-align: right;
+}
+
+.output-variable-name {
+  font-weight: 600;
+  font-family: 'JetBrains Mono', monospace;
+}
+
+.output-variable-type {
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 13px;
+}
+
+.output-variable-value {
+  font-family: 'JetBrains Mono', monospace;
+  font-weight: 500;
 }
