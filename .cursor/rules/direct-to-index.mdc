@@ -1,0 +1,8 @@
+---
+description: 
+globs: 
+alwaysApply: true
+---
+如果你是 Chat 模式（聊天模式）而非 command+k request 模式（编辑器内生成代码模式）：
+
+- 开始工作前请先阅读 `.ai/index.md` 文档（如果存在），了解必要的信息和指引。
