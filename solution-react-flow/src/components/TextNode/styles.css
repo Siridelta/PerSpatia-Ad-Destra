@@ -5,7 +5,7 @@
   flex-direction: column;
   min-width: 300px; /* 增加最小宽度 */
   width: fit-content; /* 改回fit-content，让容器根据内容扩展 */
-  font-family: 'JetBrains Mono', monospace;
+  font-family: 'JetBrains Mono', '阿里妈妈方圆体', monospace;
   font-size: 14px;
   background: transparent;
   border: none;
@@ -33,7 +33,7 @@
   padding: 2px 8px;
   font-size: 16px;
   font-weight: 600;
-  font-family: 'JetBrains Mono', monospace;
+  font-family: 'JetBrains Mono', '阿里妈妈方圆体', monospace;
   z-index: 10;
   display: flex;
   align-items: center;
@@ -51,7 +51,7 @@
   color: #7de1ea;
   font-size: 16px;
   font-weight: 600;
-  font-family: 'JetBrains Mono', monospace;
+  font-family: 'JetBrains Mono', '阿里妈妈方圆体', monospace;
   cursor: pointer;
   padding: 0; /* 移除内边距 */
   border-radius: 0; /* 确保无圆角 */
@@ -68,7 +68,7 @@
   color: #7de1ea;
   font-size: 16px;
   font-weight: 600;
-  font-family: 'JetBrains Mono', monospace;
+  font-family: 'JetBrains Mono', '阿里妈妈方圆体', monospace;
   padding: 2px 4px;
   border-radius: 0; /* 确保无圆角 */
   outline: none;
@@ -168,7 +168,7 @@
   padding: 8px 16px;
   cursor: pointer;
   border-radius: 0;
-  font-family: 'JetBrains Mono', monospace;
+  font-family: 'JetBrains Mono', '阿里妈妈方圆体', monospace;
   font-size: 12px;
   margin-top: 10px;
   transition: all 0.2s ease;
@@ -297,7 +297,7 @@
   padding: 2px 8px;
   font-size: 14px;
   font-weight: 600;
-  font-family: 'JetBrains Mono', monospace;
+  font-family: 'JetBrains Mono', '阿里妈妈方圆体', monospace;
   z-index: 10;
   display: flex;
   align-items: center;
@@ -312,7 +312,7 @@
   padding: 2px 8px;
   cursor: pointer;
   border-radius: 0;
-  font-family: 'JetBrains Mono', monospace;
+  font-family: 'JetBrains Mono', '阿里妈妈方圆体', monospace;
   font-size: 12px;
   transition: all 0.2s ease;
 }
@@ -347,7 +347,7 @@
   line-height: 1.5;
   background: transparent;
   border: none;
-  font-family: 'JetBrains Mono', monospace;
+  font-family: 'JetBrains Mono', '阿里妈妈方圆体', monospace;
   box-sizing: border-box;
   display: block; /* 确保是块级元素 */
   padding: 8px;
@@ -358,7 +358,7 @@
   margin: 0;
   background: transparent;
   color: #ffffff;
-  font-family: 'JetBrains Mono', monospace;
+  font-family: 'JetBrains Mono', '阿里妈妈方圆体', monospace;
   font-size: 14px;
   line-height: 1.5;
   white-space: pre-wrap; /* 改为pre-wrap，支持自动换行 */
@@ -381,7 +381,7 @@
   background: transparent;
   padding: 0;
   margin: 0;
-  font-family: 'JetBrains Mono', monospace;
+  font-family: 'JetBrains Mono', '阿里妈妈方圆体', monospace;
   font-variant-ligatures: none;
   box-sizing: border-box;
 }
@@ -409,7 +409,7 @@
   outline: none;
   pointer-events: none;
   box-sizing: border-box;
-  font-family: 'JetBrains Mono', monospace;
+  font-family: 'JetBrains Mono', '阿里妈妈方圆体', monospace;
   font-size: 14px;
   line-height: 1.5;
   margin: 0;
@@ -434,7 +434,7 @@
   background: transparent;
   border: none;
   outline: none;
-  font-family: 'JetBrains Mono', monospace;
+  font-family: 'JetBrains Mono', '阿里妈妈方圆体', monospace;
   font-size: 14px;
   line-height: 1.5;
   margin: 0;
@@ -444,7 +444,7 @@
 
 .text-node-editor::placeholder {
   color: rgba(125, 225, 234, 0.4);
-  font-family: 'JetBrains Mono', monospace;
+  font-family: 'JetBrains Mono', '阿里妈妈方圆体', monospace;
   font-variant-ligatures: none;
 }
 
@@ -465,13 +465,13 @@
   align-items: center;
   margin: 5px 0;
   font-size: 14px;
-  font-family: 'JetBrains Mono', monospace;
+  font-family: 'JetBrains Mono', '阿里妈妈方圆体', monospace;
   gap: 12px;
 }
 
 .variable-label {
   color: #ffffff;
-  font-family: 'JetBrains Mono', monospace;
+  font-family: 'JetBrains Mono', '阿里妈妈方圆体', monospace;
   font-size: 14px;
   min-width: 60px;
   flex-shrink: 0;
@@ -479,7 +479,7 @@
 
 .variable-value {
   color: #ffffff;
-  font-family: 'JetBrains Mono', monospace;
+  font-family: 'JetBrains Mono', '阿里妈妈方圆体', monospace;
   font-size: 14px;
   text-align: right;
   padding: 2px 4px;
@@ -591,7 +591,7 @@
 /* 滑动条数值显示 */
 .variable-value {
   color: #ffffff;
-  font-family: 'JetBrains Mono', monospace;
+  font-family: 'JetBrains Mono', '阿里妈妈方圆体', monospace;
   font-size: 14px;
   text-align: center;
   padding: 2px 6px;
@@ -621,7 +621,7 @@
   border: none;
   border-bottom: 1px solid #091c33;
   color: #ffffff;
-  font-family: 'JetBrains Mono', monospace;
+  font-family: 'JetBrains Mono', '阿里妈妈方圆体', monospace;
   font-size: 14px;
   padding: 2px 4px;
   outline: none;
@@ -657,7 +657,7 @@
   align-items: center;
   justify-content: center;
   color: #ffffff;
-  font-family: 'JetBrains Mono', monospace;
+  font-family: 'JetBrains Mono', '阿里妈妈方圆体', monospace;
   font-size: 14px;
   font-weight: bold;
   overflow: hidden;
@@ -736,7 +736,7 @@
 
 .toggle-text {
   color: #ffffff;
-  font-family: 'JetBrains Mono', monospace;
+  font-family: 'JetBrains Mono', '阿里妈妈方圆体', monospace;
   font-size: 14px;
   margin-left: 8px;
 }
@@ -747,14 +747,14 @@
   justify-content: space-between;
   align-items: flex-start;
   margin: 5px 0;
-  font-family: 'JetBrains Mono', monospace;
+  font-family: 'JetBrains Mono', '阿里妈妈方圆体', monospace;
   font-size: 14px;
   flex-wrap: wrap;
 }
 
 .output-variable-name {
   color: #ffffff;
-  font-family: 'JetBrains Mono', monospace;
+  font-family: 'JetBrains Mono', '阿里妈妈方圆体', monospace;
   font-size: 14px;
   margin-right: 10px;
   flex: 0 0 auto;
@@ -762,7 +762,7 @@
 
 .output-variable-value {
   color: #ffffff;
-  font-family: 'JetBrains Mono', monospace;
+  font-family: 'JetBrains Mono', '阿里妈妈方圆体', monospace;
   font-size: 14px;
   text-align: right;
   flex: 1 1 auto;
@@ -771,7 +771,7 @@
 
 .output-variable-type {
   color: #7de1ea;
-  font-family: 'JetBrains Mono', monospace;
+  font-family: 'JetBrains Mono', '阿里妈妈方圆体', monospace;
   font-size: 14px;
 }
 
@@ -837,7 +837,7 @@
   padding: 8px;
   background: rgba(9, 28, 51, 0.8);
   border: 1px solid #014a64;
-  font-family: 'JetBrains Mono', monospace;
+  font-family: 'JetBrains Mono', '阿里妈妈方圆体', monospace;
   font-size: 14px;
 }
 
@@ -853,7 +853,7 @@
   border: none;
   border-bottom: 1px solid #091c33;
   color: #ffffff;
-  font-family: 'JetBrains Mono', monospace;
+  font-family: 'JetBrains Mono', '阿里妈妈方圆体', monospace;
   font-size: 14px;
   padding: 2px 0;
   width: 60px;
@@ -873,7 +873,7 @@
 .log-container {
   max-height: 120px;
   overflow-y: auto;
-  font-family: 'JetBrains Mono', monospace;
+  font-family: 'JetBrains Mono', '阿里妈妈方圆体', monospace;
   font-size: 14px;
 }
 
@@ -881,7 +881,7 @@
   color: #ffffff;
   margin: 2px 0;
   padding: 2px 0;
-  font-family: 'JetBrains Mono', monospace;
+  font-family: 'JetBrains Mono', '阿里妈妈方圆体', monospace;
   font-size: 14px;
   line-height: 1.4;
   white-space: pre-wrap;
@@ -927,7 +927,7 @@
   padding: 2px 8px;
   font-size: 14px;
   font-weight: 600;
-  font-family: 'JetBrains Mono', monospace;
+  font-family: 'JetBrains Mono', '阿里妈妈方圆体', monospace;
   z-index: 10;
   display: flex;
   align-items: center;
@@ -954,7 +954,7 @@
   color: #ffffff;
   margin-bottom: 8px;
   word-wrap: break-word;
-  font-family: 'JetBrains Mono', monospace;
+  font-family: 'JetBrains Mono', '阿里妈妈方圆体', monospace;
   font-size: 14px;
   padding-top: 8px; /* 为标签留出空间 */
   line-height: 1.5;
@@ -1011,7 +1011,7 @@
   padding: 2px 8px;
   font-size: 14px;
   font-weight: 600;
-  font-family: 'JetBrains Mono', monospace;
+  font-family: 'JetBrains Mono', '阿里妈妈方圆体', monospace;
   z-index: 10;
   display: flex;
   align-items: center;
@@ -1038,7 +1038,7 @@
   color: #ffffff;
   margin-bottom: 8px;
   word-wrap: break-word;
-  font-family: 'JetBrains Mono', monospace;
+  font-family: 'JetBrains Mono', '阿里妈妈方圆体', monospace;
   font-size: 14px;
   padding-top: 8px; /* 为标签留出空间 */
   line-height: 1.5;
@@ -1100,7 +1100,7 @@
 .slider-min-value,
 .slider-max-value,
 .slider-current-value {
-  font-family: 'JetBrains Mono', monospace;
+  font-family: 'JetBrains Mono', '阿里妈妈方圆体', monospace;
   font-size: 14px;
   user-select: none;
   transition: color 0.2s ease;
@@ -1138,15 +1138,15 @@
 
 .output-variable-name {
   font-weight: 600;
-  font-family: 'JetBrains Mono', monospace;
+  font-family: 'JetBrains Mono', '阿里妈妈方圆体', monospace;
 }
 
 .output-variable-type {
-  font-family: 'JetBrains Mono', monospace;
+  font-family: 'JetBrains Mono', '阿里妈妈方圆体', monospace;
   font-size: 13px;
 }
 
 .output-variable-value {
-  font-family: 'JetBrains Mono', monospace;
+  font-family: 'JetBrains Mono', '阿里妈妈方圆体', monospace;
   font-weight: 500;
 }

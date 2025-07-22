@@ -390,6 +390,12 @@ const Canvas: React.FC = () => {
     });
   }, [edges, onEdgesChange]);
 
+
+  /*
+  *      ----------- 组件结构 ------------
+  */
+
+
   return (
     <div className={`canvas-container ${activeTool}-mode`}>
       <ReactFlow
@@ -411,6 +417,8 @@ const Canvas: React.FC = () => {
         elementsSelectable={true}
         selectNodesOnDrag={false}
         deleteKeyCode={['Delete', 'Backspace']}
+        maxZoom={10}
+        minZoom={0.1}
       >
         <Background variant={BackgroundVariant.Dots} gap={20} size={1} />
         <Controls position="bottom-right" />

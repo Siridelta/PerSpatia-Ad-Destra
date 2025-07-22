@@ -1,3 +1,6 @@
+/* 添加JetBrains Mono字体引入 */
+@import url('https://fonts.googleapis.com/css2?family=JetBrains+Mono:ital,wght@0,100..800;1,100..800&display=swap');
+
 @tailwind base;
 @tailwind components;
 @tailwind utilities;
@@ -7,14 +10,14 @@
   src: url('./assets/fonts/AlimamaFangYuanTiVF-Thin.woff2') format('woff2');
 }
 
-/* 添加JetBrains Mono字体引入 */
-@import url('https://fonts.googleapis.com/css2?family=JetBrains+Mono:ital,wght@0,100..800;1,100..800&display=swap');
 
 :root {
   /* 修改字体fallback顺序：JetBrains Mono优先，阿里妈妈方圆体作为中文fallback */
   font-family: 'JetBrains Mono', '阿里妈妈方圆体', 'Courier New', 'Monaco', 'Lucida Console', monospace, system-ui, Avenir, Helvetica, Arial, sans-serif;
   line-height: 1.5;
   font-weight: 400;
+  font-variant-ligatures: none;
+  font-variation-settings: 'BEVL' 1, 'wght' 450;
 
   color-scheme: dark;
   color: rgba(255, 255, 255, 0.87);

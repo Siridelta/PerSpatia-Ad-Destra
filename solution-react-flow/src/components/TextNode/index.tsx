@@ -148,7 +148,7 @@ const TextNode: React.FC<NodeProps<TextNodeType>> = ({ id, data, selected }) => 
     // 计算内容所需的宽度
     // 创建一个临时元素来测量文本宽度
     const tempElement = document.createElement('pre');
-    tempElement.style.fontFamily = 'JetBrains Mono, monospace';
+    // tempElement.style.fontFamily = 'JetBrains Mono, monospace';
     tempElement.style.fontSize = '14px';
     tempElement.style.lineHeight = '1.5';
     tempElement.style.whiteSpace = 'pre';
@@ -261,7 +261,7 @@ const TextNode: React.FC<NodeProps<TextNodeType>> = ({ id, data, selected }) => 
     
     // 创建临时元素测量文本宽度
     const tempElement = document.createElement('pre');
-    tempElement.style.fontFamily = 'JetBrains Mono, monospace';
+    tempElement.style.fontFamily = 'JetBrains Mono, 阿里妈妈方圆体, monospace';
     tempElement.style.fontSize = '14px';
     tempElement.style.lineHeight = '1.5';
     tempElement.style.whiteSpace = 'pre';
@@ -812,7 +812,7 @@ const TextNode: React.FC<NodeProps<TextNodeType>> = ({ id, data, selected }) => 
                 border: 'none',
                 padding: '4px 8px',
                 cursor: 'pointer',
-                fontFamily: 'JetBrains Mono, monospace',
+                fontFamily: 'JetBrains Mono, 阿里妈妈方圆体, monospace',
                 fontSize: '14px'
               }}
             >
@@ -1264,7 +1264,7 @@ const TextNode: React.FC<NodeProps<TextNodeType>> = ({ id, data, selected }) => 
                   position: 'absolute',
                   top: 0,
                   left: 0,
-                  fontFamily: 'JetBrains Mono, monospace',
+                  fontFamily: 'JetBrains Mono, 阿里妈妈方圆体, monospace',
                   fontSize: '14px',
                   lineHeight: '1.5',
                   margin: 0,
@@ -1292,7 +1292,7 @@ const TextNode: React.FC<NodeProps<TextNodeType>> = ({ id, data, selected }) => 
                   position: 'absolute',
                   top: 0,
                   left: 0,
-                  fontFamily: 'JetBrains Mono, monospace',
+                  fontFamily: 'JetBrains Mono, 阿里妈妈方圆体, monospace',
                   fontSize: '14px',
                   lineHeight: '1.5',
                   margin: 0,
@@ -1321,7 +1321,7 @@ const TextNode: React.FC<NodeProps<TextNodeType>> = ({ id, data, selected }) => 
                     __html: generateHighlightedCode(text)
                   }}
                   style={{
-                    fontFamily: 'JetBrains Mono, monospace',
+                    fontFamily: 'JetBrains Mono, 阿里妈妈方圆体, monospace',
                     fontSize: '14px',
                     lineHeight: '1.5',
                     margin: 0,
@@ -1333,7 +1333,7 @@ const TextNode: React.FC<NodeProps<TextNodeType>> = ({ id, data, selected }) => 
               ) : (
                 <pre style={{ 
                   color: 'rgba(125, 225, 234, 0.4)',
-                  fontFamily: 'JetBrains Mono, monospace',
+                  fontFamily: 'JetBrains Mono, 阿里妈妈方圆体, monospace',
                   fontSize: '14px',
                   lineHeight: '1.5',
                   margin: 0,
