@@ -1289,7 +1289,7 @@ const TextNode: React.FC<NodeProps<TextNodeType>> = ({ id, data, selected }) => 
                 ref={textElementRef}
                 suppressContentEditableWarning
                 onInput={handleSyntaxEditorInput}
-                // onBlur={exitEdit}
+                onBlur={exitEdit}
                 onKeyDown={handleDivKeyDown}
                 style={{ 
                   position: 'absolute',

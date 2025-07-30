@@ -58,7 +58,7 @@ export class SyntaxHighlighter {
     // 应用共同样式
     Object.assign(this.textElement.style, commonStyles, {
       background: 'transparent',
-      color: '#ffffff',
+      color: 'transparent',
       caretColor: '#7dd3fc', // 蓝绿色光标
       zIndex: '2',
       resize: 'none',
