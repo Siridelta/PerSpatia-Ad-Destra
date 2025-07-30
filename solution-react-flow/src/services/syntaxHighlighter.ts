@@ -37,7 +37,7 @@ export class SyntaxHighlighter {
 
     // 确保两个元素具有相同的样式
     const commonStyles = {
-      fontFamily: 'JetBrains Mono, monospace',
+      fontFamily: 'JetBrains Mono, 阿里妈妈方圆体, monospace',
       fontSize: '14px',
       lineHeight: '1.5',
       padding: '8px',
@@ -58,7 +58,7 @@ export class SyntaxHighlighter {
     // 应用共同样式
     Object.assign(this.textElement.style, commonStyles, {
       background: 'transparent',
-      color: 'transparent',
+      color: '#ffffff',
       caretColor: '#7dd3fc', // 蓝绿色光标
       zIndex: '2',
       resize: 'none',

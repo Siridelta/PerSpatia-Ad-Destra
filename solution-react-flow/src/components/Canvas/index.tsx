@@ -1,5 +1,5 @@
 import React, { useCallback, useEffect } from 'react';
-import { ReactFlow, Node, Edge, Connection, addEdge, useNodesState, useEdgesState, EdgeTypes, Controls, Background, BackgroundVariant, useReactFlow, EdgeChange } from '@xyflow/react';
+import { ReactFlow, Node, Connection, addEdge, useNodesState, useEdgesState, EdgeTypes, Controls, Background, BackgroundVariant, useReactFlow, EdgeChange } from '@xyflow/react';
 import '@xyflow/react/dist/style.css';
 
 import TextNode from '../TextNode';
@@ -16,6 +16,8 @@ import useInertialPan from '../../utils/useInertialPan';
 import { saveCanvasState, loadCanvasState } from '../../utils/persistence';
 import { exportCanvasData, importCanvasData, importNodesToCanvas } from '../../utils/import-export';
 
+import { defaultNodes, defaultEdges } from './defaultGraph';
+
 // 注册自定义节点类型
 const nodeTypes = {
   textNode: TextNode,
@@ -26,49 +28,14 @@ const edgeTypes: EdgeTypes = {
   custom: FloatingEdge,
 };
 
-const initialNodes: Node[] = [
-  { 
-    id: '1', 
-    position: { x: 400, y: 20 }, 
-    data: { 
-      label: 'let speed = node_input(new Slider(50, 0, 100, 1));\nlet name = node_input(new InputBox("测试"));\nlet enabled = node_input(new Switch(true));\n\nlet result = speed * 2;\nnode_output(result);\nconsole.log("速度:", speed, "名称:", name, "启用:", enabled);', 
-      result: '结果计算中...',
-      width: 500
-    }, 
-    type: 'textNode' 
-  },
-  { 
-    id: '2', 
-    position: { x: 100, y: 250 }, 
-    data: { 
-      label: '// result 将从连接的节点自动获取\nlet doubled = result * 2;\nlet message = `结果的两倍是: ${doubled}`;\nnode_output(doubled);\nconsole.log(message);', 
-      result: 'doubled计算中...',
-      width: 400
-    }, 
-    type: 'textNode' 
-  },
-  { 
-    id: '3', 
-    position: { x: 700, y: 250 }, 
-    data: { 
-      label: 'let message = node_input(new InputBox("Hello World"));\nlet length = message.length;\nnode_output(message);\nconsole.log("消息:", message, "长度:", length);', 
-      result: '消息处理中...',
-      width: 450
-    }, 
-    type: 'textNode' 
-  },
-];
 
-const initialEdges: Edge[] = [
-  { id: 'e1-2', source: '1', target: '2', type: 'custom' },
-];
 
 const Canvas: React.FC = () => {
   // 尝试从 localStorage 恢复初始状态，但如果没有保存的数据就使用新的初始节点
   const persisted = loadCanvasState();
-  const [nodes, setNodes, onNodesChange] = useNodesState(persisted?.nodes || initialNodes);
-  const [edges, setEdges, onEdgesChange] = useEdgesState(persisted?.edges || initialEdges);
-  
+  const [nodes, setNodes, onNodesChange] = useNodesState(persisted?.nodes || defaultNodes);
+  const [edges, setEdges, onEdgesChange] = useEdgesState(persisted?.edges || defaultEdges);
+
   // 当前活动工具（全局）
   const activeTool = useToolStore((state) => state.activeTool);
   const setActiveTool = useToolStore((state) => state.setActiveTool);

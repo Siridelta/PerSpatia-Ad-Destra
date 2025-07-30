@@ -548,10 +548,13 @@ const TextNode: React.FC<NodeProps<TextNodeType>> = ({ id, data, selected }) => 
 
   // 处理键盘事件
   const handleDivKeyDown = useCallback((e: React.KeyboardEvent<HTMLDivElement>) => {
+    // Esc
     if (e.key === 'Escape') {
       e.preventDefault();
       exitEdit();
-    } else if (e.key === 'Enter' && e.shiftKey) {
+    } 
+    // Shift + Enter
+    else if (e.key === 'Enter' && e.shiftKey) {
       e.preventDefault();
       exitEdit();
     }
@@ -1286,7 +1289,7 @@ const TextNode: React.FC<NodeProps<TextNodeType>> = ({ id, data, selected }) => 
                 ref={textElementRef}
                 suppressContentEditableWarning
                 onInput={handleSyntaxEditorInput}
-                onBlur={exitEdit}
+                // onBlur={exitEdit}
                 onKeyDown={handleDivKeyDown}
                 style={{ 
                   position: 'absolute',
