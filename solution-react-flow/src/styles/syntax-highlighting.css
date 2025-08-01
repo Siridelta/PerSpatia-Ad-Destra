@@ -6,7 +6,7 @@ code[class*="language-"] {
   color: #ffffff !important;
   background: transparent !important;
   text-shadow: none !important;
-  font-family: 'JetBrains Mono', 'Consolas', 'Monaco', monospace !important;
+  font-family: 'JetBrains Mono', 'AlimamaFangYuanTi', 'Consolas', 'Monaco', monospace !important;
   font-size: 14px !important;
   line-height: 1.5 !important;
   direction: ltr !important;
@@ -20,6 +20,11 @@ code[class*="language-"] {
   border: none !important;
   padding: 0 !important;
   margin: 0 !important;
+}
+
+.token {
+  font-family: var(--font-family-code);
+  color: #ffffff !important;
 }
 
 /* 语法高亮 Token 样式 */

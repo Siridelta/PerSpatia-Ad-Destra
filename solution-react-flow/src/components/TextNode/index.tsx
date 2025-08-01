@@ -1,9 +1,9 @@
 import React, { useState, useCallback, useEffect, useRef } from 'react';
 import { Handle, Position, NodeProps, Node, useReactFlow, NodeResizeControl } from '@xyflow/react';
 import './styles.css';
-import '../../styles/syntax-highlighting.css';
-import { jsExecutor, ControlInfo } from '../../services/jsExecutor';
-import { useToolStore } from '../../store/toolStore';
+import '@/styles/syntax-highlighting.css';
+import { jsExecutor, ControlInfo } from '@/services/jsExecutor';
+import { useToolStore } from '@/store/toolStore';
 import Prism from 'prismjs';
 import 'prismjs/components/prism-javascript';
 
@@ -261,7 +261,7 @@ const TextNode: React.FC<NodeProps<TextNodeType>> = ({ id, data, selected }) => 
     
     // 创建临时元素测量文本宽度
     const tempElement = document.createElement('pre');
-    tempElement.style.fontFamily = 'JetBrains Mono, 阿里妈妈方圆体, monospace';
+    tempElement.style.fontFamily = 'JetBrains Mono, AlimamaFangYuanTi, monospace';
     tempElement.style.fontSize = '14px';
     tempElement.style.lineHeight = '1.5';
     tempElement.style.whiteSpace = 'pre';
@@ -815,7 +815,7 @@ const TextNode: React.FC<NodeProps<TextNodeType>> = ({ id, data, selected }) => 
                 border: 'none',
                 padding: '4px 8px',
                 cursor: 'pointer',
-                fontFamily: 'JetBrains Mono, 阿里妈妈方圆体, monospace',
+                fontFamily: 'JetBrains Mono, AlimamaFangYuanTi, monospace',
                 fontSize: '14px'
               }}
             >
@@ -1267,7 +1267,7 @@ const TextNode: React.FC<NodeProps<TextNodeType>> = ({ id, data, selected }) => 
                   position: 'absolute',
                   top: 0,
                   left: 0,
-                  fontFamily: 'JetBrains Mono, 阿里妈妈方圆体, monospace',
+                  fontFamily: 'JetBrains Mono, AlimamaFangYuanTi, monospace',
                   fontSize: '14px',
                   lineHeight: '1.5',
                   margin: 0,
@@ -1295,7 +1295,7 @@ const TextNode: React.FC<NodeProps<TextNodeType>> = ({ id, data, selected }) => 
                   position: 'absolute',
                   top: 0,
                   left: 0,
-                  fontFamily: 'JetBrains Mono, 阿里妈妈方圆体, monospace',
+                  fontFamily: 'JetBrains Mono, AlimamaFangYuanTi, monospace',
                   fontSize: '14px',
                   lineHeight: '1.5',
                   margin: 0,
@@ -1324,7 +1324,7 @@ const TextNode: React.FC<NodeProps<TextNodeType>> = ({ id, data, selected }) => 
                     __html: generateHighlightedCode(text)
                   }}
                   style={{
-                    fontFamily: 'JetBrains Mono, 阿里妈妈方圆体, monospace',
+                    fontFamily: 'JetBrains Mono, AlimamaFangYuanTi, monospace',
                     fontSize: '14px',
                     lineHeight: '1.5',
                     margin: 0,
@@ -1336,7 +1336,7 @@ const TextNode: React.FC<NodeProps<TextNodeType>> = ({ id, data, selected }) => 
               ) : (
                 <pre style={{ 
                   color: 'rgba(125, 225, 234, 0.4)',
-                  fontFamily: 'JetBrains Mono, 阿里妈妈方圆体, monospace',
+                  fontFamily: 'JetBrains Mono, AlimamaFangYuanTi, monospace',
                   fontSize: '14px',
                   lineHeight: '1.5',
                   margin: 0,

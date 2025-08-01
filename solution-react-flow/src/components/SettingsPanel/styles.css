@@ -22,7 +22,7 @@
   flex-direction: column;
   min-width: 380px;
   width: fit-content;
-  font-family: 'JetBrains Mono', monospace;
+  /* font-family: 'JetBrains Mono', monospace; */
   font-size: 14px; /* 保持原来的基础字号 */
   background: transparent;
   border: none;
@@ -57,7 +57,7 @@
   padding: 2px 8px;
   font-size: 16px; /* 保持原来的标题字号 */
   font-weight: 600;
-  font-family: 'JetBrains Mono', monospace;
+  /* font-family: 'JetBrains Mono', monospace; */
   z-index: 10;
   display: flex;
   align-items: center;
@@ -72,7 +72,7 @@
   font-size: 16px; /* 保持原来的标题字号 */
   font-weight: 600;
   margin: 0;
-  font-family: 'JetBrains Mono', monospace;
+  /* font-family: 'JetBrains Mono', monospace; */
   flex: 1;
 }
 
@@ -129,7 +129,7 @@
   padding: 2px 8px;
   font-size: 14px; /* 保持原来的区域标签字号 */
   font-weight: 600;
-  font-family: 'JetBrains Mono', monospace;
+  /* font-family: 'JetBrains Mono', monospace; */
   z-index: 10;
   display: flex;
   align-items: center;
@@ -152,7 +152,7 @@
   align-items: center;
   margin: 5px 0;
   font-size: 14px; /* 保持行的基础字号 */
-  font-family: 'JetBrains Mono', monospace;
+  /* font-family: 'JetBrains Mono', monospace; */
   gap: 12px;
 }
 
@@ -160,7 +160,7 @@
 .color-label,
 .font-label {
   color: #ffffff;
-  font-family: 'JetBrains Mono', monospace;
+  /* font-family: 'JetBrains Mono', monospace; */
   font-size: 18px; /* 增大4px，从14px改为18px - 这些是内容标签 */
   min-width: 60px;
   flex-shrink: 0;
@@ -197,7 +197,7 @@
   border: none;
   border-bottom: 1px solid #091c33;
   color: #ffffff;
-  font-family: 'JetBrains Mono', monospace;
+  /* font-family: 'JetBrains Mono', monospace; */
   font-size: 14px; /* 保持输入框字号 */
   padding: 2px 4px;
   outline: none;
@@ -220,7 +220,7 @@
   border: none;
   border-bottom: 1px solid #091c33;
   color: #ffffff;
-  font-family: 'JetBrains Mono', monospace;
+  /* font-family: 'JetBrains Mono', monospace; */
   font-size: 14px; /* 保持选择框字号 */
   padding: 2px 4px;
   outline: none;
@@ -345,7 +345,7 @@
 /* 数值显示 - 复用variable-value */
 .variable-value {
   color: #ffffff;
-  font-family: 'JetBrains Mono', monospace;
+  /* font-family: 'JetBrains Mono', monospace; */
   font-size: 14px; /* 保持数值显示字号 */
   text-align: center;
   padding: 2px 6px;
@@ -381,7 +381,7 @@
   padding: 2px 8px;
   cursor: pointer;
   border-radius: 0;
-  font-family: 'JetBrains Mono', monospace;
+  /* font-family: 'JetBrains Mono', monospace; */ 
   font-size: 12px; /* 保持按钮字号 */
   transition: all 0.2s ease;
 }

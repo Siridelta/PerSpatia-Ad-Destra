@@ -1,19 +1,26 @@
 /* 添加JetBrains Mono字体引入 */
-@import url('https://fonts.googleapis.com/css2?family=JetBrains+Mono:ital,wght@0,100..800;1,100..800&display=swap');
+
 
 @tailwind base;
 @tailwind components;
 @tailwind utilities;
 
 @font-face {
-  font-family: '阿里妈妈方圆体';
+  font-family: 'AlimamaFangYuanTi';
   src: url('./assets/fonts/AlimamaFangYuanTiVF-Thin.woff2') format('woff2');
 }
 
 
 :root {
-  /* 修改字体fallback顺序：JetBrains Mono优先，阿里妈妈方圆体作为中文fallback */
-  font-family: 'JetBrains Mono', '阿里妈妈方圆体', 'Courier New', 'Monaco', 'Lucida Console', monospace, system-ui, Avenir, Helvetica, Arial, sans-serif;
+
+  --font-family-default: 'JetBrains Mono', 'AlimamaFangYuanTi';
+  --font-family-code: 'JetBrains Mono', 'AlimamaFangYuanTi', monospace; 
+
+  /* 修改字体fallback顺序：JetBrains Mono优先，AlimamaFangYuanTi作为中文fallback */
+  font-family: var(--font-family-default);
+
+  /* this is some example, not understood yet */
+  /* font-family: 'JetBrains Mono', 'AlimamaFangYuanTi', 'Courier New', 'Monaco', 'Lucida Console', monospace, system-ui, Avenir, Helvetica, Arial, sans-serif; */
   line-height: 1.5;
   font-weight: 400;
   font-variant-ligatures: none;
@@ -32,4 +39,8 @@
 body {
   margin: 0;
   background-color: #000000; /* 确保body也是纯黑色背景 */
+}
+
+button {
+  font-family: var(--font-family-default);
 }

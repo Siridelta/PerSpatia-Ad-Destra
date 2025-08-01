@@ -1,5 +1,5 @@
 import { useEffect } from 'react';
-import { useSettingsStore } from '../store/settingsStore';
+import { useSettingsStore } from '@/store/settingsStore';
 
 /**
  * 主题应用Hook - 将设置store中的主题应用到CSS变量

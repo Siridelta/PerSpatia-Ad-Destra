@@ -1,5 +1,5 @@
 import { useEffect, useRef, useCallback } from 'react';
-import { SyntaxHighlighter } from '../services/syntaxHighlighter';
+import { SyntaxHighlighter } from '@/services/syntaxHighlighter';
 
 /**
  * 语法高亮 Hook

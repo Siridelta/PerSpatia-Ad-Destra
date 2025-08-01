@@ -1,5 +1,5 @@
-import { Node } from '../models/Node';
-import { Edge } from '../models/Edge';
+import { Node } from '@/models/Node';
+import { Edge } from '@/models/Edge';
 
 type EvaluationContext = {
   nodes: Node[];

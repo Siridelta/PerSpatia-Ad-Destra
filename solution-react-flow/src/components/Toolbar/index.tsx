@@ -1,6 +1,6 @@
 import React from 'react';
 import './styles.css';
-import { useToolStore } from '../../store/toolStore';
+import { useToolStore } from '@/store/toolStore';
 
 interface ToolbarProps {
   onImport?: () => void;

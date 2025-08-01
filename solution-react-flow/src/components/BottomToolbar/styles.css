@@ -11,7 +11,7 @@
   border: none; /* 移除边框 */
   border-radius: 0; /* 方形美学 */
   padding: 12px 20px;
-  font-family: 'JetBrains Mono', monospace;
+  /* font-family: 'JetBrains Mono', monospace; */
   z-index: 1000;
   backdrop-filter: none; /* 移除模糊效果 */
   min-width: 300px;
@@ -51,7 +51,7 @@
   padding: 8px 12px;
   cursor: pointer;
   border-radius: 0; /* 方形美学 */
-  font-family: 'JetBrains Mono', monospace;
+  /* font-family: 'JetBrains Mono', monospace; */
   font-size: 13px;
   font-weight: 500;
   transition: all 0.2s ease;
@@ -124,7 +124,7 @@
   padding: 8px 12px;
   cursor: pointer;
   border-radius: 0;
-  font-family: 'JetBrains Mono', monospace;
+  /* font-family: 'JetBrains Mono', monospace; */
   font-size: 13px;
   font-weight: 500;
   transition: all 0.2s ease;
@@ -159,7 +159,7 @@
   padding: 8px 12px;
   cursor: pointer;
   border-radius: 0; /* 方形美学 */
-  font-family: 'JetBrains Mono', monospace;
+  /* font-family: 'JetBrains Mono', monospace; */
   font-size: 13px;
   font-weight: 500;
   transition: all 0.2s ease;
@@ -241,7 +241,7 @@
   color: #7de1ea;
   border: none;
   cursor: pointer;
-  font-family: 'JetBrains Mono', monospace;
+  /* font-family: 'JetBrains Mono', monospace; */
   font-size: 13px;
   text-align: left;
   transition: all 0.2s ease;

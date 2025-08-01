@@ -1,5 +1,5 @@
-import { Node } from '../models/Node';
-import { Edge } from '../models/Edge';
+import { Node } from '@/models/Node';
+import { Edge } from '@/models/Edge';
 
 export const generateNodeId = (): string => {
   return `node_${Math.random().toString(36).substr(2, 9)}`;

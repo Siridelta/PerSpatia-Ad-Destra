@@ -1,22 +1,21 @@
 import React, { useCallback, useEffect } from 'react';
-import { ReactFlow, Node, Connection, addEdge, useNodesState, useEdgesState, EdgeTypes, Controls, Background, BackgroundVariant, useReactFlow, EdgeChange } from '@xyflow/react';
+import { ReactFlow, Node, Connection, EdgeTypes, Controls, Background, BackgroundVariant, useReactFlow, EdgeChange } from '@xyflow/react';
 import '@xyflow/react/dist/style.css';
 
-import TextNode from '../TextNode';
-import FloatingEdge from '../CustomEdge';
-import Toolbar from '../Toolbar';
-import BottomToolbar from '../BottomToolbar';
-import SettingsPanel from '../SettingsPanel';
+import TextNode from '@/components/TextNode';
+import FloatingEdge from '@/components/CustomEdge';
+import Toolbar from '@/components/Toolbar';
+import BottomToolbar from '@/components/BottomToolbar';
+import SettingsPanel from '@/components/SettingsPanel';
 import './styles.css';
-import { useToolStore } from '../../store/toolStore';
-import { useSettingsStore } from '../../store/settingsStore';
-import { useTheme } from '../../hooks/useTheme';
+import { useToolStore } from '@/store/toolStore';
+import { useSettingsStore } from '@/store/settingsStore';
+import { useTheme } from '@/hooks/useTheme';
 import CustomConnectionLine from './CustomConnectionLine';
-import useInertialPan from '../../utils/useInertialPan';
-import { saveCanvasState, loadCanvasState } from '../../utils/persistence';
-import { exportCanvasData, importCanvasData, importNodesToCanvas } from '../../utils/import-export';
+import useInertialPan from '@/utils/useInertialPan';
+import { useCanvasState } from '@/hooks/useCanvasState';
 
-import { defaultNodes, defaultEdges } from './defaultGraph';
+// 默认节点和边现在由 canvasStore 管理
 
 // 注册自定义节点类型
 const nodeTypes = {
@@ -31,10 +30,19 @@ const edgeTypes: EdgeTypes = {
 
 
 const Canvas: React.FC = () => {
-  // 尝试从 localStorage 恢复初始状态，但如果没有保存的数据就使用新的初始节点
-  const persisted = loadCanvasState();
-  const [nodes, setNodes, onNodesChange] = useNodesState(persisted?.nodes || defaultNodes);
-  const [edges, setEdges, onEdgesChange] = useEdgesState(persisted?.edges || defaultEdges);
+  // 使用统一的画布状态管理
+  const {
+    nodes,
+    edges,
+    setNodes,
+    setEdges,
+    removeNode,
+    removeEdge,
+    onNodesChange,
+    onEdgesChange,
+    importCanvasData,
+    exportCanvasData,
+  } = useCanvasState();
 
   // 当前活动工具（全局）
   const activeTool = useToolStore((state) => state.activeTool);
@@ -83,8 +91,14 @@ const Canvas: React.FC = () => {
         e.preventDefault();
       } else if (e.key === 'Delete' || e.key === 'Backspace') {
         // 删除选中的节点和边
-        setNodes((nds) => nds.filter(node => !node.selected));
-        setEdges((eds) => eds.filter(edge => !edge.selected));
+        const selectedNodes = nodes.filter(node => node.selected);
+        const selectedEdges = edges.filter(edge => edge.selected);
+        
+        // 删除选中的节点
+        selectedNodes.forEach(node => removeNode(node.id));
+        // 删除选中的边
+        selectedEdges.forEach(edge => removeEdge(edge.id));
+        
         e.preventDefault();
       }
     };
@@ -123,7 +137,7 @@ const Canvas: React.FC = () => {
     if (activeTool === 'text') {
       const position = screenToFlowPosition({ x: event.clientX, y: event.clientY });
       const newNode = createTextNode(position);
-      setNodes((nds) => [...nds, newNode]);
+      setNodes([...nodes, newNode]);
       setActiveTool('select'); // 创建后切回选择模式
     }
     
@@ -131,9 +145,9 @@ const Canvas: React.FC = () => {
     if (activeTool === 'select' && event.detail === 2) {
       const position = screenToFlowPosition({ x: event.clientX, y: event.clientY });
       const newNode = createTextNode(position);
-      setNodes((nds) => [...nds, newNode]);
+      setNodes([...nodes, newNode]);
     }
-  }, [activeTool, screenToFlowPosition, createTextNode, setNodes, setActiveTool]);
+  }, [activeTool, screenToFlowPosition, createTextNode, setNodes, setActiveTool, nodes]);
 
   // 处理连接事件
   const onConnect = useCallback((connection: Connection) => {
@@ -142,7 +156,7 @@ const Canvas: React.FC = () => {
       id: `edge-${Date.now()}`,
       type: 'custom',
     };
-    setEdges((eds) => addEdge(edge, eds));
+    setEdges([...edges, edge]);
     
     // 连接建立后，立即通知目标节点更新
     if (connection.target) {
@@ -167,7 +181,7 @@ const Canvas: React.FC = () => {
     if (activeTool === 'connect') {
       setActiveTool('select');
     }
-  }, [setEdges, setConnectionStartNode, activeTool, setActiveTool]);
+  }, [setEdges, setConnectionStartNode, activeTool, setActiveTool, edges]);
 
   // 处理节点点击（用于连接模式）
   const onNodeClick = useCallback((event: React.MouseEvent, node: Node) => {
@@ -186,7 +200,7 @@ const Canvas: React.FC = () => {
           target: node.id,
           type: 'custom',
         };
-        setEdges((eds) => [...eds, newEdge]);
+        setEdges([...edges, newEdge]);
         console.log('创建连接:', connectionStartNode, '->', node.id);
         
         // 连接建立后，立即通知目标节点更新
@@ -209,13 +223,13 @@ const Canvas: React.FC = () => {
     }
   }, [activeTool, connectionStartNode, setConnectionStartNode, setEdges, setActiveTool]);
 
-  // 自动保存状态
-  useEffect(() => {
-    const timer = setTimeout(() => {
-      saveCanvasState(nodes, edges);
-    }, 500);
-    return () => clearTimeout(timer);
-  }, [nodes, edges]);
+  // 自动保存状态 - 现在由 Zustand persist 自动处理
+  // useEffect(() => {
+  //   const timer = setTimeout(() => {
+  //     saveCanvasState(nodes, edges);
+  //   }, 500);
+  //   return () => clearTimeout(timer);
+  // }, [nodes, edges]);
 
   // 节点依赖更新逻辑：当节点输出改变时，更新所有下游节点
   const triggerDownstreamUpdate = useCallback((sourceNodeId: string) => {
@@ -283,35 +297,80 @@ const Canvas: React.FC = () => {
 
   // 导出画布数据
   const handleExport = useCallback(() => {
-    exportCanvasData(nodes, edges);
-  }, [nodes, edges]);
+    const data = exportCanvasData();
+    // 创建下载链接
+    const dataStr = JSON.stringify(data, null, 2);
+    const dataBlob = new Blob([dataStr], { type: 'application/json' });
+    const url = URL.createObjectURL(dataBlob);
+    const link = document.createElement('a');
+    link.href = url;
+    link.download = 'canvas-data.json';
+    link.click();
+    URL.revokeObjectURL(url);
+  }, [exportCanvasData]);
 
   // 导入并替换画布数据
   const handleImportReplace = useCallback(async () => {
     try {
-      const { nodes: newNodes, edges: newEdges } = await importCanvasData();
-      setNodes(newNodes);
-      setEdges(newEdges);
-      console.log('画布数据已替换');
+      const input = document.createElement('input');
+      input.type = 'file';
+      input.accept = '.json';
+      input.onchange = (e) => {
+        const file = (e.target as HTMLInputElement).files?.[0];
+        if (file) {
+          const reader = new FileReader();
+          reader.onload = (e) => {
+            try {
+              const data = JSON.parse(e.target?.result as string);
+              importCanvasData(data);
+              console.log('画布数据已替换');
+            } catch (error) {
+              console.error('导入画布失败:', error);
+              alert('导入失败：文件格式错误');
+            }
+          };
+          reader.readAsText(file);
+        }
+      };
+      input.click();
     } catch (error) {
       console.error('导入画布失败:', error);
       alert(error instanceof Error ? error.message : '导入失败');
     }
-  }, [setNodes, setEdges]);
+  }, [importCanvasData]);
 
   // 导入并添加节点到画布
   const handleImportAdd = useCallback(async () => {
     try {
-      const { nodes: newNodes, edges: newEdges } = await importCanvasData();
-      const { nodes: mergedNodes, edges: mergedEdges } = importNodesToCanvas(nodes, edges, newNodes, newEdges);
-      setNodes(mergedNodes);
-      setEdges(mergedEdges);
-      console.log('节点已添加到画布');
+      const input = document.createElement('input');
+      input.type = 'file';
+      input.accept = '.json';
+      input.onchange = (e) => {
+        const file = (e.target as HTMLInputElement).files?.[0];
+        if (file) {
+          const reader = new FileReader();
+          reader.onload = (e) => {
+            try {
+              const data = JSON.parse(e.target?.result as string);
+              // 合并节点和边
+              const mergedNodes = [...nodes, ...data.nodes];
+              const mergedEdges = [...edges, ...data.edges];
+              importCanvasData({ nodes: mergedNodes, edges: mergedEdges });
+              console.log('节点已添加到画布');
+            } catch (error) {
+              console.error('导入节点失败:', error);
+              alert('导入失败：文件格式错误');
+            }
+          };
+          reader.readAsText(file);
+        }
+      };
+      input.click();
     } catch (error) {
       console.error('导入节点失败:', error);
       alert(error instanceof Error ? error.message : '导入失败');
     }
-  }, [nodes, edges, setNodes, setEdges]);
+  }, [nodes, edges, importCanvasData]);
 
   // 连接线样式
   const connectionLineStyle = {

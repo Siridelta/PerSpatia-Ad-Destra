@@ -1,4 +1,5 @@
-import { ReactFlow, Node, Edge, Connection, addEdge, useNodesState, useEdgesState, EdgeTypes, Controls, Background, BackgroundVariant, useReactFlow, EdgeChange } from '@xyflow/react';
+import { Node } from '@/models/Node';
+import { Edge } from '@/models/Edge';
 
 const defaultNodes: Node[] = [
   { 

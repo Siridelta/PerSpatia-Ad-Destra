@@ -9,4 +9,5 @@ export interface Node {
     label: string;
     [key: string]: any;
   };
+  selected?: boolean; // 添加选中状态支持
 }
