@@ -4,6 +4,8 @@ import './styles.css';
 import '@/styles/syntax-highlighting.css';
 import { jsExecutor, ControlInfo } from '@/services/jsExecutor';
 import { useToolStore } from '@/store/toolStore';
+import { SliderControl, ToggleControl, TextControl } from './controls';
+import { ErrorDisplay, WarningDisplay, LogDisplay, OutputDisplay } from './displays';
 import Prism from 'prismjs';
 import 'prismjs/components/prism-javascript';
 
@@ -201,13 +203,7 @@ const TextNode: React.FC<NodeProps<TextNodeType>> = ({ id, data, selected }) => 
   // 控件值状态
   const [controlValues, setControlValues] = useState<Record<string, any>>({});
   
-  // 滑动条编辑状态
-  const [editingSlider, setEditingSlider] = useState<string | null>(null);
-  const [sliderSettings, setSliderSettings] = useState<{
-    min: number;
-    max: number;
-    step: number;
-  }>({ min: 0, max: 100, step: 1 });
+
 
   // 初始化控件值
   useEffect(() => {
@@ -678,323 +674,41 @@ const TextNode: React.FC<NodeProps<TextNodeType>> = ({ id, data, selected }) => 
     });
   }, [id, setNodes, text, executeCode, getConnectedNodeData, controls]);
 
-  // 渲染开关控件的函数
-  const renderToggleControl = (control: ControlInfo) => {
+  // 渲染控件的函数
+  const renderControl = (control: ControlInfo) => {
     const currentValue = controlValues[control.name] ?? control.defaultValue;
-    const isActive = Boolean(currentValue);
     
-    // 处理开关点击
-    const handleToggleClick = (e: React.MouseEvent) => {
-      e.stopPropagation();
-      handleVariableChange(control.name, !currentValue);
-    };
-    
-    return (
-      <div className="toggle-container nodrag">
-        <div 
-          className={`toggle-switch ${isActive ? 'active' : ''}`}
-          onClick={handleToggleClick}
-        >
-          <div className="toggle-knob"></div>
-        </div>
-        <span 
-          className="toggle-text" 
-          style={{ color: isActive ? '#28d900' : '#d90000' }}
-        >
-          {isActive ? 'true' : 'false'}
-        </span>
-      </div>
-    );
-  };
-
-  // 渲染滑动条控件的函数
-  const renderSliderControl = (control: ControlInfo) => {
-    const min = control.min ?? 0;
-    const max = control.max ?? 100;
-    const step = control.step ?? 1;
-    const currentValue = controlValues[control.name] ?? control.defaultValue ?? 0;
-    const progress = ((currentValue - min) / (max - min)) * 100;
-    
-    // 检查是否正在编辑此滑动条的设置
-    const isEditingThis = editingSlider === control.name;
-    
-    // 处理数值点击 - 切换到设置界面
-    const handleValueClick = (e: React.MouseEvent) => {
-      e.preventDefault();
-      e.stopPropagation();
-      if (isEditingThis) {
-        // 如果正在编辑，恢复为滑动条
-        setEditingSlider(null);
-      } else {
-        // 进入编辑模式
-        setEditingSlider(control.name);
-        setSliderSettings({ min, max, step });
-      }
-    };
-    
-    // 处理数值右键清空
-    const handleValueRightClick = (e: React.MouseEvent) => {
-      e.preventDefault();
-      e.stopPropagation();
-      handleVariableChange(control.name, control.defaultValue || 0);
-    };
-
-    // 应用滑动条设置
-    const applySliderSettings = () => {
-      // 更新控件配置
-      setControls(prev => prev.map(c => 
-        c.name === control.name 
-          ? { ...c, min: sliderSettings.min, max: sliderSettings.max, step: sliderSettings.step }
-          : c
-      ));
-      
-      // 确保当前值在新范围内
-      const newValue = Math.max(sliderSettings.min, Math.min(sliderSettings.max, currentValue));
-      if (newValue !== currentValue) {
-        handleVariableChange(control.name, newValue);
-      }
-      
-      setEditingSlider(null);
-    };
-
-    // 处理滑动条输入变化
-    const handleSliderChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-      e.stopPropagation();
-      const newValue = parseFloat(e.target.value);
-      handleVariableChange(control.name, newValue);
-    };
-
-    // 处理鼠标按下事件，防止拖动冲突
-    const handleSliderMouseDown = (e: React.MouseEvent) => {
-      e.stopPropagation();
-    };
-
-    // 处理滑动条释放，移除焦点以恢复键盘响应
-    const handleSliderMouseUp = (e: React.MouseEvent) => {
-      e.stopPropagation();
-      (e.target as HTMLElement).blur(); // 移除焦点，恢复键盘响应
-    };
-
-    // 如果正在编辑设置，显示设置面板
-    if (isEditingThis) {
-      return (
-        <div className="slider-settings-panel nodrag">
-          <div className="slider-settings-row">
-            <span>最小</span>
-            <input
-              type="number"
-              value={sliderSettings.min}
-              onChange={(e) => setSliderSettings(prev => ({ ...prev, min: parseFloat(e.target.value) || 0 }))}
-              className="slider-settings-input"
-              placeholder="0"
-            />
-            <span>-</span>
-            <input
-              type="number"
-              value={sliderSettings.max}
-              onChange={(e) => setSliderSettings(prev => ({ ...prev, max: parseFloat(e.target.value) || 100 }))}
-              className="slider-settings-input"
-              placeholder="100"
-            />
-            <span>最大</span>
-          </div>
-          <div className="slider-settings-row">
-            <span>步长</span>
-            <input
-              type="number"
-              value={sliderSettings.step}
-              onChange={(e) => setSliderSettings(prev => ({ ...prev, step: parseFloat(e.target.value) || 1 }))}
-              className="slider-settings-input"
-              placeholder="1"
-            />
-            <button
-              onClick={applySliderSettings}
-              style={{
-                background: '#014a64',
-                color: '#ffffff',
-                border: 'none',
-                padding: '4px 8px',
-                cursor: 'pointer',
-                fontFamily: 'JetBrains Mono, AlimamaFangYuanTi, monospace',
-                fontSize: '14px'
-              }}
-            >
-              确定
-            </button>
-          </div>
-        </div>
-      );
+    switch (control.type) {
+      case 'switch':
+        return (
+          <ToggleControl
+            control={control}
+            value={Boolean(currentValue)}
+            onChange={handleVariableChange}
+          />
+        );
+      case 'slider':
+        return (
+          <SliderControl
+            control={control}
+            value={Number(currentValue) || 0}
+            onChange={handleVariableChange}
+          />
+        );
+      case 'input':
+        return (
+          <TextControl
+            control={control}
+            value={String(currentValue) || ''}
+            onChange={handleVariableChange}
+          />
+        );
+      default:
+        return null;
     }
-
-    // 正常的滑动条显示
-    return (
-      <div className="slider-container nodrag">
-        {/* 显示：最小值 {滑动条} 最大值 值 */}
-        <div className="slider-layout">
-          <span 
-            className="slider-min-value"
-            onClick={handleValueClick}
-            style={{ cursor: 'pointer', color: '#7de1ea', margin: '0 8px' }}
-            title="点击设置范围"
-          >
-            {min}
-          </span>
-          <div className="slider-track-wrapper">
-            <div className="slider-track" onMouseDown={handleSliderMouseDown} onMouseUp={handleSliderMouseUp}>
-              <div 
-                className="slider-progress" 
-                style={{ width: `${progress}%` }}
-              ></div>
-              <input
-                type="range"
-                min={min}
-                max={max}
-                step={step}
-                value={currentValue}
-                onChange={handleSliderChange}
-                onMouseDown={handleSliderMouseDown}
-                onMouseUp={handleSliderMouseUp}
-                className="slider-input"
-              />
-            </div>
-          </div>
-          <span 
-            className="slider-max-value"
-            onClick={handleValueClick}
-            style={{ cursor: 'pointer', color: '#7de1ea', margin: '0 8px' }}
-            title="点击设置范围"
-          >
-            {max}
-          </span>
-          <span 
-            className="slider-current-value"
-            onClick={(e) => {
-              e.preventDefault();
-              e.stopPropagation();
-              // TODO: 实现直接设置数值的功能
-              const newValue = prompt(`设置 ${control.name} 的值:`, String(currentValue));
-              if (newValue !== null && !isNaN(Number(newValue))) {
-                const numValue = Math.max(min, Math.min(max, Number(newValue)));
-                handleVariableChange(control.name, numValue);
-              }
-            }}
-            onContextMenu={handleValueRightClick}
-            style={{ cursor: 'pointer', color: '#7de1ea' }}
-            title="左键直接设置值，右键重置"
-          >
-            {currentValue}
-          </span>
-        </div>
-      </div>
-    );
   };
 
-  // 渲染文本输入控件的函数
-  const renderTextControl = (control: ControlInfo) => {
-    const currentValue = controlValues[control.name] ?? control.defaultValue ?? '';
-    
-    // 处理文本框右键清空
-    const handleTextRightClick = (e: React.MouseEvent<HTMLInputElement>) => {
-      e.preventDefault();
-      e.stopPropagation();
-      handleVariableChange(control.name, control.defaultValue || '');
-    };
 
-    // 处理文本框变化
-    const handleTextChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-      e.stopPropagation();
-      handleVariableChange(control.name, e.target.value);
-    };
-
-    return (
-      <div className="text-input-container nodrag">
-        <input
-          type="text"
-          value={currentValue}
-          onChange={handleTextChange}
-          onContextMenu={handleTextRightClick}
-          className="text-input"
-          placeholder="输入文本..."
-          title="右键清空"
-        />
-      </div>
-    );
-  };
-
-  // 渲染输出变量的函数
-  const renderOutput = (outputName: string, index: number) => {
-    const value = outputs[outputName]; // 直接从outputs获取值
-    const valueStr = String(value);
-    const type = typeof value;
-    
-    return (
-      <div key={index} className="output-variable">
-        <div className="output-left">
-          <span className="output-variable-name" style={{ color: '#ffffff' }}>{outputName}</span>
-          <span className="output-variable-type" style={{ color: '#091c33' }}>:{type}</span>
-        </div>
-        <div className="output-right">
-          <span className="output-variable-value" style={{ color: '#7de1ea' }}>{valueStr}</span>
-        </div>
-      </div>
-    );
-  };
-
-  // 渲染错误卡片
-  const renderErrorCard = (error: {
-    message: string;
-    line?: number;
-    column?: number;
-    stack?: string;
-  }, index: number) => {
-    return (
-      <div key={index} className="error-card animate-fade-in-up" style={{ animationDelay: `${index * 0.1}s` }}>
-        <div className="error-header">
-          <span className="error-label">Error</span>
-          {error.line && (
-            <span className="error-location">行 {error.line}{error.column ? `:${error.column}` : ''}</span>
-          )}
-        </div>
-        <div className="error-message">{error.message}</div>
-        {error.stack && (
-          <div className="error-stack">
-            <details>
-              <summary>栈追踪</summary>
-              <pre>{error.stack}</pre>
-            </details>
-          </div>
-        )}
-      </div>
-    );
-  };
-
-  // 渲染警告卡片  
-  const renderWarningCard = (warning: {
-    message: string;
-    line?: number;
-    column?: number;
-    stack?: string;
-  }, index: number) => {
-    return (
-      <div key={index} className="warning-card animate-fade-in-up" style={{ animationDelay: `${index * 0.1}s` }}>
-        <div className="warning-header">
-          <span className="warning-label">Warning</span>
-          {warning.line && (
-            <span className="warning-location">行 {warning.line}{warning.column ? `:${warning.column}` : ''}</span>
-          )}
-        </div>
-        <div className="warning-message">{warning.message}</div>
-        {warning.stack && (
-          <div className="warning-stack">
-            <details>
-              <summary>栈追踪</summary>
-              <pre>{warning.stack}</pre>
-            </details>
-          </div>
-        )}
-      </div>
-    );
-  };
 
   // 更新节点数据的通用函数
   const updateNodeData = useCallback((updates: Partial<TextNodeData>) => {
@@ -1289,7 +1003,7 @@ const TextNode: React.FC<NodeProps<TextNodeType>> = ({ id, data, selected }) => 
                 ref={textElementRef}
                 suppressContentEditableWarning
                 onInput={handleSyntaxEditorInput}
-                onBlur={exitEdit}
+                // onBlur={exitEdit}
                 onKeyDown={handleDivKeyDown}
                 style={{ 
                   position: 'absolute',
@@ -1350,21 +1064,10 @@ const TextNode: React.FC<NodeProps<TextNodeType>> = ({ id, data, selected }) => 
 
       {/* 错误和警告区域 - 在代码区域下面，输入区域上面 */}
       {!isCollapsed && ((errors.length > 0 || warnings.length > 0) || animatingOut.errors) && (
-        <div className={`text-node-errors-section ${animatingOut.errors ? 'animate-fade-out-down' : 'animate-fade-in-up'}`}>
-          {/* 错误卡片 - 按行号排序 */}
-          {errors.sort((a, b) => (a.line || 0) - (b.line || 0)).map((error, index) => (
-            <div key={index} className={`${animatingOut.errors ? 'animate-fade-out-left' : ''}`} style={{ animationDelay: `${index * 0.1}s` }}>
-              {renderErrorCard(error, index)}
-            </div>
-          ))}
-          
-          {/* 警告卡片 - 按行号排序 */}
-          {warnings.sort((a, b) => (a.line || 0) - (b.line || 0)).map((warning, index) => (
-            <div key={index + errors.length} className={`${animatingOut.errors ? 'animate-fade-out-left' : ''}`} style={{ animationDelay: `${(index + errors.length) * 0.1}s` }}>
-              {renderWarningCard(warning, index)}
-            </div>
-          ))}
-        </div>
+        <>
+          <ErrorDisplay errors={errors} isAnimatingOut={animatingOut.errors} />
+          <WarningDisplay warnings={warnings} isAnimatingOut={animatingOut.errors} />
+        </>
       )}
 
       {/* 输入区域 - 只在有变量控件时显示且未隐藏 */}
@@ -1380,9 +1083,7 @@ const TextNode: React.FC<NodeProps<TextNodeType>> = ({ id, data, selected }) => 
           {controls.map((control, index) => (
             <div key={index} className={`variable-control ${animatingOut.inputs ? 'animate-fade-out-left' : 'animate-fade-in-left'}`} style={{ animationDelay: `${index * 0.1}s` }}>
               <span className="variable-label">{control.name}</span>
-              {control.type === 'switch' && renderToggleControl(control)}
-              {control.type === 'slider' && renderSliderControl(control)}
-              {control.type === 'input' && renderTextControl(control)}
+              {renderControl(control)}
             </div>
           ))}
         </div>
@@ -1390,28 +1091,12 @@ const TextNode: React.FC<NodeProps<TextNodeType>> = ({ id, data, selected }) => 
 
       {/* 日志区域 - 在输入区域下面，输出区域上面 */}
       {!isCollapsed && (!hiddenSections.logs || animatingOut.logs) && consoleLogs.length > 0 && (
-        <div className={`text-node-section text-node-logs-section ${animatingOut.logs ? 'animate-fade-out-down' : 'animate-fade-in-up'}`}>
-          <div className="section-label">Logs</div>
-          <div className="log-container">
-            {consoleLogs.map((log, index) => (
-              <div key={index} className={`log-entry ${animatingOut.logs ? 'animate-fade-out-left' : 'animate-fade-in-left'}`} style={{ animationDelay: `${index * 0.05}s` }}>
-                {log}
-              </div>
-            ))}
-          </div>
-        </div>
+        <LogDisplay logs={consoleLogs} isAnimatingOut={animatingOut.logs} />
       )}
 
       {/* 输出区域 - 只在有输出时显示且未隐藏 */}
       {!isCollapsed && (!hiddenSections.outputs || animatingOut.outputs) && Object.keys(outputs).length > 0 && (
-        <div className={`text-node-section text-node-outputs-section ${animatingOut.outputs ? 'animate-fade-out-down' : 'animate-fade-in-up'}`}>
-          <div className="section-label">Outputs</div>
-          {Object.keys(outputs).map((output, index) => (
-            <div key={index} className={`${animatingOut.outputs ? 'animate-fade-out-right' : 'animate-fade-in-right'}`} style={{ animationDelay: `${index * 0.1}s` }}>
-              {renderOutput(output, index)}
-            </div>
-          ))}
-        </div>
+        <OutputDisplay outputs={outputs} isAnimatingOut={animatingOut.outputs} />
       )}
 
       {/* 连接句柄 - 禁用拖动，只允许点击连接 */}

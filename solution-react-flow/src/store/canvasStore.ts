@@ -3,6 +3,15 @@ import { persist } from 'zustand/middleware';
 import { Node } from '@/models/Node';
 import { Edge } from '@/models/Edge';
 
+/**
+ * 画布状态管理 Store
+ * 
+ * 使用 Zustand persist 中间件实现自动持久化：
+ * - 每次状态变化时自动保存到 localStorage
+ * - 页面加载时自动从 localStorage 恢复状态
+ * - 支持版本控制和数据迁移
+ */
+
 interface CanvasState {
   // 状态数据
   nodes: Node[];
@@ -33,7 +42,7 @@ import { defaultNodes, defaultEdges } from '@/components/Canvas/defaultGraph';
 export const useCanvasStore = create<CanvasState>()(
   persist(
     (set) => ({
-      // 初始状态
+      // 初始状态 - 这些会被 persist 中间件覆盖（如果 localStorage 中有数据）
       nodes: defaultNodes,
       edges: defaultEdges,
       
@@ -90,8 +99,25 @@ export const useCanvasStore = create<CanvasState>()(
       }),
     }),
     {
-      name: 'julia-canvas-flow-state', // localStorage key
+      name: 'desmos-canvas-flow-state', // localStorage key
       version: 1, // 版本号，便于未来兼容
+      storage: {
+        getItem: (name) => {
+          const str = localStorage.getItem(name);
+          if (!str) return null;
+          try {
+            return JSON.parse(str);
+          } catch {
+            return null;
+          }
+        },
+        setItem: (name, value) => {
+          localStorage.setItem(name, JSON.stringify(value));
+        },
+        removeItem: (name) => {
+          localStorage.removeItem(name);
+        },
+      },
     }
   )
 ); 

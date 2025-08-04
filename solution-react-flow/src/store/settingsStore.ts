@@ -93,7 +93,7 @@ export const useSettingsStore = create<SettingsStore>()(
         set({ isSettingsPanelOpen: false }),
     }),
     {
-      name: 'julia-canvas-settings',
+      name: 'desmos-canvas-settings',
       version: 1,
     }
   )
