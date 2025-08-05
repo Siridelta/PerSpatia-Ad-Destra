@@ -67,7 +67,20 @@ const Canvas: React.FC = () => {
   // V/T/C 快捷键切换工具栏模式
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
-      // 编辑区聚焦时不响应
+      // 优先处理 Ctrl+S，确保阻止浏览器默认行为
+      if ((e.key === 's' || e.key === 'S') && e.ctrlKey) {
+        e.preventDefault();
+        console.log('Canvas Ctrl+S: 保存所有更改');
+        
+        // 触发所有有未保存更改的节点重新执行
+        const updateEvent = new CustomEvent('save-all-changes', {
+          detail: { timestamp: Date.now() }
+        });
+        document.dispatchEvent(updateEvent);
+        return;
+      }
+      
+      // 编辑区聚焦时不响应其他快捷键
       const tag = (e.target as HTMLElement)?.tagName?.toLowerCase();
       const isEditable = (tag === 'input' || tag === 'textarea' || (e.target as HTMLElement)?.isContentEditable);
       if (isEditable) return;
@@ -111,11 +124,11 @@ const Canvas: React.FC = () => {
       }
     };
 
-    window.addEventListener('keydown', handleKeyDown);
+    window.addEventListener('keydown', handleKeyDown, true); // 使用 capture 模式
     document.addEventListener('mousedown', handleMouseDown);
     
     return () => {
-      window.removeEventListener('keydown', handleKeyDown);
+      window.removeEventListener('keydown', handleKeyDown, true);
       document.removeEventListener('mousedown', handleMouseDown);
     };
   }, [setActiveTool, activeTool, setConnectionStartNode, setNodes, setEdges]);

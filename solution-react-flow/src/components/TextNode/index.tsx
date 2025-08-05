@@ -6,6 +6,8 @@ import { jsExecutor, ControlInfo } from '@/services/jsExecutor';
 import { useToolStore } from '@/store/toolStore';
 import { SliderControl, ToggleControl, TextControl } from './controls';
 import { ErrorDisplay, WarningDisplay, LogDisplay, OutputDisplay } from './displays';
+import { useMonacoStyleEditor } from './hooks/useMonacoStyleEditor';
+import { useNodeExecution } from './hooks/useNodeExecution';
 import Prism from 'prismjs';
 import 'prismjs/components/prism-javascript';
 
@@ -65,10 +67,46 @@ function placeCaretAtPoint(x: number, y: number) {
 }
 
 const TextNode: React.FC<NodeProps<TextNodeType>> = ({ id, data, selected }) => {
-  const [isEditing, setIsEditing] = useState(false);
-  const [text, setText] = useState(data.label || '');
   const [isEditingName, setIsEditingName] = useState(false); // 是否在编辑节点名称
   const [nodeName, setNodeName] = useState(data.nodeName || '未命名节点');
+  
+  // 使用代码编辑器Hook
+  const {
+    isEditing,
+    text,
+    editorRef,
+    textareaRef,
+    handleInput,
+    handleKeyDown,
+    handleDoubleClick,
+    handleDisplayClick,
+    handleBlur,
+    highlightedHtml,
+    adjustSize,
+  } = useMonacoStyleEditor({
+    initialText: data.label || '',
+    onTextChange: (newText) => {
+      // 更新节点数据
+      updateNodeData({ label: newText });
+      // 检查是否有未保存的更改
+      const originalText = data.label || '';
+      setHasUnsavedChanges(newText !== originalText);
+    },
+    onExitEdit: () => {
+      // 退出编辑时的处理
+      const finalCode = textareaRef.current?.value || text;
+      updateNodeData({ 
+        label: finalCode,
+        initialEditing: undefined
+      });
+      // 清除未保存状态
+      setHasUnsavedChanges(false);
+      // 触发代码重新执行
+      if (finalCode.trim()) {
+        executeCode(finalCode, controlValues);
+      }
+    },
+  });
   
   // 获取当前工具状态
   const activeTool = useToolStore((state) => state.activeTool);
@@ -81,150 +119,10 @@ const TextNode: React.FC<NodeProps<TextNodeType>> = ({ id, data, selected }) => 
     errors?: boolean; // 添加错误区域动画状态
   }>({});
   
+
+  
   // React Flow 实例，用于更新节点数据
   const { setNodes, getNodes, getEdges } = useReactFlow();
-
-  // 编辑器元素引用
-  const textElementRef = useRef<HTMLDivElement>(null);
-  const nameInputRef = useRef<HTMLInputElement>(null);
-
-  // 从data中获取节点宽度，移除最大宽度限制
-  const nodeWidth = data.width || 'auto';
-  const nodeHeight = data.height || 'auto';
-
-  // 隐藏状态
-  const isCollapsed = data.isCollapsed || false;
-  const hiddenSections = data.hiddenSections || {};
-
-  /**
-   * 生成语法高亮的HTML
-   * @param code 要高亮的代码
-   * @returns 高亮后的HTML字符串
-   */
-  const generateHighlightedCode = useCallback((code: string): string => {
-    if (!code.trim()) return '';
-    
-    try {
-      // 直接使用Prism进行语法高亮，不需要手动转义
-      const highlighted = Prism.highlight(code, Prism.languages.javascript, 'javascript');
-      return highlighted;
-    } catch (error) {
-      console.warn('语法高亮失败:', error);
-      // 回退到转义后的纯文本
-      return code
-        .replace(/&/g, '&amp;')
-        .replace(/</g, '&lt;')
-        .replace(/>/g, '&gt;')
-        .replace(/"/g, '&quot;')
-        .replace(/'/g, '&#39;');
-    }
-  }, []);
-
-  /**
-   * 自动调整编辑器尺寸以适应内容
-   */
-  const adjustEditorSize = useCallback(() => {
-    if (!textElementRef.current) return;
-    
-    const editor = textElementRef.current;
-    const container = editor.parentElement;
-    const highlightDisplay = container?.querySelector('.syntax-highlight-display') as HTMLElement;
-    const nodeContainer = container?.closest('.text-node') as HTMLElement;
-    
-    if (!container || !highlightDisplay || !nodeContainer) return;
-    
-    // 重置高度以获取真实的scrollHeight
-    editor.style.height = 'auto';
-    highlightDisplay.style.height = 'auto';
-    container.style.height = 'auto';
-    
-    // 计算所需高度（至少100px）
-    const scrollHeight = Math.max(editor.scrollHeight, 100);
-    const newHeight = `${scrollHeight}px`;
-    
-    // 设置高度
-    editor.style.height = newHeight;
-    highlightDisplay.style.height = newHeight;
-    container.style.height = newHeight;
-    
-    // 计算内容所需的宽度
-    // 创建一个临时元素来测量文本宽度
-    const tempElement = document.createElement('pre');
-    // tempElement.style.fontFamily = 'JetBrains Mono, monospace';
-    tempElement.style.fontSize = '14px';
-    tempElement.style.lineHeight = '1.5';
-    tempElement.style.whiteSpace = 'pre';
-    tempElement.style.position = 'absolute';
-    tempElement.style.visibility = 'hidden';
-    tempElement.style.padding = '8px';
-    tempElement.style.top = '-9999px';
-    tempElement.style.left = '-9999px';
-    tempElement.textContent = text || '// 在此输入JS代码';
-    
-    document.body.appendChild(tempElement);
-    const contentWidth = tempElement.offsetWidth;
-    document.body.removeChild(tempElement);
-    
-    // 计算节点所需的最小宽度（内容宽度 + padding + margin）
-    const minNodeWidth = Math.max(contentWidth + 60, 300); // 60px for padding and margins
-    
-    // 设置节点容器的宽度
-    nodeContainer.style.width = `${minNodeWidth}px`;
-    
-    console.log('调整编辑器尺寸:', {
-      contentWidth,
-      minNodeWidth,
-      scrollHeight,
-      newHeight,
-      text: text?.substring(0, 50) + '...'
-    });
-  }, [text]);
-
-  // 变量相关状态
-  const [controls, setControls] = useState<ControlInfo[]>(data.controls || []);
-  const [outputs, setOutputs] = useState<Record<string, any>>(data.outputs || {});
-  const [consoleLogs, setConsoleLogs] = useState<string[]>(data.consoleLogs || []);
-  const [isExecuting, setIsExecuting] = useState(false);
-  
-  // 错误和警告状态
-  const [errors, setErrors] = useState<Array<{
-    message: string;
-    line?: number;
-    column?: number;
-    stack?: string;
-  }>>(data.errors || []);
-  const [warnings, setWarnings] = useState<Array<{
-    message: string;
-    line?: number;
-    column?: number;
-    stack?: string;
-  }>>(data.warnings || []);
-  
-  // 控件值状态
-  const [controlValues, setControlValues] = useState<Record<string, any>>({});
-  
-
-
-  // 初始化控件值
-  useEffect(() => {
-    const initialValues: Record<string, any> = {};
-    controls.forEach(control => {
-      if (controlValues[control.name] === undefined) {
-        initialValues[control.name] = control.value ?? control.defaultValue;
-      }
-    });
-    if (Object.keys(initialValues).length > 0) {
-      setControlValues(prev => ({ ...prev, ...initialValues }));
-    }
-  }, [controls, controlValues]);
-
-  // 初始化时需要通过 useEffect 来进行一次 isEditing 的状态切换，这样才能触发编辑态 textarea 的自动聚焦。
-  useEffect(() => {
-    console.log('data.initialEditing', data.initialEditing);
-    if (data.initialEditing) {
-      setIsEditing(true);
-    }
-  }, [data.initialEditing]);
 
   // 获取所有连接节点的输出数据
   const getConnectedNodeData = useCallback(() => {
@@ -247,6 +145,91 @@ const TextNode: React.FC<NodeProps<TextNodeType>> = ({ id, data, selected }) => 
     console.log('从连接节点获取的数据:', connectedData);
     return connectedData;
   }, [id, getNodes, getEdges]);
+
+  // 编辑器元素引用
+  const nameInputRef = useRef<HTMLInputElement>(null);
+  
+  // 使用节点执行Hook
+  const {
+    isExecuting,
+    controls,
+    outputs,
+    consoleLogs,
+    errors,
+    warnings,
+    executeCode,
+    setControls,
+    setOutputs,
+    setConsoleLogs,
+    setErrors,
+    setWarnings,
+  } = useNodeExecution({
+    id,
+    onControlsChange: (newControls) => {
+      setControls(newControls);
+      updateNodeData({ controls: newControls });
+    },
+    onOutputsChange: (newOutputs) => {
+      setOutputs(newOutputs);
+      updateNodeData({ outputs: newOutputs });
+    },
+    onLogsChange: (newLogs) => {
+      setConsoleLogs(newLogs);
+      updateNodeData({ consoleLogs: newLogs });
+    },
+    onErrorsChange: (newErrors) => {
+      setErrors(newErrors);
+      updateNodeData({ errors: newErrors });
+    },
+    onWarningsChange: (newWarnings) => {
+      setWarnings(newWarnings);
+      updateNodeData({ warnings: newWarnings });
+    },
+    getConnectedNodeData,
+  });
+
+  // 从data中获取节点宽度，移除最大宽度限制
+  const nodeWidth = data.width || 'auto';
+  const nodeHeight = data.height || 'auto';
+
+  // 隐藏状态
+  const isCollapsed = data.isCollapsed || false;
+  const hiddenSections = data.hiddenSections || {};
+
+
+
+  // 控件值状态
+  const [controlValues, setControlValues] = useState<Record<string, any>>({});
+  
+  // 未保存状态
+  const [hasUnsavedChanges, setHasUnsavedChanges] = useState(false);
+  
+
+
+  // 初始化控件值
+  useEffect(() => {
+    const initialValues: Record<string, any> = {};
+    controls.forEach(control => {
+      if (controlValues[control.name] === undefined) {
+        initialValues[control.name] = control.value ?? control.defaultValue;
+      }
+    });
+    if (Object.keys(initialValues).length > 0) {
+      setControlValues(prev => ({ ...prev, ...initialValues }));
+    }
+  }, [controls, controlValues]);
+
+  // 初始化时需要通过 useEffect 来进行一次 isEditing 的状态切换，这样才能触发编辑态 textarea 的自动聚焦。
+  useEffect(() => {
+    console.log('data.initialEditing', data.initialEditing);
+    if (data.initialEditing) {
+      // 使用Hook提供的方法进入编辑模式
+      // 这里需要调用Hook的enterEditMode方法
+      // 注意：Hook内部已经处理了初始编辑状态
+    }
+  }, [data.initialEditing]);
+
+
 
   /**
    * 调整显示模式下的节点宽度
@@ -284,292 +267,13 @@ const TextNode: React.FC<NodeProps<TextNodeType>> = ({ id, data, selected }) => 
     });
   }, [text, id]);
 
-  // 执行JS代码
-  const executeCode = useCallback(async (code: string, inputValues: Record<string, any> = {}) => {
-    if (!code.trim()) {
-      // 清空错误状态时添加淡出动画
-      if (errors.length > 0 || warnings.length > 0) {
-        setAnimatingOut(prev => ({ ...prev, errors: true }));
-        setTimeout(() => {
-          setErrors([]);
-          setWarnings([]);
-          setAnimatingOut(prev => ({ ...prev, errors: false }));
-        }, 300);
-      }
-      return;
-    }
-    
-    // 如果正在执行，跳过新的执行请求
-    if (isExecuting) {
-      console.log('代码正在执行中，跳过新的执行请求');
-      return;
-    }
 
-    console.log('执行JS代码:', code, '输入值:', inputValues);
-    setIsExecuting(true);
 
-    try {
-      // 获取所有连接节点的输出数据
-      const connectedInputValues = getConnectedNodeData();
-      
-      // 合并用户输入值和连接节点的数据
-      const allInputValues = { ...connectedInputValues, ...inputValues };
-      
-      console.log('所有输入值（包括连接数据）:', allInputValues);
-      
-      const result = await jsExecutor.executeCode(code, allInputValues);
-      
-      if (result.success) {
-        // 更新控件信息
-        setControls(result.controls);
-        
-        // 更新输出
-        setOutputs(result.outputs);
-        
-        // 更新日志
-        setConsoleLogs(result.logs);
-        
-        // 清空错误和警告时添加淡出动画
-        if (errors.length > 0 || warnings.length > 0) {
-          setAnimatingOut(prev => ({ ...prev, errors: true }));
-          setTimeout(() => {
-            setErrors([]);
-            setWarnings([]);
-            setAnimatingOut(prev => ({ ...prev, errors: false }));
-          }, 300);
-        } else {
-          // 如果之前没有错误，直接清空
-          setErrors([]);
-          setWarnings([]);
-        }
-        
-        // 同步到React Flow节点数据
-        setNodes((nodes) =>
-          nodes.map((node) => {
-            if (node.id === id) {
-              return { 
-                ...node, 
-                data: { 
-                  ...node.data, 
-                  controls: result.controls,
-                  outputs: result.outputs,
-                  consoleLogs: result.logs,
-                  errors: [],
-                  warnings: []
-                } 
-              };
-            }
-            return node;
-          })
-        );
-        
-        console.log('代码执行成功:', result);
-      } else {
-        console.error('代码执行失败:', result.errors);
-        
-        // 更新错误状态
-        const sortedErrors = (result.errors || []).sort((a: any, b: any) => (a.line || 0) - (b.line || 0));
-        setErrors(sortedErrors);
-        setWarnings(result.warnings || []);
-        
-        // 同步到React Flow节点数据
-        setNodes((nodes) =>
-          nodes.map((node) => {
-            if (node.id === id) {
-              return { 
-                ...node, 
-                data: { 
-                  ...node.data, 
-                  errors: sortedErrors,
-                  warnings: result.warnings || []
-                } 
-              };
-            }
-            return node;
-          })
-        );
-      }
-    } catch (error) {
-      console.error('JS代码执行失败:', error);
-      const errorInfo = {
-        message: error instanceof Error ? error.message : String(error),
-        stack: error instanceof Error ? error.stack : undefined
-      };
-      setErrors([errorInfo]);
-      
-      // 同步到React Flow节点数据
-      setNodes((nodes) =>
-        nodes.map((node) => {
-          if (node.id === id) {
-            return { 
-              ...node, 
-              data: { 
-                ...node.data, 
-                errors: [errorInfo],
-                warnings: []
-              } 
-            };
-          }
-          return node;
-        })
-      );
-    } finally {
-      setIsExecuting(false);
-    }
-  }, [id, setNodes, isExecuting, getConnectedNodeData, errors.length, warnings.length]);
 
-  // 记录最近一次点击事件，用于进入编辑态时定位光标
-  const lastPointerDown = useRef<{ x: number; y: number } | null>(null);
-  
-  // 记录用户是否正在输入，避免干扰光标位置
-  const isUserInputting = useRef(false);
-  
-  // 记录编辑器是否已经初始化内容
-  const editorInitialized = useRef(false);
 
-  // 处理文本变化（编辑器）
-  const handleSyntaxEditorInput = useCallback((e: React.FormEvent<HTMLDivElement>) => {
-    isUserInputting.current = true;
-    const currentCode = e.currentTarget.innerText;
-    setText(currentCode);
-    
-    // 实时更新语法高亮显示层
-    const highlightDisplay = e.currentTarget.parentElement?.querySelector('.syntax-highlight-display') as HTMLElement;
-    if (highlightDisplay) {
-      highlightDisplay.innerHTML = generateHighlightedCode(currentCode);
-    }
-    
-    // 自动调整编辑器高度
-    setTimeout(() => {
-      adjustEditorSize();
-    }, 0);
-    
-    // 延迟执行代码，避免过于频繁的执行
-    setTimeout(() => {
-      const valuesSnapshot = { ...controlValues };
-      executeCode(currentCode, valuesSnapshot);
-    }, 300);
-    
-    // 短暂延迟后重置标志，避免其他操作被误认为用户输入
-    setTimeout(() => {
-      isUserInputting.current = false;
-    }, 100);
-  }, [controls, controlValues, executeCode, generateHighlightedCode, adjustEditorSize]);
 
-  // 退出编辑状态的复用逻辑
-  const exitEdit = useCallback(() => {
-    // 从编辑器元素获取最新代码
-    const finalCode = textElementRef.current?.innerText || text;
-    setText(finalCode);
-    
-    setIsEditing(false);
-    isUserInputting.current = false; // 退出编辑时重置标志
-    editorInitialized.current = false; // 重置初始化标志
-    
-    // 同步数据到React Flow节点数据
-    setNodes((nodes) =>
-      nodes.map((node) =>
-        node.id === id
-          ? { 
-              ...node, 
-              data: { 
-                ...node.data, 
-                label: finalCode, // 使用从编辑器获取的代码
-                initialEditing: undefined
-              } 
-            }
-          : node
-      )
-    );
-  }, [text, id, setNodes]);
 
-  // 自动聚焦到编辑器
-  useEffect(() => {
-    // 只有在刚进入编辑模式且用户没有正在输入时才重新定位光标
-    if (isEditing && textElementRef.current && !isUserInputting.current) {
-      const editorElement = textElementRef.current;
-      
-      // 首先设置内容（只在编辑器刚初始化时或内容确实不匹配时）
-      if (!editorInitialized.current || editorElement.innerText !== text) {
-        editorElement.innerText = text;
-        editorInitialized.current = true;
-        
-        // 初始化语法高亮
-        const highlightDisplay = editorElement.parentElement?.querySelector('.syntax-highlight-display') as HTMLElement;
-        if (highlightDisplay) {
-          highlightDisplay.innerHTML = generateHighlightedCode(text);
-        }
-        
-        // 调整编辑器高度
-        setTimeout(() => {
-          adjustEditorSize();
-        }, 0);
-      }
-      
-      // 聚焦元素
-      editorElement.focus();
-      
-      // 如果有记录的点击位置，尝试定位光标
-      if (lastPointerDown.current) {
-        const { x, y } = lastPointerDown.current;
-        
-        setTimeout(() => {
-          const placed = placeCaretAtPoint(x, y);
-          if (!placed) {
-            // 如果定位失败，将光标移到末尾
-            const range = document.createRange();
-            range.selectNodeContents(editorElement);
-            range.collapse(false);
-            const sel = window.getSelection();
-            sel?.removeAllRanges();
-            sel?.addRange(range);
-          }
-        }, 10);
-        
-        // 清除记录的位置
-        lastPointerDown.current = null;
-      } else {
-        // 没有点击位置，将光标移到末尾（只在初次进入编辑模式时）
-        setTimeout(() => {
-          const range = document.createRange();
-          range.selectNodeContents(editorElement);
-          range.collapse(false);
-          const sel = window.getSelection();
-          sel?.removeAllRanges();
-          sel?.addRange(range);
-        }, 10);
-      }
-    }
-  }, [isEditing, text, generateHighlightedCode, adjustEditorSize]); // 添加新的依赖项
 
-  // 处理键盘事件
-  const handleDivKeyDown = useCallback((e: React.KeyboardEvent<HTMLDivElement>) => {
-    // Esc
-    if (e.key === 'Escape') {
-      e.preventDefault();
-      exitEdit();
-    } 
-    // Shift + Enter
-    else if (e.key === 'Enter' && e.shiftKey) {
-      e.preventDefault();
-      exitEdit();
-    }
-  }, [exitEdit]);
-
-  // 处理双击事件 - 只保留这一个监听
-  const handleDoubleClick = useCallback((e: React.MouseEvent<HTMLDivElement>) => {
-    // 只有在点击代码区域时才进入编辑
-    const target = e.target as HTMLElement;
-    const isCodeArea = target.closest('.text-node-content') || target.closest('.text-node-editor');
-    
-    if (isCodeArea && !isEditing) {
-      e.preventDefault();
-      e.stopPropagation();
-      // 记录双击位置
-      lastPointerDown.current = { x: e.clientX, y: e.clientY };
-      setIsEditing(true);
-    }
-  }, [isEditing]);
 
   // 当变量列表更新时，更新输出显示和日志
   useEffect(() => {
@@ -630,14 +334,33 @@ const TextNode: React.FC<NodeProps<TextNodeType>> = ({ id, data, selected }) => 
       }
     };
 
+    const handleSaveAllChanges = (event: CustomEvent) => {
+      // 检查当前节点是否有未保存的更改
+      if (hasUnsavedChanges && text.trim()) {
+        console.log(`节点 ${id} 收到全局保存命令，重新执行代码`);
+        
+        // 清除未保存状态
+        setHasUnsavedChanges(false);
+        
+        // 重新执行代码
+        const inputValues: Record<string, any> = { ...controlValues };
+        const connectedData = getConnectedNodeData();
+        Object.assign(inputValues, connectedData);
+        
+        executeCode(text, inputValues);
+      }
+    };
+
     // 添加事件监听器
     document.addEventListener('node-upstream-changed', handleUpstreamChange as EventListener);
+    document.addEventListener('save-all-changes', handleSaveAllChanges as EventListener);
     
     // 清理事件监听器
     return () => {
       document.removeEventListener('node-upstream-changed', handleUpstreamChange as EventListener);
+      document.removeEventListener('save-all-changes', handleSaveAllChanges as EventListener);
     };
-  }, [id, text, controlValues, executeCode, getConnectedNodeData]);
+  }, [id, text, controlValues, executeCode, getConnectedNodeData, hasUnsavedChanges]);
 
   // 当变量值变化时，重新执行代码
   const handleVariableChange = useCallback((name: string, value: any) => {
@@ -849,11 +572,26 @@ const TextNode: React.FC<NodeProps<TextNodeType>> = ({ id, data, selected }) => 
               onClick={isCollapsed ? toggleCollapse : undefined}
               style={{ 
                 textAlign: isCollapsed ? 'center' : 'left',
-                cursor: isCollapsed ? 'pointer' : 'pointer'
+                cursor: isCollapsed ? 'pointer' : 'pointer',
+                display: 'flex',
+                alignItems: 'center',
+                gap: '4px'
               }}
               title={isCollapsed ? '点击展开节点' : '双击编辑名称'}
             >
               {nodeName}
+              {hasUnsavedChanges && (
+                <div
+                  style={{
+                    width: '6px',
+                    height: '6px',
+                    borderRadius: '50%',
+                    backgroundColor: '#ffffff',
+                    flexShrink: 0
+                  }}
+                  title="未保存的更改"
+                />
+              )}
             </div>
           )}
         </div>
@@ -970,12 +708,13 @@ const TextNode: React.FC<NodeProps<TextNodeType>> = ({ id, data, selected }) => 
             <div 
               className="syntax-highlight-container nodrag" 
               key="syntax-editor"
+              style={{ position: 'relative' }}
             >
               {/* 语法高亮显示层 */}
               <pre 
                 className="syntax-highlight-display"
                 dangerouslySetInnerHTML={{
-                  __html: generateHighlightedCode(text)
+                  __html: highlightedHtml
                 }}
                 style={{
                   position: 'absolute',
@@ -986,47 +725,74 @@ const TextNode: React.FC<NodeProps<TextNodeType>> = ({ id, data, selected }) => 
                   lineHeight: '1.5',
                   margin: 0,
                   padding: '8px',
-                  whiteSpace: 'pre-wrap', // 改为pre-wrap，支持自动换行
+                  whiteSpace: 'pre-wrap',
                   background: 'transparent',
                   border: 'none',
                   outline: 'none',
-                  overflow: 'visible', // 保持visible
+                  overflow: 'visible',
                   pointerEvents: 'none',
                   zIndex: 1,
                   boxSizing: 'border-box'
                 }}
               />
-              {/* 可编辑文本层 */}
-              <div
-                className="text-node-editor"
-                contentEditable
-                ref={textElementRef}
-                suppressContentEditableWarning
-                onInput={handleSyntaxEditorInput}
-                // onBlur={exitEdit}
-                onKeyDown={handleDivKeyDown}
+              {/* 1x1 textarea 用于输入 */}
+              <textarea
+                ref={textareaRef}
+                onInput={handleInput}
+                onKeyDown={handleKeyDown}
+                onBlur={handleBlur}
                 style={{ 
                   position: 'absolute',
                   top: 0,
                   left: 0,
+                  width: '1px',
+                  height: '1px',
                   fontFamily: 'JetBrains Mono, AlimamaFangYuanTi, monospace',
                   fontSize: '14px',
                   lineHeight: '1.5',
                   margin: 0,
                   padding: '8px',
-                  whiteSpace: 'pre-wrap', // 改为pre-wrap，支持自动换行
+                  whiteSpace: 'pre-wrap',
                   background: 'transparent',
                   border: 'none',
                   outline: 'none',
                   color: 'transparent',
-                  caretColor: '#7dd3fc',
+                  caretColor: 'transparent',
                   zIndex: 2,
                   boxSizing: 'border-box',
                   cursor: 'text',
-                  overflow: 'visible', // 保持visible
-                  resize: 'none'
+                  overflow: 'hidden',
+                  resize: 'none',
+                  opacity: 0
                 }}
                 spellCheck={false}
+              />
+              {/* 显示层容器 */}
+              <div
+                ref={editorRef}
+                onDoubleClick={handleDoubleClick}
+                onClick={handleDisplayClick}
+                style={{
+                  position: 'absolute',
+                  top: 0,
+                  left: 0,
+                  right: 0,
+                  bottom: 0,
+                  fontFamily: 'JetBrains Mono, AlimamaFangYuanTi, monospace',
+                  fontSize: '14px',
+                  lineHeight: '1.5',
+                  margin: 0,
+                  padding: '8px',
+                  whiteSpace: 'pre-wrap',
+                  background: 'transparent',
+                  border: 'none',
+                  outline: 'none',
+                  zIndex: 1,
+                  boxSizing: 'border-box',
+                  cursor: 'text',
+                  overflow: 'visible',
+                  pointerEvents: 'auto'
+                }}
               />
             </div>
           ) : (
@@ -1035,7 +801,7 @@ const TextNode: React.FC<NodeProps<TextNodeType>> = ({ id, data, selected }) => 
                 <pre 
                   className="syntax-highlighted-code"
                   dangerouslySetInnerHTML={{
-                    __html: generateHighlightedCode(text)
+                    __html: highlightedHtml
                   }}
                   style={{
                     fontFamily: 'JetBrains Mono, AlimamaFangYuanTi, monospace',
@@ -1043,8 +809,8 @@ const TextNode: React.FC<NodeProps<TextNodeType>> = ({ id, data, selected }) => 
                     lineHeight: '1.5',
                     margin: 0,
                     padding: 0,
-                    whiteSpace: 'pre-wrap', // 改为pre-wrap，支持自动换行
-                    overflow: 'visible' // 保持visible
+                    whiteSpace: 'pre-wrap',
+                    overflow: 'visible'
                   }}
                 />
               ) : (
@@ -1099,7 +865,7 @@ const TextNode: React.FC<NodeProps<TextNodeType>> = ({ id, data, selected }) => 
         <OutputDisplay outputs={outputs} isAnimatingOut={animatingOut.outputs} />
       )}
 
-      {/* 连接句柄 - 禁用拖动，只允许点击连接 */}
+      {/* 连接handle - 禁用拖动，只允许点击连接 */}
       <Handle
         type="source"
         position={Position.Right}
