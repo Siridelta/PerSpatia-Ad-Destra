@@ -338,8 +338,7 @@
   display: block;
   padding: 15px;
   box-sizing: border-box;
-  height: auto; /* 让高度自动适应内容 */
-  min-height: 100px; /* 保持最小高度 */
+  height: fit-content;
 }
 
 .text-node-content {

@@ -105,7 +105,6 @@ export const useNodeExecution = ({
       const result = await jsExecutor.executeCode(code, allInputValues);
 
       if (result.success) {
-        console.log('result.controls', result.controls, result.controls.map(c => c.value));
         // 更新控件信息
         setControls(result.controls);
         onControlsChange(result.controls);
