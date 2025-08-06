@@ -94,7 +94,6 @@ export const CodeEditor: React.FC<CodeEditorProps> = ({
     const placeholder = container.querySelector('.code-editor-placeholder') as HTMLElement;
 
     // 重置高度以获取真实的scrollHeight
-    editor.style.height = 'auto';
     placeholder.style.height = 'auto';
 
     // 计算所需高度（至少100px）
@@ -102,7 +101,6 @@ export const CodeEditor: React.FC<CodeEditorProps> = ({
     const newHeight = `${scrollHeight}px`;
 
     // 设置编辑器高度
-    editor.style.height = newHeight;
     placeholder.style.height = newHeight;
 
   }, [text]);
@@ -135,6 +133,9 @@ export const CodeEditor: React.FC<CodeEditorProps> = ({
 
   // 处理文本变化（textarea）
   const handleInput = useCallback((e: React.FormEvent<HTMLTextAreaElement>) => {
+    // 只有在编辑模式下才处理输入
+    if (!isEditing) return;
+    
     isUserInputting.current = true;
     const currentCode = e.currentTarget.value;
     setText(currentCode);
@@ -154,35 +155,51 @@ export const CodeEditor: React.FC<CodeEditorProps> = ({
     setTimeout(() => {
       isUserInputting.current = false;
     }, 100);
-  }, [onTextChange, updateCursorPosition, adjustSize]);
+  }, [isEditing, onTextChange, updateCursorPosition, adjustSize]);
 
   // 处理键盘事件
   const handleKeyDown = useCallback((e: React.KeyboardEvent<HTMLTextAreaElement>) => {
+    // 只有在编辑模式下才处理键盘事件
+    if (!isEditing) return;
+    
     // 处理 Shift+Enter 退出编辑
     if (e.key === 'Enter' && e.shiftKey) {
       e.preventDefault();
-      exitEditMode();
+      setIsEditing(false);
+      onExitEdit();
+      if (textareaRef.current) {
+        textareaRef.current.blur();
+      }
     }
 
     // 处理 Escape 退出编辑
     if (e.key === 'Escape') {
       e.preventDefault();
-      exitEditMode();
+      setIsEditing(false);
+      onExitEdit();
+      if (textareaRef.current) {
+        textareaRef.current.blur();
+      }
     }
-  }, []);
+
+    // 处理箭头键 - 延迟更新光标位置
+    if (['ArrowUp', 'ArrowDown', 'ArrowLeft', 'ArrowRight', 'Home', 'End'].includes(e.key)) {
+      setTimeout(() => {
+        updateCursorPosition();
+      }, 0);
+    }
+  }, [isEditing, updateCursorPosition, onExitEdit]);
 
   // 处理双击事件
   const handleDoubleClick = useCallback((e: React.MouseEvent<HTMLDivElement>) => {
-    // 只有在点击代码区域时才进入编辑
-    const target = e.target as HTMLElement;
-    const isCodeArea = target.closest('.text-node-content') || target.closest('.text-node-editor');
-
-    if (isCodeArea && !isEditing) {
+    // 双击进入编辑模式
+    if (!isEditing) {
       e.preventDefault();
       e.stopPropagation();
       // 记录双击位置
       lastPointerDown.current = { x: e.clientX, y: e.clientY };
       setIsEditing(true);
+      console.log('Entering edit mode');
     }
   }, [isEditing]);
 
@@ -224,10 +241,8 @@ export const CodeEditor: React.FC<CodeEditorProps> = ({
     textarea.focus();
     textarea.setSelectionRange(charPosition, charPosition);
 
-    // 更新光标位置
-    setTimeout(() => {
-      updateCursorPosition();
-    }, 0);
+    // 立即更新光标位置，避免被其他逻辑重置
+    updateCursorPosition();
   }, [isEditing, text, updateCursorPosition]);
 
   // 进入编辑模式
@@ -239,6 +254,11 @@ export const CodeEditor: React.FC<CodeEditorProps> = ({
   const exitEditMode = useCallback(() => {
     setIsEditing(false);
     onExitEdit();
+    
+    // 让 textarea 失去焦点，停止接收输入
+    if (textareaRef.current) {
+      textareaRef.current.blur();
+    }
   }, [onExitEdit]);
 
   // 处理失焦事件
@@ -273,16 +293,35 @@ export const CodeEditor: React.FC<CodeEditorProps> = ({
 
       // 如果有记录的点击位置，尝试定位光标
       if (lastPointerDown.current) {
-        // 暂时不使用点击位置，直接移到末尾
-        setTimeout(() => {
-          // 尝试根据点击位置设置光标
-          const textarea = textareaRef.current;
-          if (textarea) {
-            // 简单实现：将光标移到末尾
-            textarea.setSelectionRange(textarea.value.length, textarea.value.length);
-            updateCursorPosition();
+        // 使用记录的点击位置设置光标
+        const textarea = textareaRef.current;
+        if (textarea) {
+          // 根据点击位置计算光标位置
+          const rect = textarea.getBoundingClientRect();
+          const clickX = lastPointerDown.current!.x - rect.left - 8;
+          const clickY = lastPointerDown.current!.y - rect.top - 8;
+
+          // 计算字符位置
+          const lines = text.split('\n');
+          const lineHeight = 21;
+          const charWidth = 8.4;
+
+          const lineNumber = Math.floor(clickY / lineHeight);
+          const actualLineNumber = Math.max(0, Math.min(lineNumber, lines.length - 1));
+
+          const currentLine = lines[actualLineNumber] || '';
+          const columnNumber = Math.floor(clickX / charWidth);
+          const actualColumnNumber = Math.max(0, Math.min(columnNumber, currentLine.length));
+
+          let charPosition = 0;
+          for (let i = 0; i < actualLineNumber; i++) {
+            charPosition += lines[i].length + 1;
           }
-        }, 10);
+          charPosition += actualColumnNumber;
+
+          textarea.setSelectionRange(charPosition, charPosition);
+          updateCursorPosition();
+        }
 
         // 清除记录的位置
         lastPointerDown.current = null;
@@ -330,11 +369,13 @@ export const CodeEditor: React.FC<CodeEditorProps> = ({
       {/* 语法高亮显示层 - 覆盖在占位元素上 */}
       <div
         ref={editorRef}
+        className="code-editor-display"
         onDoubleClick={handleDoubleClick}
         onClick={handleDisplayClick}
         dangerouslySetInnerHTML={{ __html: highlightedHtml }}
         style={{
           position: 'absolute',
+          height: 'auto',
           top: 0,
           left: 0,
           right: 0,
@@ -343,11 +384,11 @@ export const CodeEditor: React.FC<CodeEditorProps> = ({
           fontSize: '14px',
           lineHeight: '1.5',
           margin: 0,
+          padding: '8px',
           whiteSpace: 'pre-wrap',
           background: 'transparent',
           border: 'none',
           outline: 'none',
-          zIndex: 1,
           boxSizing: 'border-box',
           cursor: 'text',
           overflow: 'visible',
@@ -372,14 +413,13 @@ export const CodeEditor: React.FC<CodeEditorProps> = ({
           fontSize: '14px',
           lineHeight: '1.5',
           margin: 0,
-          padding: '8px',
+          padding: 0,
           whiteSpace: 'pre-wrap',
           background: 'transparent',
           border: 'none',
           outline: 'none',
           color: 'transparent',
           caretColor: 'transparent',
-          zIndex: 2,
           boxSizing: 'border-box',
           cursor: 'text',
           overflow: 'hidden',
@@ -388,6 +428,23 @@ export const CodeEditor: React.FC<CodeEditorProps> = ({
         }}
         spellCheck={false}
       />
+
+      {/* 光标层 - 显示光标位置 */}
+      {isEditing && (
+        <div
+          className="code-editor-cursor"
+          style={{
+            position: 'absolute',
+            top: `${cursorPosition.y}px`,
+            left: `${cursorPosition.x}px`,
+            width: '2px',
+            height: '21px',
+            backgroundColor: '#7dd3fc',
+            pointerEvents: 'none',
+            animation: 'blink 1s infinite'
+          }}
+        />
+      )}
     </div>
   );
 };
