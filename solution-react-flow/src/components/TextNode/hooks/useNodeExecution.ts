@@ -33,10 +33,10 @@ export interface UseNodeExecutionReturn {
   consoleLogs: string[];
   errors: ErrorInfo[];
   warnings: WarningInfo[];
-  
+
   // 执行方法
   executeCode: (code: string, inputValues?: Record<string, any>) => Promise<void>;
-  
+
   // 状态更新
   setControls: Dispatch<SetStateAction<ControlInfo[]>>;
   setOutputs: Dispatch<SetStateAction<Record<string, any>>>;
@@ -73,7 +73,7 @@ export const useNodeExecution = ({
       }
       return;
     }
-    
+
     // 如果正在执行，跳过新的执行请求
     if (isExecuting) {
       console.log('代码正在执行中，跳过新的执行请求');
@@ -86,37 +86,48 @@ export const useNodeExecution = ({
     try {
       // 获取所有连接节点的输出数据
       const connectedInputValues = getConnectedNodeData();
-      
+
       // 合并用户输入值和连接节点的数据
-      const allInputValues = { ...connectedInputValues, ...inputValues };
-      
+      const allInputValues = {
+        ...connectedInputValues,
+        ...controls.reduce((acc, control) => {
+          const value = control.value ?? control.defaultValue;
+          if (value !== undefined) {
+            acc[control.name] = value;
+          }
+          return acc;
+        }, {} as Record<string, any>),
+        ...inputValues
+      };
+
       console.log('所有输入值（包括连接数据）:', allInputValues);
-      
+
       const result = await jsExecutor.executeCode(code, allInputValues);
-      
+
       if (result.success) {
+        console.log('result.controls', result.controls, result.controls.map(c => c.value));
         // 更新控件信息
         setControls(result.controls);
         onControlsChange(result.controls);
-        
+
         // 更新输出
         setOutputs(result.outputs);
         onOutputsChange(result.outputs);
-        
+
         // 更新日志
         setConsoleLogs(result.logs);
         onLogsChange(result.logs);
-        
+
         // 清空错误和警告
         setErrors([]);
         setWarnings([]);
         onErrorsChange([]);
         onWarningsChange([]);
-        
+
         console.log('代码执行成功:', result);
       } else {
         console.error('代码执行失败:', result.errors);
-        
+
         // 更新错误状态
         const sortedErrors = (result.errors || []).sort((a: any, b: any) => (a.line || 0) - (b.line || 0));
         setErrors(sortedErrors);
@@ -125,7 +136,7 @@ export const useNodeExecution = ({
         onWarningsChange(result.warnings || []);
       }
     } catch (error) {
-      console.error('JS代码执行失败:', error);
+      console.error('代码执行失败(internal failure):', error);
       const errorInfo = {
         message: error instanceof Error ? error.message : String(error),
         stack: error instanceof Error ? error.stack : undefined
@@ -135,7 +146,7 @@ export const useNodeExecution = ({
     } finally {
       setIsExecuting(false);
     }
-  }, [isExecuting, errors.length, warnings.length, getConnectedNodeData, onControlsChange, onOutputsChange, onLogsChange, onErrorsChange, onWarningsChange]);
+  }, [isExecuting, errors.length, warnings.length, controls, getConnectedNodeData, onControlsChange, onOutputsChange, onLogsChange, onErrorsChange, onWarningsChange]);
 
   return {
     isExecuting,

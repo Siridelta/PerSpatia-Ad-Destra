@@ -170,10 +170,13 @@ export class JSExecutor {
       throw new Error('Invalid control type');
     }
 
+    const value = this.inputValues[actualName] ?? controlInfo.defaultValue;
+    controlInfo.value = value;
+
     this.controls.push(controlInfo);
     
     // 返回当前输入值或默认值
-    return this.inputValues[actualName] ?? controlInfo.defaultValue;
+    return value;
   };
 
   // node_output函数实现 - 新格式：node_output(变量名, 值)

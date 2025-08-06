@@ -150,52 +150,48 @@ const TextNode: React.FC<NodeProps<TextNodeType>> = ({ id, data, selected }) => 
     getConnectedNodeData,
   });
 
-  // derived state, 控件值管理
-  const controlValues = controls.reduce((acc, control) => {
-    acc[control.name] = control.value ?? control.defaultValue;
-    return acc;
-  }, {} as Record<string, any>);
+  // derived, but independent state
+  const [controlValues, _setControlValues] = useState<Record<string, any>>({});
 
   const setControlValues = useCallback((values: Record<string, any>) => {
-    setControls(prevControls =>
-      prevControls.map((c: ControlInfo) => ({
-        ...c,
-        value: values[c.name] ?? c.defaultValue
-      }))
+    console.log('setControlValues', values);
+    const newControls = controls.map((c: ControlInfo) => ({
+      ...c,
+      value: values[c.name] ?? c.defaultValue
+    }));
+    console.log('setControls', controls, newControls);
+    setControls(newControls);
+  }, [controls, setControls]);
+
+  // 通过 useEffect 管理 controlValues 的更新，进行精确的数据比较
+  useEffect(() => {
+    const newControlValues = controls.reduce((acc, control) => {
+      acc[control.name] = control.value ?? control.defaultValue;
+      return acc;
+    }, {} as Record<string, any>);
+
+    // 比较新旧值是否真正发生了变化
+    const hasChanged = Object.keys(newControlValues).some(key =>
+      newControlValues[key] !== controlValues[key]
+    ) || Object.keys(controlValues).some(key =>
+      !(key in newControlValues)
     );
-  }, []);
+    if (hasChanged) {
+      console.log('controlValues has changed', newControlValues);
+      _setControlValues(newControlValues);
+    }
+  }, [controls, controlValues, _setControlValues]);
+
+  // 使用 useRef 存储 executeCode 的最新实例，避免依赖循环
+  const executeCodeRef = useRef(executeCode);
+  executeCodeRef.current = executeCode;
+
 
   // ============================================================================
-  // 代码执行逻辑 (集中管理)
+  // 代码执行逻辑, 响应式更新逻辑 (集中管理)
   // ============================================================================
 
-  // 执行代码的核心函数
-  const executeCodeWithInputs = useCallback((code: string, additionalInputs: Record<string, any> = {}) => {
-    const inputValues = { ...controlValues, ...additionalInputs };
-    const connectedData = getConnectedNodeData();
-    Object.assign(inputValues, connectedData);
-    
-    console.log('执行代码', inputValues);
-    executeCode(code, inputValues);
-  }, [controlValues, executeCode, getConnectedNodeData]);
-
-  // 变量值变化处理
-  const handleVariableChange = useCallback((name: string, value: any) => {
-    const updatedValues = { ...controlValues, [name]: value };
-    setControlValues(updatedValues);
-
-    setTimeout(() => {
-      console.log('变量值变化，重新执行代码', updatedValues);
-      const currentText = data.label || '';
-      executeCodeWithInputs(currentText, updatedValues);
-    }, 100);
-  }, [setControlValues, controlValues, executeCodeWithInputs, data.label]);
-
-  // ============================================================================
-  // 响应式更新逻辑 (集中管理)
-  // ============================================================================
-
-  // 上游节点变化监听
+  // 上游节点变化监听, 重新执行代码
   useEffect(() => {
     const handleUpstreamChange = (event: CustomEvent) => {
       const { nodeId, sourceNodeId, timestamp, reason } = event.detail;
@@ -205,7 +201,7 @@ const TextNode: React.FC<NodeProps<TextNodeType>> = ({ id, data, selected }) => 
 
         const currentText = data.label || '';
         if (currentText.trim()) {
-          executeCodeWithInputs(currentText);
+          executeCodeRef.current(currentText);
         }
       }
     };
@@ -215,7 +211,7 @@ const TextNode: React.FC<NodeProps<TextNodeType>> = ({ id, data, selected }) => 
       if (hasUnsavedChanges && currentText.trim()) {
         console.log(`节点 ${id} 收到全局保存命令，重新执行代码`);
         setHasUnsavedChanges(false);
-        executeCodeWithInputs(currentText);
+        executeCodeRef.current(currentText);
       }
     };
 
@@ -226,9 +222,17 @@ const TextNode: React.FC<NodeProps<TextNodeType>> = ({ id, data, selected }) => 
       document.removeEventListener('node-upstream-changed', handleUpstreamChange as EventListener);
       document.removeEventListener('save-all-changes', handleSaveAllChanges as EventListener);
     };
-  }, [id, data.label, executeCodeWithInputs, hasUnsavedChanges]);
+  }, [id, data.label, hasUnsavedChanges]);
 
-  // 代码变化监听
+  // 监听 controlValues 和代码内容变化，重新执行代码
+  useEffect(() => {
+    const currentText = data.label || '';
+    if (currentText.trim()) {
+      executeCodeRef.current(currentText);
+    }
+  }, [controlValues, data.label]); // 不依赖 executeCode，避免循环
+
+  // 监听代码变化, 自动调整节点宽度
   useEffect(() => {
     const currentText = data.label || '';
     if (currentText) {
@@ -271,15 +275,8 @@ const TextNode: React.FC<NodeProps<TextNodeType>> = ({ id, data, selected }) => 
           text: currentText?.substring(0, 50) + '...'
         });
       }, 100);
-
-      // 延迟执行代码
-      const timeoutId = setTimeout(() => {
-        executeCodeWithInputs(currentText);
-      }, 300);
-
-      return () => clearTimeout(timeoutId);
     }
-  }, [data.label, controlValues, executeCodeWithInputs, data.width, id, setNodes]);
+  }, [data.label, data.width, id, setNodes]);
 
   // ============================================================================
   // UI交互逻辑 (集中管理)
@@ -306,10 +303,10 @@ const TextNode: React.FC<NodeProps<TextNodeType>> = ({ id, data, selected }) => 
   // 退出编辑处理
   const handleExitEdit = () => {
     setHasUnsavedChanges(false);
-    const finalCode = data.label || '';
-    if (finalCode.trim()) {
-      executeCodeWithInputs(finalCode);
-    }
+    // const finalCode = data.label || '';
+    // if (finalCode.trim()) {
+    //   executeCode(finalCode);
+    // }
   };
 
   // 节点名称编辑
@@ -365,12 +362,7 @@ const TextNode: React.FC<NodeProps<TextNodeType>> = ({ id, data, selected }) => 
       return acc;
     }, {} as Record<string, any>);
     setControlValues(defaultValues);
-    
-    const currentText = data.label || '';
-    if (currentText.trim()) {
-      executeCodeWithInputs(currentText, defaultValues);
-    }
-  }, [controls, data.label, setControlValues, executeCodeWithInputs]);
+  }, [controls, setControlValues]);
 
   // 复制代码
   const copyCode = useCallback(async () => {
@@ -380,6 +372,12 @@ const TextNode: React.FC<NodeProps<TextNodeType>> = ({ id, data, selected }) => 
       console.error('复制代码失败:', err);
     }
   }, [data.label]);
+
+  // 变量值变化处理
+  const handleVariableChange = useCallback((name: string, value: any) => {
+    const updatedValues = { ...controlValues, [name]: value };
+    setControlValues(updatedValues);
+  }, [setControlValues, controlValues]);
 
   // ============================================================================
   // 动画管理逻辑 (集中管理)
@@ -426,22 +424,18 @@ const TextNode: React.FC<NodeProps<TextNodeType>> = ({ id, data, selected }) => 
   };
 
   // 获取输入变量信息
-  const getInputVariablesInfo = useCallback(() => {
-    return controls.map(control => ({
-      name: control.name,
-      type: control.type,
-      value: control.value ?? control.defaultValue
-    }));
-  }, [controls]);
+  const inputVarsInfo = controls.map(control => ({
+    name: control.name,
+    type: control.type,
+    value: control.value ?? control.defaultValue
+  }));
 
   // 获取输出变量信息
-  const getOutputVariablesInfo = useCallback(() => {
-    return Object.entries(outputs).map(([name, value]) => ({
-      name,
-      type: typeof value,
-      value
-    }));
-  }, [outputs]);
+  const outputVarsInfo = Object.entries(outputs).map(([name, value]) => ({
+    name,
+    type: typeof value,
+    value
+  }));
 
   // ============================================================================
   // 计算属性
@@ -577,10 +571,10 @@ const TextNode: React.FC<NodeProps<TextNodeType>> = ({ id, data, selected }) => 
       {/* 折叠状态显示 */}
       {isCollapsed && (
         <div className="collapsed-info animate-fade-in-up">
-          {getInputVariablesInfo().length > 0 && (
+          {inputVarsInfo.length > 0 && (
             <div className="collapsed-section">
               <div className="collapsed-label">输入:</div>
-              {getInputVariablesInfo().map((input, index) => (
+              {inputVarsInfo.map((input, index) => (
                 <div key={index} className="collapsed-variable">
                   <span className="var-name">{input.name}</span>
                   <span className="var-type">({input.type})</span>
@@ -589,10 +583,10 @@ const TextNode: React.FC<NodeProps<TextNodeType>> = ({ id, data, selected }) => 
             </div>
           )}
 
-          {getOutputVariablesInfo().length > 0 && (
+          {outputVarsInfo.length > 0 && (
             <div className="collapsed-section">
               <div className="collapsed-label">输出:</div>
-              {getOutputVariablesInfo().map((output, index) => (
+              {outputVarsInfo.map((output, index) => (
                 <div key={index} className="collapsed-variable">
                   <span className="var-name">{output.name}</span>
                   <span className="var-type">({output.type})</span>
@@ -704,7 +698,7 @@ const TextNode: React.FC<NodeProps<TextNodeType>> = ({ id, data, selected }) => 
       />
 
       {/* 节点宽度调整控制 */}
-      {selected && !isCollapsed && (
+      {!isCollapsed && (
         <>
           <NodeResizeControl
             style={{
