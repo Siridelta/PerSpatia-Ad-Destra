@@ -1,4 +1,4 @@
-import { useState, useCallback } from 'react';
+import { useState, useCallback, Dispatch, SetStateAction } from 'react';
 import { jsExecutor, ControlInfo } from '@/services/jsExecutor';
 
 export interface ErrorInfo {
@@ -38,11 +38,11 @@ export interface UseNodeExecutionReturn {
   executeCode: (code: string, inputValues?: Record<string, any>) => Promise<void>;
   
   // 状态更新
-  setControls: (controls: ControlInfo[]) => void;
-  setOutputs: (outputs: Record<string, any>) => void;
-  setConsoleLogs: (logs: string[]) => void;
-  setErrors: (errors: ErrorInfo[]) => void;
-  setWarnings: (warnings: WarningInfo[]) => void;
+  setControls: Dispatch<SetStateAction<ControlInfo[]>>;
+  setOutputs: Dispatch<SetStateAction<Record<string, any>>>;
+  setConsoleLogs: Dispatch<SetStateAction<string[]>>;
+  setErrors: Dispatch<SetStateAction<ErrorInfo[]>>;
+  setWarnings: Dispatch<SetStateAction<WarningInfo[]>>;
 }
 
 export const useNodeExecution = ({

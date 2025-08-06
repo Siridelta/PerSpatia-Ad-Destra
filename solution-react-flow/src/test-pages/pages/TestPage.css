@@ -1,0 +1,465 @@
+/* 测试页面容器 */
+.test-page-container {
+  min-height: 100vh;
+  background: #0a0e1a;
+  color: #ffffff;
+  font-family: 'JetBrains Mono', monospace;
+  position: relative;
+  margin-top: 0; /* 移除顶部边距 */
+  overflow-y: auto; /* 允许垂直滚动 */
+  height: auto; /* 允许内容超出视口高度 */
+}
+
+/* 页面内容 */
+.page-content {
+  padding: 40px 60px 60px;
+  max-width: 1400px;
+  margin: 0 auto;
+  min-height: auto; /* 移除最小高度限制 */
+}
+
+/* 页面头部 */
+.page-header {
+  text-align: center;
+  margin-bottom: 40px;
+}
+
+.page-header h1 {
+  color: #7de1ea;
+  font-size: 32px;
+  margin: 0 0 8px 0;
+  font-weight: bold;
+}
+
+.page-header p {
+  color: rgba(125, 225, 234, 0.7);
+  font-size: 16px;
+  margin: 0;
+}
+
+/* 新的测试布局 */
+.test-layout {
+  display: grid;
+  grid-template-columns: 350px 1fr;
+  gap: 40px;
+  min-height: 600px;
+}
+
+/* 左侧控制面板 */
+.control-panel {
+  background: rgba(9, 14, 28, 0.5);
+  border: 1px solid rgba(125, 225, 234, 0.3);
+  border-radius: 8px;
+  padding: 24px;
+  height: fit-content;
+  display: flex;
+  flex-direction: column;
+  gap: 24px;
+}
+
+/* 测试信息区域 */
+.test-info {
+  background: rgba(125, 225, 234, 0.1);
+  border: 1px solid rgba(125, 225, 234, 0.3);
+  border-radius: 8px;
+  padding: 20px;
+}
+
+.test-info h3 {
+  color: #7de1ea;
+  margin: 0 0 12px 0;
+  font-size: 18px;
+  font-weight: bold;
+}
+
+.test-info ul {
+  color: rgba(125, 225, 234, 0.8);
+  font-size: 14px;
+  margin: 0;
+  padding-left: 20px;
+}
+
+.test-info li {
+  margin-bottom: 6px;
+  line-height: 1.4;
+}
+
+/* 测试控制按钮 */
+.test-controls {
+  background: rgba(9, 14, 28, 0.3);
+  border: 1px solid rgba(125, 225, 234, 0.3);
+  border-radius: 8px;
+  padding: 20px;
+}
+
+.test-controls h4 {
+  color: #7de1ea;
+  margin: 0 0 16px 0;
+  font-size: 16px;
+  font-weight: bold;
+}
+
+.test-controls button {
+  background: rgba(125, 225, 234, 0.1);
+  border: 1px solid rgba(125, 225, 234, 0.3);
+  color: #7de1ea;
+  padding: 10px 16px;
+  border-radius: 6px;
+  cursor: pointer;
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 13px;
+  transition: all 0.2s ease;
+  white-space: nowrap;
+  width: 100%;
+  margin-bottom: 8px;
+  text-align: left;
+}
+
+.test-controls button:hover {
+  background: rgba(125, 225, 234, 0.2);
+  border-color: rgba(125, 225, 234, 0.5);
+  transform: translateY(-1px);
+}
+
+.test-controls button:active {
+  transform: translateY(0);
+}
+
+.test-controls button:last-child {
+  margin-bottom: 0;
+}
+
+/* 代码显示区域 */
+.code-display {
+  background: rgba(9, 14, 28, 0.3);
+  border: 1px solid rgba(125, 225, 234, 0.3);
+  border-radius: 8px;
+  padding: 20px;
+}
+
+.code-display h4 {
+  color: #7de1ea;
+  margin: 0 0 12px 0;
+  font-size: 16px;
+  font-weight: bold;
+}
+
+.code-preview {
+  background: rgba(9, 14, 28, 0.8);
+  border: 1px solid rgba(125, 225, 234, 0.3);
+  border-radius: 6px;
+  padding: 12px;
+  max-height: 200px;
+  overflow-y: auto;
+}
+
+.code-preview pre {
+  color: rgba(125, 225, 234, 0.9);
+  font-size: 12px;
+  line-height: 1.4;
+  margin: 0;
+  white-space: pre-wrap;
+  word-wrap: break-word;
+}
+
+/* 右侧TextNode容器 */
+.node-container {
+  background: rgba(9, 14, 28, 0.5);
+  border: 1px solid rgba(125, 225, 234, 0.3);
+  border-radius: 8px;
+  padding: 24px;
+  display: flex;
+  flex-direction: column;
+  min-height: 600px;
+}
+
+.container-header {
+  margin-bottom: 20px;
+  text-align: center;
+}
+
+.container-header h3 {
+  color: #7de1ea;
+  margin: 0 0 8px 0;
+  font-size: 20px;
+  font-weight: bold;
+}
+
+.container-header p {
+  color: rgba(125, 225, 234, 0.7);
+  font-size: 14px;
+  margin: 0;
+}
+
+.node-display-area {
+  flex: 1;
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  min-height: 500px;
+  background: rgba(9, 14, 28, 0.3);
+  border: 1px solid rgba(125, 225, 234, 0.2);
+  border-radius: 6px;
+  padding: 20px;
+}
+
+/* 响应式设计 */
+@media (max-width: 1200px) {
+  .test-layout {
+    grid-template-columns: 300px 1fr;
+    gap: 30px;
+  }
+  
+  .page-content {
+    padding: 30px 40px 40px;
+  }
+}
+
+@media (max-width: 768px) {
+  .test-layout {
+    grid-template-columns: 1fr;
+    gap: 20px;
+  }
+  
+  .page-content {
+    padding: 30px 20px 40px;
+  }
+  
+  .page-header h1 {
+    font-size: 24px;
+  }
+  
+  .page-header p {
+    font-size: 14px;
+  }
+  
+  .control-panel {
+    padding: 20px;
+  }
+  
+  .test-info {
+    padding: 16px;
+  }
+  
+  .test-info h3 {
+    font-size: 16px;
+  }
+  
+  .test-info ul {
+    font-size: 13px;
+  }
+  
+  .test-controls {
+    padding: 16px;
+  }
+  
+  .test-controls h4 {
+    font-size: 14px;
+  }
+  
+  .test-controls button {
+    padding: 8px 12px;
+    font-size: 12px;
+  }
+  
+  .code-display {
+    padding: 16px;
+  }
+  
+  .code-display h4 {
+    font-size: 14px;
+  }
+  
+  .code-preview {
+    padding: 10px;
+  }
+  
+  .code-preview pre {
+    font-size: 11px;
+  }
+  
+  .node-container {
+    padding: 20px;
+    min-height: 500px;
+  }
+  
+  .container-header h3 {
+    font-size: 18px;
+  }
+  
+  .container-header p {
+    font-size: 13px;
+  }
+  
+  .node-display-area {
+    min-height: 400px;
+    padding: 16px;
+  }
+}
+
+/* 动画效果 */
+.test-page-container {
+  animation: fadeIn 0.3s ease-out;
+}
+
+@keyframes fadeIn {
+  from {
+    opacity: 0;
+    transform: translateY(10px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+/* 滚动条样式 */
+.code-preview::-webkit-scrollbar {
+  width: 6px;
+}
+
+.code-preview::-webkit-scrollbar-track {
+  background: rgba(125, 225, 234, 0.1);
+  border-radius: 3px;
+}
+
+.code-preview::-webkit-scrollbar-thumb {
+  background: rgba(125, 225, 234, 0.3);
+  border-radius: 3px;
+}
+
+.code-preview::-webkit-scrollbar-thumb:hover {
+  background: rgba(125, 225, 234, 0.5);
+}
+
+.node-display-area::-webkit-scrollbar {
+  width: 8px;
+}
+
+.node-display-area::-webkit-scrollbar-track {
+  background: rgba(125, 225, 234, 0.1);
+  border-radius: 4px;
+}
+
+.node-display-area::-webkit-scrollbar-thumb {
+  background: rgba(125, 225, 234, 0.3);
+  border-radius: 4px;
+}
+
+.node-display-area::-webkit-scrollbar-thumb:hover {
+  background: rgba(125, 225, 234, 0.5);
+}
+
+/* 测试页面专用滚动条样式 */
+.test-page-container::-webkit-scrollbar {
+  width: 10px;
+}
+
+.test-page-container::-webkit-scrollbar-track {
+  background: rgba(125, 225, 234, 0.1);
+  border-radius: 5px;
+}
+
+.test-page-container::-webkit-scrollbar-thumb {
+  background: rgba(125, 225, 234, 0.3);
+  border-radius: 5px;
+}
+
+.test-page-container::-webkit-scrollbar-thumb:hover {
+  background: rgba(125, 225, 234, 0.5);
+} 
+
+/* 测试用例 */
+.test-case {
+  background: rgba(9, 14, 28, 0.3);
+  border: 1px solid rgba(125, 225, 234, 0.3);
+  border-radius: 6px;
+  padding: 20px;
+  margin-bottom: 20px;
+}
+
+.test-case h4 {
+  color: #7de1ea;
+  margin: 0 0 12px 0;
+  font-size: 16px;
+  font-weight: bold;
+}
+
+/* 可见textarea */
+.visible-textarea {
+  margin-top: 12px;
+}
+
+/* 调试信息 */
+.debug-info {
+  background: rgba(125, 225, 234, 0.1);
+  border: 1px solid rgba(125, 225, 234, 0.3);
+  border-radius: 6px;
+  padding: 16px;
+  margin-top: 16px;
+}
+
+.debug-info h4 {
+  color: #7de1ea;
+  margin: 0 0 8px 0;
+  font-size: 14px;
+  font-weight: bold;
+}
+
+.debug-info p {
+  color: rgba(125, 225, 234, 0.8);
+  font-size: 12px;
+  margin: 0 0 4px 0;
+}
+
+/* textarea网格 */
+.textarea-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(120px, 1fr));
+  gap: 16px;
+  margin-top: 12px;
+}
+
+.textarea-grid > div {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 8px;
+}
+
+.textarea-grid label {
+  color: rgba(125, 225, 234, 0.8);
+  font-size: 12px;
+  font-weight: bold;
+}
+
+.textarea-grid textarea {
+  border: 1px solid rgba(125, 225, 234, 0.3);
+  border-radius: 4px;
+  background: rgba(9, 14, 28, 0.8);
+  color: #7de1ea;
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 10px;
+  padding: 4px;
+  resize: none;
+}
+
+/* 隐藏textarea滚动条 */
+.textarea-grid textarea::-webkit-scrollbar {
+  display: none;
+}
+
+.textarea-grid textarea {
+  -ms-overflow-style: none;  /* IE and Edge */
+  scrollbar-width: none;  /* Firefox */
+}
+
+/* 隐藏可见textarea的滚动条 */
+.visible-textarea textarea::-webkit-scrollbar {
+  display: none;
+}
+
+.visible-textarea textarea {
+  -ms-overflow-style: none;  /* IE and Edge */
+  scrollbar-width: none;  /* Firefox */
+} 

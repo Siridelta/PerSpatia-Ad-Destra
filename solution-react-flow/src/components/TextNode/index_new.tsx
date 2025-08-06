@@ -150,7 +150,7 @@ const TextNode: React.FC<NodeProps<TextNodeType>> = ({ id, data, selected }) => 
     getConnectedNodeData,
   });
 
-  // derived state, 控件值管理
+  // 控件值管理
   const controlValues = controls.reduce((acc, control) => {
     acc[control.name] = control.value ?? control.defaultValue;
     return acc;

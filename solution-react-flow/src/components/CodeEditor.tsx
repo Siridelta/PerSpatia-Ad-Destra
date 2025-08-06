@@ -1,68 +1,23 @@
-import { useState, useCallback, useRef, useMemo, useEffect } from 'react';
+import React, { useState, useCallback, useRef, useMemo, useEffect } from 'react';
 import Prism from 'prismjs';
 import 'prismjs/components/prism-javascript';
 
-export interface UseMonacoStyleEditorProps {
+export interface CodeEditorProps {
   initialText: string;
   onTextChange: (text: string) => void;
   onExitEdit: () => void;
+  className?: string;
+  style?: React.CSSProperties;
 }
 
-export interface UseMonacoStyleEditorReturn {
-  // 状态
-  isEditing: boolean;
-  text: string;
-  
-  // 编辑器引用
-  editorRef: React.RefObject<HTMLDivElement | null>;
-  textareaRef: React.RefObject<HTMLTextAreaElement | null>;
-  
-  // 事件处理
-  handleInput: (e: React.FormEvent<HTMLTextAreaElement>) => void;
-  handleKeyDown: (e: React.KeyboardEvent<HTMLTextAreaElement>) => void;
-  handleDoubleClick: (e: React.MouseEvent<HTMLDivElement>) => void;
-  handleDisplayClick: (e: React.MouseEvent<HTMLDivElement>) => void;
-  handleBlur: () => void;
-  
-  // 编辑器控制
-  enterEditMode: () => void;
-  exitEditMode: () => void;
-  
-  // 语法高亮
-  highlightedHtml: string;
-  
-  // 尺寸调整
-  adjustSize: () => void;
-  
-  // 光标位置
-  cursorPosition: { x: number; y: number };
-}
-
-// 工具函数：将光标定位到指定页面坐标（x, y）处
-function placeCaretAtPoint(x: number, y: number) {
-  let range: Range | null = null;
-  if ((document as any).caretPositionFromPoint) {
-    const pos = (document as any).caretPositionFromPoint(x, y);
-    if (pos) {
-      range = document.createRange();
-      range.setStart(pos.offsetNode, pos.offset);
-      range.collapse(true);
-    }
-  }
-  if (range) {
-    const sel = window.getSelection();
-    sel?.removeAllRanges();
-    sel?.addRange(range);
-    return true;
-  }
-  return false;
-}
-
-export const useMonacoStyleEditor = ({ 
-  initialText, 
-  onTextChange, 
-  onExitEdit 
-}: UseMonacoStyleEditorProps): UseMonacoStyleEditorReturn => {
+// 代码编辑器组件 - 使用 Monaco 风格的输入机制
+export const CodeEditor: React.FC<CodeEditorProps> = ({
+  initialText,
+  onTextChange,
+  onExitEdit,
+  className = '',
+  style = {}
+}) => {
   const [isEditing, setIsEditing] = useState(false);
   const [text, setText] = useState(initialText);
   const [cursorPosition, setCursorPosition] = useState({ x: 0, y: 0 });
@@ -104,48 +59,23 @@ export const useMonacoStyleEditor = ({
 
   // 计算光标位置并更新 textarea 位置
   const updateCursorPosition = useCallback(() => {
-    if (!textareaRef.current || !editorRef.current) return;
+    if (!textareaRef.current) return;
     
     const textarea = textareaRef.current;
-    const editor = editorRef.current;
     const textBeforeCursor = textarea.value.substring(0, textarea.selectionStart);
     
-    // 创建临时元素来计算光标位置
-    const tempElement = document.createElement('div');
-    tempElement.style.fontFamily = 'JetBrains Mono, AlimamaFangYuanTi, monospace';
-    tempElement.style.fontSize = '14px';
-    tempElement.style.lineHeight = '1.5';
-    tempElement.style.whiteSpace = 'pre-wrap';
-    tempElement.style.position = 'absolute';
-    tempElement.style.visibility = 'hidden';
-    tempElement.style.padding = '8px';
-    tempElement.style.top = '-9999px';
-    tempElement.style.left = '-9999px';
-    tempElement.textContent = textBeforeCursor;
-    
-    document.body.appendChild(tempElement);
-    
-    // 计算光标位置
+    // 使用更简单的方法计算光标位置
     const lines = textBeforeCursor.split('\n');
     const currentLine = lines[lines.length - 1];
     const lineNumber = lines.length - 1;
     
-    // 计算当前行的宽度
-    const currentLineElement = document.createElement('div');
-    currentLineElement.style.fontFamily = 'JetBrains Mono, AlimamaFangYuanTi, monospace';
-    currentLineElement.style.fontSize = '14px';
-    currentLineElement.style.whiteSpace = 'pre';
-    currentLineElement.textContent = currentLine;
-    
-    document.body.appendChild(currentLineElement);
-    const lineWidth = currentLineElement.offsetWidth;
-    document.body.removeChild(currentLineElement);
+    // 估算字符宽度和行高
+    const charWidth = 8.4; // 字符宽度（估算）
+    const lineHeight = 21; // 行高
     
     // 计算光标位置
-    const x = lineWidth + 8; // 8px 是 padding
-    const y = lineNumber * 21 + 8; // 21px 是行高，8px 是 padding
-    
-    document.body.removeChild(tempElement);
+    const x = currentLine.length * charWidth + 8; // 8px 是 padding
+    const y = lineNumber * lineHeight + 8; // 8px 是 padding
     
     // 更新 textarea 位置
     textarea.style.left = `${x}px`;
@@ -154,50 +84,62 @@ export const useMonacoStyleEditor = ({
     setCursorPosition({ x, y });
   }, [text]);
 
-  // 自动调整编辑器尺寸以适应内容
+  // 自动调整编辑器高度以适应内容
   const adjustSize = useCallback(() => {
     if (!editorRef.current) return;
     
     const editor = editorRef.current;
     const container = editor.parentElement;
-    const nodeContainer = container?.closest('.text-node') as HTMLElement;
     
-    if (!container || !nodeContainer) return;
+    if (!container) return;
     
     // 重置高度以获取真实的scrollHeight
     editor.style.height = 'auto';
-    container.style.height = 'auto';
     
     // 计算所需高度（至少100px）
     const scrollHeight = Math.max(editor.scrollHeight, 100);
     const newHeight = `${scrollHeight}px`;
     
-    // 设置高度
+    console.log('adjustSize called:', { scrollHeight, newHeight, textLength: text.length });
+    
+    // 设置编辑器高度
     editor.style.height = newHeight;
-    container.style.height = newHeight;
     
-    // 计算内容所需的宽度
-    const tempElement = document.createElement('pre');
-    tempElement.style.fontSize = '14px';
-    tempElement.style.lineHeight = '1.5';
-    tempElement.style.whiteSpace = 'pre';
-    tempElement.style.position = 'absolute';
-    tempElement.style.visibility = 'hidden';
-    tempElement.style.padding = '8px';
-    tempElement.style.top = '-9999px';
-    tempElement.style.left = '-9999px';
-    tempElement.textContent = text || '// 在此输入JS代码';
-    
-    document.body.appendChild(tempElement);
-    const contentWidth = tempElement.offsetWidth;
-    document.body.removeChild(tempElement);
-    
-    // 计算节点所需的最小宽度（内容宽度 + padding + margin）
-    const minNodeWidth = Math.max(contentWidth + 60, 300);
-    
-    // 设置节点容器的宽度
-    nodeContainer.style.width = `${minNodeWidth}px`;
+    // 同时调整父容器（TextNode 的代码区域）的高度
+    const codeSection = container.closest('.text-node-code-section') as HTMLElement;
+    if (codeSection) {
+      codeSection.style.height = newHeight;
+      console.log('Updated code section height to:', newHeight);
+    }
   }, [text]);
+
+  // 监听容器尺寸变化
+  useEffect(() => {
+    if (!editorRef.current) return;
+    
+    const editor = editorRef.current;
+    const container = editor.parentElement;
+    
+    if (!container) return;
+    
+    // 使用 ResizeObserver 监听容器尺寸变化
+    const resizeObserver = new ResizeObserver(() => {
+      // 当容器尺寸变化时，重新调整高度
+      setTimeout(() => {
+        adjustSize();
+      }, 0);
+    });
+    
+    // 监听父容器（TextNode 的代码区域）的尺寸变化
+    const codeSection = container.closest('.text-node-code-section') as HTMLElement;
+    if (codeSection) {
+      resizeObserver.observe(codeSection);
+    }
+    
+    return () => {
+      resizeObserver.disconnect();
+    };
+  }, [adjustSize]);
 
   // 处理文本变化（textarea）
   const handleInput = useCallback((e: React.FormEvent<HTMLTextAreaElement>) => {
@@ -222,42 +164,20 @@ export const useMonacoStyleEditor = ({
     }, 100);
   }, [onTextChange, updateCursorPosition, adjustSize]);
 
-  // 退出编辑状态的复用逻辑
-  const exitEditMode = useCallback(() => {
-    // 从 textarea 元素获取最新代码
-    const finalCode = textareaRef.current?.value || text;
-    setText(finalCode);
-    
-    setIsEditing(false);
-    isUserInputting.current = false;
-    editorInitialized.current = false;
-    
-    onExitEdit();
-  }, [text, onExitEdit]);
-
-  // 处理编辑器失去焦点
-  const handleBlur = useCallback(() => {
-    // 延迟一点时间，避免点击其他元素时立即退出
-    setTimeout(() => {
-      if (isEditing) {
-        exitEditMode();
-      }
-    }, 100);
-  }, [isEditing, exitEditMode]);
-
   // 处理键盘事件
   const handleKeyDown = useCallback((e: React.KeyboardEvent<HTMLTextAreaElement>) => {
-    // Esc
-    if (e.key === 'Escape') {
-      e.preventDefault();
-      exitEditMode();
-    } 
-    // Shift + Enter
-    else if (e.key === 'Enter' && e.shiftKey) {
+    // 处理 Shift+Enter 退出编辑
+    if (e.key === 'Enter' && e.shiftKey) {
       e.preventDefault();
       exitEditMode();
     }
-  }, [exitEditMode]);
+    
+    // 处理 Escape 退出编辑
+    if (e.key === 'Escape') {
+      e.preventDefault();
+      exitEditMode();
+    }
+  }, []);
 
   // 处理双击事件
   const handleDoubleClick = useCallback((e: React.MouseEvent<HTMLDivElement>) => {
@@ -286,22 +206,58 @@ export const useMonacoStyleEditor = ({
     const clickX = e.clientX - rect.left - 8; // 减去 padding
     const clickY = e.clientY - rect.top - 8;
     
-    // 简单实现：将光标移到末尾
-    // TODO: 实现更精确的光标定位
+    // 计算点击位置对应的字符位置
+    const lines = text.split('\n');
+    const lineHeight = 21; // 行高
+    const charWidth = 8.4; // 字符宽度（估算）
+    
+    // 计算行号
+    const lineNumber = Math.floor(clickY / lineHeight);
+    const actualLineNumber = Math.max(0, Math.min(lineNumber, lines.length - 1));
+    
+    // 计算列号
+    const currentLine = lines[actualLineNumber] || '';
+    const columnNumber = Math.floor(clickX / charWidth);
+    const actualColumnNumber = Math.max(0, Math.min(columnNumber, currentLine.length));
+    
+    // 计算字符位置
+    let charPosition = 0;
+    for (let i = 0; i < actualLineNumber; i++) {
+      charPosition += lines[i].length + 1; // +1 for newline
+    }
+    charPosition += actualColumnNumber;
+    
+    // 设置光标位置
     const textarea = textareaRef.current;
     textarea.focus();
-    textarea.setSelectionRange(textarea.value.length, textarea.value.length);
+    textarea.setSelectionRange(charPosition, charPosition);
     
     // 更新光标位置
     setTimeout(() => {
       updateCursorPosition();
     }, 0);
-  }, [isEditing, updateCursorPosition]);
+  }, [isEditing, text, updateCursorPosition]);
 
   // 进入编辑模式
   const enterEditMode = useCallback(() => {
     setIsEditing(true);
   }, []);
+
+  // 退出编辑模式
+  const exitEditMode = useCallback(() => {
+    setIsEditing(false);
+    onExitEdit();
+  }, [onExitEdit]);
+
+  // 处理失焦事件
+  const handleBlur = useCallback(() => {
+    // 延迟退出编辑模式，避免点击事件冲突
+    setTimeout(() => {
+      if (isEditing) {
+        exitEditMode();
+      }
+    }, 100);
+  }, [isEditing, exitEditMode]);
 
   // 自动聚焦到编辑器
   useEffect(() => {
@@ -325,8 +281,7 @@ export const useMonacoStyleEditor = ({
       
       // 如果有记录的点击位置，尝试定位光标
       if (lastPointerDown.current) {
-        const { x, y } = lastPointerDown.current;
-        
+        // 暂时不使用点击位置，直接移到末尾
         setTimeout(() => {
           // 尝试根据点击位置设置光标
           const textarea = textareaRef.current;
@@ -352,20 +307,83 @@ export const useMonacoStyleEditor = ({
     }
   }, [isEditing, text, adjustSize, updateCursorPosition]);
 
-  return {
-    isEditing,
-    text,
-    editorRef,
-    textareaRef,
-    handleInput,
-    handleKeyDown,
-    handleDoubleClick,
-    handleDisplayClick,
-    handleBlur,
-    enterEditMode,
-    exitEditMode,
-    highlightedHtml,
-    adjustSize,
-    cursorPosition,
-  };
-}; 
+  // 初始化时调整尺寸
+  useEffect(() => {
+    if (editorRef.current) {
+      setTimeout(() => {
+        adjustSize();
+      }, 0);
+    }
+  }, [adjustSize]);
+
+  return (
+    <div 
+      className={`code-editor ${className}`}
+      style={{ position: 'relative', ...style }}
+    >
+      {/* 语法高亮显示层 */}
+      <div
+        ref={editorRef}
+        onDoubleClick={handleDoubleClick}
+        onClick={handleDisplayClick}
+        dangerouslySetInnerHTML={{ __html: highlightedHtml }}
+        style={{
+          position: 'absolute',
+          top: 0,
+          left: 0,
+          right: 0,
+          bottom: 0,
+          fontFamily: 'JetBrains Mono, AlimamaFangYuanTi, monospace',
+          fontSize: '14px',
+          lineHeight: '1.5',
+          margin: 0,
+          padding: '8px',
+          whiteSpace: 'pre-wrap',
+          background: 'transparent',
+          border: 'none',
+          outline: 'none',
+          zIndex: 1,
+          boxSizing: 'border-box',
+          cursor: 'text',
+          overflow: 'visible',
+          pointerEvents: 'auto',
+          userSelect: 'none'
+        }}
+      />
+      {/* 1x1 textarea 用于输入 */}
+      <textarea
+        ref={textareaRef}
+        onInput={handleInput}
+        onKeyDown={handleKeyDown}
+        onBlur={handleBlur}
+        style={{ 
+          position: 'absolute',
+          top: 0,
+          left: 0,
+          width: '1px',
+          height: '1px',
+          fontFamily: 'JetBrains Mono, AlimamaFangYuanTi, monospace',
+          fontSize: '14px',
+          lineHeight: '1.5',
+          margin: 0,
+          padding: '8px',
+          whiteSpace: 'pre-wrap',
+          background: 'transparent',
+          border: 'none',
+          outline: 'none',
+          color: 'transparent',
+          caretColor: 'transparent',
+          zIndex: 2,
+          boxSizing: 'border-box',
+          cursor: 'text',
+          overflow: 'hidden',
+          resize: 'none',
+          opacity: 0
+        }}
+        spellCheck={false}
+      />
+    </div>
+  );
+};
+
+export default CodeEditor; 

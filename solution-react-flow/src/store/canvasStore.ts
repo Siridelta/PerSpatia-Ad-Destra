@@ -16,22 +16,22 @@ interface CanvasState {
   // 状态数据
   nodes: Node[];
   edges: Edge[];
-  
+
   // 节点操作
   addNode: (node: Node) => void;
   updateNode: (id: string, updates: Partial<Node>) => void;
   removeNode: (id: string) => void;
-  
+
   // 边操作
   addEdge: (edge: Edge) => void;
   updateEdge: (id: string, updates: Partial<Edge>) => void;
   removeEdge: (id: string) => void;
-  
+
   // 批量操作
   setNodes: (nodes: Node[]) => void;
   setEdges: (edges: Edge[]) => void;
   clearCanvas: () => void;
-  
+
   // 画布操作
   resetToDefault: () => void;
 }
@@ -45,57 +45,57 @@ export const useCanvasStore = create<CanvasState>()(
       // 初始状态 - 这些会被 persist 中间件覆盖（如果 localStorage 中有数据）
       nodes: defaultNodes,
       edges: defaultEdges,
-      
+
       // 节点操作
-      addNode: (node) => 
-        set((state) => ({ 
-          nodes: [...state.nodes, node] 
+      addNode: (node) =>
+        set((state) => ({
+          nodes: [...state.nodes, node]
         })),
-      
+
       updateNode: (id, updates) =>
         set((state) => ({
           nodes: state.nodes.map((node) =>
             node.id === id ? { ...node, ...updates } : node
           ),
         })),
-      
+
       removeNode: (id) =>
-        set((state) => ({ 
+        set((state) => ({
           nodes: state.nodes.filter((node) => node.id !== id),
           // 同时移除相关的边
-          edges: state.edges.filter((edge) => 
+          edges: state.edges.filter((edge) =>
             edge.source !== id && edge.target !== id
           ),
         })),
-      
+
       // 边操作
-      addEdge: (edge) => 
-        set((state) => ({ 
-          edges: [...state.edges, edge] 
+      addEdge: (edge) =>
+        set((state) => ({
+          edges: [...state.edges, edge]
         })),
-      
+
       updateEdge: (id, updates) =>
         set((state) => ({
           edges: state.edges.map((edge) =>
             edge.id === id ? { ...edge, ...updates } : edge
           ),
         })),
-      
+
       removeEdge: (id) =>
-        set((state) => ({ 
-          edges: state.edges.filter((edge) => edge.id !== id) 
+        set((state) => ({
+          edges: state.edges.filter((edge) => edge.id !== id)
         })),
-      
+
       // 批量操作
       setNodes: (nodes) => set({ nodes }),
       setEdges: (edges) => set({ edges }),
-      
+
       clearCanvas: () => set({ nodes: [], edges: [] }),
-      
+
       // 画布操作
-      resetToDefault: () => set({ 
-        nodes: defaultNodes, 
-        edges: defaultEdges 
+      resetToDefault: () => set({
+        nodes: defaultNodes,
+        edges: defaultEdges
       }),
     }),
     {

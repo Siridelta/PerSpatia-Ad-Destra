@@ -24,3 +24,53 @@
   font-family: 'JetBrains Mono', 'AlimamaFangYuanTi', sans-serif;
   font-variant-ligatures: none;
 }
+
+/* 应用容器 */
+.app-container {
+  width: 100vw;
+  height: 100vh;
+  display: flex;
+  flex-direction: column;
+}
+
+/* 主画布容器调整 */
+.reactflow-canvas {
+  margin-top: 0; /* 移除顶部边距 */
+}
+
+/* 响应式设计 */
+@media (max-width: 768px) {
+  .floating-nav {
+    top: 15px;
+    right: 15px;
+  }
+  
+  .nav-toggle {
+    width: 44px;
+    height: 44px;
+  }
+  
+  .nav-panel {
+    width: 260px;
+    right: -10px;
+  }
+}
+
+/* 滚动条样式 */
+.nav-scenarios::-webkit-scrollbar {
+  width: 6px;
+}
+
+.nav-scenarios::-webkit-scrollbar-track {
+  background: rgba(125, 225, 234, 0.1);
+  border-radius: 3px;
+}
+
+.nav-scenarios::-webkit-scrollbar-thumb {
+  background: rgba(125, 225, 234, 0.3);
+  border-radius: 3px;
+}
+
+.nav-scenarios::-webkit-scrollbar-thumb:hover {
+  background: rgba(125, 225, 234, 0.5);
+}
