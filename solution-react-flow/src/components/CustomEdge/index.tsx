@@ -69,7 +69,7 @@ const FloatingEdge: React.FC<EdgeProps> = ({ id, source, target, style, selected
         style={{
           ...style,
           stroke: selected ? 'rgba(100, 200, 255, 0.8)' : 'rgb(88, 88, 88)',
-          strokeWidth: selected ? 2 : 1,
+          strokeWidth: selected ? 4 : 2,
         }}
       />
       {/* 增加点击区域，便于选中 */}
