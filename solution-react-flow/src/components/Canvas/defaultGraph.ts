@@ -16,7 +16,7 @@ const defaultNodes: Node[] = [
 	id: '2', 
 	position: { x: 100, y: 700 }, 
 	data: { 
-	  label: '// result 将从连接的节点自动获取\nlet doubled = result * 2;\nlet message = `结果的两倍是: ${doubled}`;\nnode_output(doubled);\nconsole.log(message);', 
+	  label: 'let result = node_input("result");\nlet doubled = result * 2;\nlet message = `结果的两倍是: ${doubled}`;\nnode_output(doubled);\nconsole.log(message);', 
 	  result: 'doubled计算中...',
 	  width: 400
 	}, 
