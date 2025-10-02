@@ -334,9 +334,9 @@
 }
 
 /* 代码区域 - 允许内容扩展 */
-.text-node-code-section {
+.text-node-section.text-node-code-section {
   display: block;
-  padding: 15px;
+  padding: 0;
   box-sizing: border-box;
   height: fit-content;
 }

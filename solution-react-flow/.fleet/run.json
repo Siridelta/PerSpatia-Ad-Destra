@@ -1,0 +1,21 @@
+{
+    "configurations": [
+        {
+            "type": "npm",
+            "name": "solution-react-flow npm run dev",
+            "command": "run",
+            "scripts": "dev",
+            "environment": {
+
+            }
+        },
+        {
+            "type": "command",
+            "name": "Command configuration",
+            "program": "pnpm",
+            
+            "args": ["dev"]
+        }
+
+    ]
+}
