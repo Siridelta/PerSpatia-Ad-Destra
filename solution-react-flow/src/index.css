@@ -11,7 +11,7 @@
 }
 
 
-:root {
+:root, input, textarea {
 
   --font-family-default: 'JetBrains Mono', 'AlimamaFangYuanTi';
   --font-family-code: 'JetBrains Mono', 'AlimamaFangYuanTi', monospace; 

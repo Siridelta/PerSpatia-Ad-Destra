@@ -119,22 +119,7 @@
   margin-bottom: 0;
 }
 
-/* 区域标签 - 调整字体大小 */
-.section-label {
-  position: absolute;
-  top: -13px;
-  left: -4px;
-  background: transparent;
-  color: #7de1ea;
-  padding: 2px 8px;
-  font-size: 14px; /* 保持原来的区域标签字号 */
-  font-weight: 600;
-  /* font-family: 'JetBrains Mono', monospace; */
-  z-index: 10;
-  display: flex;
-  align-items: center;
-  gap: 10px;
-}
+
 
 /* 颜色设置组 */
 .color-setting-group,

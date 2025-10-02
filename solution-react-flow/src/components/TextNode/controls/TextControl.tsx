@@ -1,3 +1,4 @@
+import { useKeyPress } from '@xyflow/react';
 import React from 'react';
 
 export interface TextControlProps {
@@ -23,17 +24,21 @@ const TextControl: React.FC<TextControlProps> = ({ control, value, onChange }) =
     onChange(control.name, e.target.value);
   };
 
+  const isShiftPressed = useKeyPress('Shift');
+
   return (
-    <div className="text-input-container nodrag">
+    <div className="text-input-container">
       <input
         type="text"
         value={value}
         onChange={handleTextChange}
         onContextMenu={handleTextRightClick}
-        className="text-input"
+        className={`text-input ${isShiftPressed ? 'drag' : 'nodrag'}`}
         placeholder="输入文本..."
         title="右键清空"
       />
+      {/* 使用一个div来模拟下划线 */}
+      <div className="text-input-underline" />
     </div>
   );
 };

@@ -1,5 +1,5 @@
 import React, { useState, useCallback, useEffect, useRef } from 'react';
-import { Handle, Position, NodeProps, Node, useReactFlow, NodeResizeControl } from '@xyflow/react';
+import { Handle, Position, NodeProps, Node, useReactFlow, NodeResizeControl, useKeyPress } from '@xyflow/react';
 import './styles.css';
 import '@/styles/syntax-highlighting.css';
 import { jsExecutor, ControlInfo } from '@/services/jsExecutor';
@@ -8,8 +8,6 @@ import { SliderControl, ToggleControl, TextControl } from './controls';
 import { ErrorDisplay, WarningDisplay, LogDisplay, OutputDisplay } from './displays';
 import CodeEditor from '../CodeEditor';
 import { useNodeExecution } from './hooks/useNodeExecution';
-import Prism from 'prismjs';
-import 'prismjs/components/prism-javascript';
 
 // ============================================================================
 // 类型定义
@@ -94,11 +92,11 @@ const TextNode: React.FC<NodeProps<TextNodeType>> = ({ id, data, selected }) => 
     logs?: boolean;
     errors?: boolean;
   }>({});
-  
+
   // ============================================================================
   // 外部状态和工具
   // ============================================================================
-  
+
   const activeTool = useToolStore((state) => state.activeTool);
   const { setNodes, getNodes, getEdges } = useReactFlow();
   const nameInputRef = useRef<HTMLInputElement>(null);
@@ -112,7 +110,7 @@ const TextNode: React.FC<NodeProps<TextNodeType>> = ({ id, data, selected }) => 
     const edges = getEdges();
     const nodes = getNodes();
     const connectedData: Record<string, any> = {};
-    
+
     const incomingEdges = edges.filter(edge => edge.target === id);
     for (const edge of incomingEdges) {
       const sourceNode = nodes.find(node => node.id === edge.source);
@@ -121,11 +119,11 @@ const TextNode: React.FC<NodeProps<TextNodeType>> = ({ id, data, selected }) => 
         Object.assign(connectedData, sourceOutputs);
       }
     }
-    
+
     console.log('从连接节点获取的数据:', connectedData);
     return connectedData;
   }, [id, getNodes, getEdges]);
-  
+
   // 使用节点执行Hook
   const {
     isExecuting,
@@ -239,41 +237,41 @@ const TextNode: React.FC<NodeProps<TextNodeType>> = ({ id, data, selected }) => 
       // 自动调整节点宽度
       setTimeout(() => {
         // 节点宽度调整逻辑
-    if (data.width && typeof data.width === 'number') return;
-    
-    const nodeContainer = document.querySelector(`[data-id="${id}"] .text-node`) as HTMLElement;
-    if (!nodeContainer || !currentText) return;
-    
-    const tempElement = document.createElement('pre');
-    tempElement.style.fontFamily = 'JetBrains Mono, AlimamaFangYuanTi, monospace';
-    tempElement.style.fontSize = '14px';
-    tempElement.style.lineHeight = '1.5';
-    tempElement.style.whiteSpace = 'pre';
-    tempElement.style.position = 'absolute';
-    tempElement.style.visibility = 'hidden';
-    tempElement.style.top = '-9999px';
-    tempElement.style.left = '-9999px';
-    tempElement.textContent = currentText;
-    
-    document.body.appendChild(tempElement);
-    const contentWidth = tempElement.offsetWidth;
-    document.body.removeChild(tempElement);
-    
-    const minNodeWidth = Math.max(contentWidth + 60, 300);
-    
-    setNodes((nodes) =>
-      nodes.map((node) =>
-        node.id === id
-          ? { ...node, data: { ...node.data, width: minNodeWidth } }
-          : node
-      )
-    );
-    
-    console.log('自动调整节点宽度:', {
-      contentWidth,
-      minNodeWidth,
-      text: currentText?.substring(0, 50) + '...'
-    });
+        if (data.width && typeof data.width === 'number') return;
+
+        const nodeContainer = document.querySelector(`[data-id="${id}"] .text-node`) as HTMLElement;
+        if (!nodeContainer || !currentText) return;
+
+        const tempElement = document.createElement('pre');
+        tempElement.style.fontFamily = 'JetBrains Mono, AlimamaFangYuanTi, monospace';
+        tempElement.style.fontSize = '14px';
+        tempElement.style.lineHeight = '1.5';
+        tempElement.style.whiteSpace = 'pre';
+        tempElement.style.position = 'absolute';
+        tempElement.style.visibility = 'hidden';
+        tempElement.style.top = '-9999px';
+        tempElement.style.left = '-9999px';
+        tempElement.textContent = currentText;
+
+        document.body.appendChild(tempElement);
+        const contentWidth = tempElement.offsetWidth;
+        document.body.removeChild(tempElement);
+
+        const minNodeWidth = Math.max(contentWidth + 60, 300);
+
+        setNodes((nodes) =>
+          nodes.map((node) =>
+            node.id === id
+              ? { ...node, data: { ...node.data, width: minNodeWidth } }
+              : node
+          )
+        );
+
+        console.log('自动调整节点宽度:', {
+          contentWidth,
+          minNodeWidth,
+          text: currentText?.substring(0, 50) + '...'
+        });
       }, 100);
     }
   }, [data.label, data.width, id, setNodes]);
@@ -392,7 +390,7 @@ const TextNode: React.FC<NodeProps<TextNodeType>> = ({ id, data, selected }) => 
   // 渲染控件
   const renderControl = (control: ControlInfo) => {
     const currentValue = control.value ?? control.defaultValue;
-    
+
     switch (control.type) {
       case 'switch':
         return (
@@ -423,19 +421,32 @@ const TextNode: React.FC<NodeProps<TextNodeType>> = ({ id, data, selected }) => 
     }
   };
 
+  const evalControlType = (control: ControlInfo) => {
+    switch (control.type) {
+      case 'slider':
+        return 'number';
+      case 'input':
+        return 'string';
+      case 'switch':
+        return 'boolean';
+      default:
+        return '';
+    }
+  };
+
   // 获取输入变量信息
   const inputVarsInfo = controls.map(control => ({
-      name: control.name,
-      type: control.type,
+    name: control.name,
+    type: control.type,
     value: control.value ?? control.defaultValue
-    }));
+  }));
 
   // 获取输出变量信息
   const outputVarsInfo = Object.entries(outputs).map(([name, value]) => ({
-      name,
-      type: typeof value,
-      value
-    }));
+    name,
+    type: typeof value,
+    value
+  }));
 
   // ============================================================================
   // 计算属性
@@ -445,6 +456,12 @@ const TextNode: React.FC<NodeProps<TextNodeType>> = ({ id, data, selected }) => 
   const nodeHeight = data.height || 'auto';
   const isCollapsed = data.isCollapsed || false;
   const hiddenSections = data.hiddenSections || {};
+
+  // ------------------
+  // 按住 Shift 键，强制进入全部位可拖动状态
+  // ------------------
+  // 使用 React Flow 的内置按键监听 hook，避免手动注册全局事件
+  const isShiftPressed = useKeyPress('Shift');
 
   // ============================================================================
   // 渲染JSX
@@ -457,8 +474,9 @@ const TextNode: React.FC<NodeProps<TextNodeType>> = ({ id, data, selected }) => 
         ...(nodeWidth !== 'auto' && { width: `${nodeWidth}px` }),
         height: nodeHeight,
         boxSizing: 'border-box',
-        cursor: isCollapsed ? 'default' : 'text',
+        // cursor: isCollapsed ? 'default' : 'text',
         minWidth: isCollapsed ? '200px' : '300px',
+        pointerEvents: isShiftPressed ? 'none' : 'auto'
       }}
     >
       {/* 节点头部 */}
@@ -467,7 +485,7 @@ const TextNode: React.FC<NodeProps<TextNodeType>> = ({ id, data, selected }) => 
           {isEditingName ? (
             <input
               ref={nameInputRef}
-              className="text-node-name-input"
+              className={`text-node-name-input ${isShiftPressed ? 'drag' : 'nodrag'}`}
               value={nodeName}
               onChange={(e) => setNodeName(e.target.value)}
               onBlur={handleNameSubmit}
@@ -478,9 +496,9 @@ const TextNode: React.FC<NodeProps<TextNodeType>> = ({ id, data, selected }) => 
               className="text-node-name"
               onDoubleClick={isCollapsed ? toggleCollapse : handleNameEdit}
               onClick={isCollapsed ? toggleCollapse : undefined}
-              style={{ 
+              style={{
                 textAlign: isCollapsed ? 'center' : 'left',
-                cursor: isCollapsed ? 'pointer' : 'pointer',
+                cursor: 'pointer',
                 display: 'flex',
                 alignItems: 'center',
                 gap: '4px'
@@ -503,7 +521,7 @@ const TextNode: React.FC<NodeProps<TextNodeType>> = ({ id, data, selected }) => 
             </div>
           )}
         </div>
-        
+
         {/* 控制按钮 */}
         {isCollapsed ? (
           <div className="text-node-controls">
@@ -582,7 +600,7 @@ const TextNode: React.FC<NodeProps<TextNodeType>> = ({ id, data, selected }) => 
               ))}
             </div>
           )}
-          
+
           {outputVarsInfo.length > 0 && (
             <div className="collapsed-section">
               <div className="collapsed-label">输出:</div>
@@ -594,8 +612,8 @@ const TextNode: React.FC<NodeProps<TextNodeType>> = ({ id, data, selected }) => 
               ))}
             </div>
           )}
-          
-          <button 
+
+          <button
             className="copy-code-btn"
             onClick={copyCode}
             title="复制代码"
@@ -609,6 +627,7 @@ const TextNode: React.FC<NodeProps<TextNodeType>> = ({ id, data, selected }) => 
       {!isCollapsed && (
         <div className="text-node-section text-node-code-section animate-fade-in-up">
           <CodeEditor
+            className={isShiftPressed ? 'drag' : 'nodrag'}
             initialText={data.label || ''}
             onTextChange={handleTextChange}
             onExitEdit={handleExitEdit}
@@ -630,8 +649,8 @@ const TextNode: React.FC<NodeProps<TextNodeType>> = ({ id, data, selected }) => 
       {/* 输入区域 */}
       {!isCollapsed && (!hiddenSections.inputs || animatingOut.inputs) && controls.length > 0 && (data.showControls !== false) && (
         <div className={`text-node-section text-node-inputs-section ${animatingOut.inputs ? 'animate-fade-out-down' : 'animate-fade-in-up'}`}>
-          <div 
-            className="section-label clickable" 
+          <div
+            className="section-label clickable"
             onClick={resetInputsToDefault}
             title="点击重置所有输入为默认值"
           >
@@ -639,7 +658,8 @@ const TextNode: React.FC<NodeProps<TextNodeType>> = ({ id, data, selected }) => 
           </div>
           {controls.map((control, index) => (
             <div key={index} className={`variable-control ${animatingOut.inputs ? 'animate-fade-out-left' : 'animate-fade-in-left'}`} style={{ animationDelay: `${index * 0.1}s` }}>
-              <span className="variable-label">{control.name}</span>
+              <span className="output-variable-name">{control.name}</span>
+              <span className="output-variable-type">:{evalControlType(control)}</span>
               {renderControl(control)}
             </div>
           ))}
@@ -695,7 +715,7 @@ const TextNode: React.FC<NodeProps<TextNodeType>> = ({ id, data, selected }) => 
           pointerEvents: 'none'
         }}
       />
-      
+
       {/* 节点宽度调整控制 */}
       {!isCollapsed && (
         <>

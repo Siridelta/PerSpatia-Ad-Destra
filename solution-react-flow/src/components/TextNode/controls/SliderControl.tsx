@@ -1,3 +1,4 @@
+import { useKeyPress } from '@xyflow/react';
 import React, { useState } from 'react';
 
 export interface SliderControlProps {
@@ -17,13 +18,15 @@ const SliderControl: React.FC<SliderControlProps> = ({ control, value, onChange 
   const max = control.max ?? 100;
   const step = control.step ?? 1;
   const progress = ((value - min) / (max - min)) * 100;
-  
+
   const [isEditingSettings, setIsEditingSettings] = useState(false);
   const [sliderSettings, setSliderSettings] = useState({
     min,
     max,
     step
   });
+
+  const isShiftPressed = useKeyPress('Shift');
 
   // 处理数值点击 - 切换到设置界面
   const handleValueClick = (e: React.MouseEvent) => {
@@ -75,7 +78,9 @@ const SliderControl: React.FC<SliderControlProps> = ({ control, value, onChange 
   // 如果正在编辑设置，显示设置面板
   if (isEditingSettings) {
     return (
-      <div className="slider-settings-panel nodrag">
+      <div
+        className={`slider-settings-panel ${isShiftPressed ? 'drag' : 'nodrag'}`}
+      >
         <div className="slider-settings-row">
           <span>最小</span>
           <input
@@ -125,20 +130,38 @@ const SliderControl: React.FC<SliderControlProps> = ({ control, value, onChange 
 
   // 正常的滑动条显示
   return (
-    <div className="slider-container nodrag">
+    <div
+      className={`slider-container ${isShiftPressed ? 'drag' : 'nodrag'}`}
+
+    >
       <div className="slider-layout">
-        <span 
+        <span
+          className="slider-current-value"
+          onClick={(e) => {
+            e.preventDefault();
+            e.stopPropagation();
+            const newValue = prompt(`设置 ${control.name} 的值:`, String(value));
+            if (newValue !== null && !isNaN(Number(newValue))) {
+              const numValue = Math.max(min, Math.min(max, Number(newValue)));
+              onChange(control.name, numValue);
+            }
+          }}
+          onContextMenu={handleValueRightClick}
+          title="左键直接设置值，右键重置"
+        >
+          {value}
+        </span>
+        <span
           className="slider-min-value"
           onClick={handleValueClick}
-          style={{ cursor: 'pointer', color: '#7de1ea', margin: '0 8px' }}
           title="点击设置范围"
         >
           {min}
         </span>
         <div className="slider-track-wrapper">
           <div className="slider-track" onMouseDown={handleSliderMouseDown} onMouseUp={handleSliderMouseUp}>
-            <div 
-              className="slider-progress" 
+            <div
+              className="slider-progress"
               style={{ width: `${progress}%` }}
             ></div>
             <input
@@ -154,30 +177,12 @@ const SliderControl: React.FC<SliderControlProps> = ({ control, value, onChange 
             />
           </div>
         </div>
-        <span 
+        <span
           className="slider-max-value"
           onClick={handleValueClick}
-          style={{ cursor: 'pointer', color: '#7de1ea', margin: '0 8px' }}
           title="点击设置范围"
         >
           {max}
-        </span>
-        <span 
-          className="slider-current-value"
-          onClick={(e) => {
-            e.preventDefault();
-            e.stopPropagation();
-            const newValue = prompt(`设置 ${control.name} 的值:`, String(value));
-            if (newValue !== null && !isNaN(Number(newValue))) {
-              const numValue = Math.max(min, Math.min(max, Number(newValue)));
-              onChange(control.name, numValue);
-            }
-          }}
-          onContextMenu={handleValueRightClick}
-          style={{ cursor: 'pointer', color: '#7de1ea' }}
-          title="左键直接设置值，右键重置"
-        >
-          {value}
         </span>
       </div>
     </div>

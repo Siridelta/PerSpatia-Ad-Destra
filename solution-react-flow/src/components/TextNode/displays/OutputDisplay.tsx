@@ -15,13 +15,9 @@ const OutputDisplay: React.FC<OutputDisplayProps> = ({ outputs, isAnimatingOut =
     
     return (
       <div key={index} className={`output-variable ${isAnimatingOut ? 'animate-fade-out-right' : 'animate-fade-in-right'}`} style={{ animationDelay: `${index * 0.1}s` }}>
-        <div className="output-left">
-          <span className="output-variable-name" style={{ color: '#ffffff' }}>{outputName}</span>
-          <span className="output-variable-type" style={{ color: '#091c33' }}>:{type}</span>
-        </div>
-        <div className="output-right">
-          <span className="output-variable-value" style={{ color: '#7de1ea' }}>{valueStr}</span>
-        </div>
+          <span className="output-variable-name">{outputName}</span>
+          <span className="output-variable-type">:{type}</span>
+          <span className="output-variable-value">{valueStr}</span>
       </div>
     );
   };

@@ -1,3 +1,4 @@
+import { useKeyPress } from '@xyflow/react';
 import React from 'react';
 
 export interface ToggleControlProps {
@@ -16,20 +17,21 @@ const ToggleControl: React.FC<ToggleControlProps> = ({ control, value, onChange 
     onChange(control.name, !value);
   };
 
+  const isShiftPressed = useKeyPress('Shift');
+
   return (
-    <div className="toggle-container nodrag">
-      <div 
-        className={`toggle-switch ${value ? 'active' : ''}`}
+    <div className="toggle-container">
+      <span
+        className={`toggle-text ${value ? 'toggle-text-true' : 'toggle-text-false'}`}
+      >
+        {value ? 'true' : 'false'}
+      </span>
+      <div
+        className={`toggle-switch ${isShiftPressed ? 'drag' : 'nodrag'} ${value ? 'active' : ''}`}
         onClick={handleToggleClick}
       >
         <div className="toggle-knob"></div>
       </div>
-      <span 
-        className="toggle-text" 
-        style={{ color: value ? '#28d900' : '#d90000' }}
-      >
-        {value ? 'true' : 'false'}
-      </span>
     </div>
   );
 };

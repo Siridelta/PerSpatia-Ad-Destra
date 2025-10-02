@@ -49,12 +49,12 @@ const Canvas: React.FC = () => {
   const setActiveTool = useToolStore((state) => state.setActiveTool);
   const connectionStartNode = useToolStore((state) => state.connectionStartNode);
   const setConnectionStartNode = useToolStore((state) => state.setConnectionStartNode);
-  
+
   // 设置面板状态
   const isSettingsPanelOpen = useSettingsStore((state) => state.isSettingsPanelOpen);
   const toggleSettingsPanel = useSettingsStore((state) => state.toggleSettingsPanel);
   const closeSettingsPanel = useSettingsStore((state) => state.closeSettingsPanel);
-  
+
   // ReactFlow 实例引用
   const { screenToFlowPosition, setViewport, getViewport } = useReactFlow();
 
@@ -71,7 +71,7 @@ const Canvas: React.FC = () => {
       if ((e.key === 's' || e.key === 'S') && e.ctrlKey) {
         e.preventDefault();
         console.log('Canvas Ctrl+S: 保存所有更改');
-        
+
         // 触发所有有未保存更改的节点重新执行
         const updateEvent = new CustomEvent('save-all-changes', {
           detail: { timestamp: Date.now() }
@@ -79,12 +79,12 @@ const Canvas: React.FC = () => {
         document.dispatchEvent(updateEvent);
         return;
       }
-      
+
       // 编辑区聚焦时不响应其他快捷键
       const tag = (e.target as HTMLElement)?.tagName?.toLowerCase();
       const isEditable = (tag === 'input' || tag === 'textarea' || (e.target as HTMLElement)?.isContentEditable);
       if (isEditable) return;
-      
+
       if (e.key === 'v' || e.key === 'V') {
         setActiveTool('select');
         setConnectionStartNode(null); // 清除连接状态
@@ -106,12 +106,12 @@ const Canvas: React.FC = () => {
         // 删除选中的节点和边
         const selectedNodes = nodes.filter(node => node.selected);
         const selectedEdges = edges.filter(edge => edge.selected);
-        
+
         // 删除选中的节点
         selectedNodes.forEach(node => removeNode(node.id));
         // 删除选中的边
         selectedEdges.forEach(edge => removeEdge(edge.id));
-        
+
         e.preventDefault();
       }
     };
@@ -126,7 +126,7 @@ const Canvas: React.FC = () => {
 
     window.addEventListener('keydown', handleKeyDown, true); // 使用 capture 模式
     document.addEventListener('mousedown', handleMouseDown);
-    
+
     return () => {
       window.removeEventListener('keydown', handleKeyDown, true);
       document.removeEventListener('mousedown', handleMouseDown);
@@ -138,8 +138,8 @@ const Canvas: React.FC = () => {
     id: `node-${Date.now()}`,
     type: 'textNode',
     position,
-    data: { 
-      label: '', 
+    data: {
+      label: '',
       initialEditing: true,
       width: 400  // 默认宽度
     },
@@ -153,7 +153,7 @@ const Canvas: React.FC = () => {
       setNodes([...nodes, newNode]);
       setActiveTool('select'); // 创建后切回选择模式
     }
-    
+
     // 双击检测逻辑（简单实现）
     if (activeTool === 'select' && event.detail === 2) {
       const position = screenToFlowPosition({ x: event.clientX, y: event.clientY });
@@ -170,15 +170,15 @@ const Canvas: React.FC = () => {
       type: 'custom',
     };
     setEdges([...edges, edge]);
-    
+
     // 连接建立后，立即通知目标节点更新
     if (connection.target) {
       console.log('新连接建立，通知目标节点更新:', connection.source, '->', connection.target);
-      
+
       // 延迟一点时间确保连接已经添加到edges中
       setTimeout(() => {
         const updateEvent = new CustomEvent('node-upstream-changed', {
-          detail: { 
+          detail: {
             nodeId: connection.target,
             sourceNodeId: connection.source,
             timestamp: Date.now(),
@@ -188,7 +188,7 @@ const Canvas: React.FC = () => {
         document.dispatchEvent(updateEvent);
       }, 50);
     }
-    
+
     // 连接完成后，清除连接状态并退出连接模式
     setConnectionStartNode(null);
     if (activeTool === 'connect') {
@@ -199,7 +199,7 @@ const Canvas: React.FC = () => {
   // 处理节点点击（用于连接模式）
   const onNodeClick = useCallback((event: React.MouseEvent, node: Node) => {
     event.stopPropagation();
-    
+
     if (activeTool === 'connect') {
       if (!connectionStartNode) {
         // 设置连接起始节点
@@ -215,11 +215,11 @@ const Canvas: React.FC = () => {
         };
         setEdges([...edges, newEdge]);
         console.log('创建连接:', connectionStartNode, '->', node.id);
-        
+
         // 连接建立后，立即通知目标节点更新
         setTimeout(() => {
           const updateEvent = new CustomEvent('node-upstream-changed', {
-            detail: { 
+            detail: {
               nodeId: node.id,
               sourceNodeId: connectionStartNode,
               timestamp: Date.now(),
@@ -228,7 +228,7 @@ const Canvas: React.FC = () => {
           });
           document.dispatchEvent(updateEvent);
         }, 50);
-        
+
         // 重置连接状态并退出连接模式
         setConnectionStartNode(null);
         setActiveTool('select');
@@ -236,76 +236,57 @@ const Canvas: React.FC = () => {
     }
   }, [activeTool, connectionStartNode, setConnectionStartNode, setEdges, setActiveTool]);
 
-  // 自动保存状态 - 现在由 Zustand persist 自动处理
-  // useEffect(() => {
-  //   const timer = setTimeout(() => {
-  //     saveCanvasState(nodes, edges);
-  //   }, 500);
-  //   return () => clearTimeout(timer);
-  // }, [nodes, edges]);
-
   // 节点依赖更新逻辑：当节点输出改变时，更新所有下游节点
   const triggerDownstreamUpdate = useCallback((sourceNodeId: string) => {
     console.log('触发下游节点更新，源节点:', sourceNodeId);
-    
+
     // 找到所有从sourceNodeId出发的边
     const downstreamEdges = edges.filter(edge => edge.source === sourceNodeId);
-    
+
     if (downstreamEdges.length === 0) {
       console.log('没有下游节点需要更新');
       return;
     }
-    
+
     // 获取所有下游节点ID
     const downstreamNodeIds = downstreamEdges.map(edge => edge.target);
     console.log('需要更新的下游节点:', downstreamNodeIds);
-    
+
     // 为每个下游节点触发更新
     downstreamNodeIds.forEach(nodeId => {
       // 通过自定义事件通知节点更新
       const updateEvent = new CustomEvent('node-upstream-changed', {
-        detail: { 
+        detail: {
           nodeId,
           sourceNodeId,
           timestamp: Date.now()
         }
       });
       document.dispatchEvent(updateEvent);
-      
-      // 递归更新更下游的节点
-      setTimeout(() => {
-        triggerDownstreamUpdate(nodeId);
-      }, 100); // 延迟一点时间确保当前节点先完成更新
     });
   }, [edges]);
 
   // 监听节点变化，检测输出变化并触发下游更新
   useEffect(() => {
     // 检查节点输出是否发生变化
-    const checkNodeOutputChanges = () => {
-      nodes.forEach(node => {
-        if (node.type === 'textNode' && node.data.outputs) {
-          const nodeId = node.id;
-          const currentOutputs = node.data.outputs;
-          
-          // 使用ref来存储上一次的输出，避免无限循环
-          const prevOutputsKey = `prevOutputs_${nodeId}`;
-          const prevOutputs = (window as any)[prevOutputsKey];
-          
-          if (prevOutputs && JSON.stringify(currentOutputs) !== JSON.stringify(prevOutputs)) {
-            console.log('检测到节点输出变化:', nodeId, currentOutputs);
-            triggerDownstreamUpdate(nodeId);
-          }
-          
-          // 更新缓存的输出
-          (window as any)[prevOutputsKey] = JSON.parse(JSON.stringify(currentOutputs));
+    nodes.forEach(node => {
+      if (node.type === 'textNode' && node.data.outputs) {
+        const nodeId = node.id;
+        const currentOutputs = node.data.outputs;
+
+        // 使用ref来存储上一次的输出，避免无限循环
+        const prevOutputsKey = `prevOutputs_${nodeId}`;
+        const prevOutputs = (window as any)[prevOutputsKey];
+
+        if (prevOutputs && JSON.stringify(currentOutputs) !== JSON.stringify(prevOutputs)) {
+          console.log('检测到节点输出变化:', nodeId, currentOutputs);
+          triggerDownstreamUpdate(nodeId);
         }
-      });
-    };
-    
-    // 延迟检查，避免初始化时的误触发
-    const timer = setTimeout(checkNodeOutputChanges, 200);
-    return () => clearTimeout(timer);
+
+        // 更新缓存的输出
+        (window as any)[prevOutputsKey] = JSON.parse(JSON.stringify(currentOutputs));
+      }
+    });
   }, [nodes, triggerDownstreamUpdate]);
 
   // 导出画布数据
@@ -401,21 +382,21 @@ const Canvas: React.FC = () => {
   const handleEdgesChange = useCallback((changes: EdgeChange[]) => {
     // 先获取当前边的信息，用于检测删除
     const currentEdges = edges;
-    
+
     // 处理边变化
     onEdgesChange(changes);
-    
+
     // 检查是否有边被删除
     changes.forEach(change => {
       if (change.type === 'remove') {
         const removedEdge = currentEdges.find(edge => edge.id === change.id);
         if (removedEdge && removedEdge.target) {
           console.log('连接被删除，通知目标节点更新:', removedEdge.source, '->', removedEdge.target);
-          
+
           // 延迟一点时间确保边已经从edges中删除
           setTimeout(() => {
             const updateEvent = new CustomEvent('node-upstream-changed', {
-              detail: { 
+              detail: {
                 nodeId: removedEdge.target,
                 sourceNodeId: removedEdge.source,
                 timestamp: Date.now(),
@@ -461,7 +442,7 @@ const Canvas: React.FC = () => {
       >
         <Background variant={BackgroundVariant.Dots} gap={20} size={1} />
         <Controls position="bottom-right" />
-        
+
         {/* 自定义箭头标记 */}
         <svg>
           <defs>
@@ -483,21 +464,21 @@ const Canvas: React.FC = () => {
           </defs>
         </svg>
       </ReactFlow>
-      
+
       <Toolbar />
-      
+
       {/* 底部工具栏 */}
-      <BottomToolbar 
-        onSettingsClick={toggleSettingsPanel} 
+      <BottomToolbar
+        onSettingsClick={toggleSettingsPanel}
         onExport={handleExport}
         onImportReplace={handleImportReplace}
         onImportAdd={handleImportAdd}
       />
-      
+
       {/* 设置面板 */}
-      <SettingsPanel 
-        isOpen={isSettingsPanelOpen} 
-        onClose={closeSettingsPanel} 
+      <SettingsPanel
+        isOpen={isSettingsPanelOpen}
+        onClose={closeSettingsPanel}
       />
     </div>
   );

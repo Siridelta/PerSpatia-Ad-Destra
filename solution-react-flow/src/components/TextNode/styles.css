@@ -27,10 +27,10 @@
 .text-node-header {
   position: absolute;
   top: -13px;
-  left: -4px;
+  left: 0px;
   background: transparent;
   color: #7de1ea;
-  padding: 2px 8px;
+  padding: 2px 0px;
   font-size: 16px;
   font-weight: 600;
   font-family: 'JetBrains Mono', 'AlimamaFangYuanTi', monospace;
@@ -38,7 +38,7 @@
   display: flex;
   align-items: center;
   justify-content: space-between;
-  width: calc(100% + 8px); /* 覆盖整个卡片宽度 */
+  width: 100%;
   box-sizing: border-box;
 }
 
@@ -64,21 +64,20 @@
 
 .text-node-name-input {
   background: transparent;
-  border: 1px solid #7de1ea;
+  border: none;
   color: #7de1ea;
   font-size: 16px;
   font-weight: 600;
   font-family: 'JetBrains Mono', 'AlimamaFangYuanTi', monospace;
-  padding: 2px 4px;
-  border-radius: 0; /* 确保无圆角 */
+  padding: 0px;
   outline: none;
   width: 100%;
-  box-sizing: border-box;
+  /* box-sizing: border-box; */
 }
 
 .text-node-name-input:focus {
-  border-color: #ffffff;
-  box-shadow: 0 0 0 1px rgba(125, 225, 234, 0.3);
+  border: none;
+  box-shadow: none;
 }
 
 /* 控制按钮区域 */
@@ -86,7 +85,7 @@
   display: flex;
   align-items: center;
   gap: 8px; /* 一致的间距 */
-  margin-left: 16px; /* 与名称保持距离 */
+  margin-left: 0px; /* 与名称保持距离 */
 }
 
 .control-button {
@@ -276,7 +275,7 @@
   position: relative;
   background: rgba(9, 14, 28, 0.5);
   padding: 10px;
-  margin-bottom: 2px;
+  margin-bottom: 20px;
   border: none; /* 移除描边 */
   min-height: 20px;
   box-sizing: border-box;
@@ -291,10 +290,10 @@
 .section-label {
   position: absolute;
   top: -13px;
-  left: -4px;
+  left: 0px;
   background: transparent;
   color: #7de1ea;
-  padding: 2px 8px;
+  padding: 2px 0px;
   font-size: 14px;
   font-weight: 600;
   font-family: 'JetBrains Mono', 'AlimamaFangYuanTi', monospace;
@@ -326,6 +325,7 @@
 /* 可点击标签的样式 */
 .section-label.clickable {
   transition: color 0.2s ease, transform 0.2s ease;
+  cursor: pointer;
 }
 
 .section-label.clickable:hover {
@@ -427,7 +427,7 @@
   height: auto;
   min-height: 100px;
   color: transparent;
-  caret-color: #7dd3fc;
+  caret-color: #7de1ea;
   z-index: 2;
   resize: none;
   white-space: pre-wrap; /* 改为pre-wrap支持换行 */
@@ -470,22 +470,6 @@
   gap: 12px;
 }
 
-.variable-label {
-  color: #ffffff;
-  font-family: 'JetBrains Mono', 'AlimamaFangYuanTi', monospace;
-  font-size: 14px;
-  min-width: 60px;
-  flex-shrink: 0;
-}
-
-.variable-value {
-  color: #ffffff;
-  font-family: 'JetBrains Mono', 'AlimamaFangYuanTi', monospace;
-  font-size: 14px;
-  text-align: right;
-  padding: 2px 4px;
-}
-
 /* 滑动条重新设计 */
 .slider-container {
   display: flex;
@@ -493,6 +477,24 @@
   gap: 10px;
   flex: 1;
   min-width: 120px;
+}
+
+.slider-current-value {
+  cursor: pointer;
+  color: #7de1ea;
+  margin: 0;
+}
+
+.slider-min-value {
+  cursor: pointer;
+  color: rgba(255, 255, 255, 0.8);
+  margin: 0 8px;
+}
+
+.slider-max-value {
+  cursor: pointer;
+  color: rgba(255, 255, 255, 0.8);
+  margin: 0 8px;
 }
 
 .slider-track {
@@ -614,25 +616,36 @@
   min-width: 80px;
   display: flex;
   align-items: center;
+  position: relative;
 }
 
 /* 输入框重新设计 - 优化宽度适应 */
 .text-input {
   background: transparent;
   border: none;
-  border-bottom: 1px solid #091c33;
-  color: #ffffff;
+  color: #7de1ea;
   font-family: 'JetBrains Mono', 'AlimamaFangYuanTi', monospace;
   font-size: 14px;
-  padding: 2px 4px;
+  padding: 0px 0px 0px 0px;
   outline: none;
   width: 100%; /* 改为100%以更好适应容器宽度 */
   min-width: 80px; /* 降低最小宽度 */
   box-sizing: border-box;
 }
 
-.text-input:focus {
-  border-bottom-color: #7de1ea;
+.text-input-underline {
+  position: absolute;
+  bottom: 0;
+  left: 0;
+  right: 0;
+  width: 100%;
+  height: 1px;
+  background: #091c33;
+}
+
+/* 当相邻的 input 获得焦点时，下划线高亮显示 */
+.text-input:focus + .text-input-underline {
+    background: #7de1ea;
 }
 
 .text-input::placeholder {
@@ -642,10 +655,27 @@
 /* 开关重新设计 */
 .toggle-container {
   display: flex;
+  flex: 1;
   align-items: center;
   gap: 8px;
-  justify-content: flex-end;
+  justify-content: flex-start;
   min-width: 80px;
+}
+
+.toggle-text {
+  color: #ffffff;
+  font-family: 'JetBrains Mono', 'AlimamaFangYuanTi', monospace;
+  font-size: 14px;
+  margin-right: 8px;
+  width: 40px;
+}
+
+.toggle-text-true {
+  color: #67e04b;
+}
+
+.toggle-text-false {
+  color: #ff5a5a;
 }
 
 .toggle-switch {
@@ -735,13 +765,6 @@
   opacity: 1;
 }
 
-.toggle-text {
-  color: #ffffff;
-  font-family: 'JetBrains Mono', 'AlimamaFangYuanTi', monospace;
-  font-size: 14px;
-  margin-left: 8px;
-}
-
 /* 输出变量样式重写 */
 .output-variable {
   display: flex;
@@ -754,26 +777,29 @@
 }
 
 .output-variable-name {
-  color: #ffffff;
+  color: #f6ee99;
   font-family: 'JetBrains Mono', 'AlimamaFangYuanTi', monospace;
   font-size: 14px;
+  min-width: 60px;
   margin-right: 10px;
   flex: 0 0 auto;
 }
 
 .output-variable-value {
-  color: #ffffff;
+  color: #7de1ea;
   font-family: 'JetBrains Mono', 'AlimamaFangYuanTi', monospace;
   font-size: 14px;
-  text-align: right;
+  text-align: left;
   flex: 1 1 auto;
   min-width: 0;
 }
 
 .output-variable-type {
-  color: #7de1ea;
   font-family: 'JetBrains Mono', 'AlimamaFangYuanTi', monospace;
   font-size: 14px;
+  color: #1e3b5e;
+  width: 70px;
+  flex-shrink: 1;
 }
 
 /* 当变量名过长时，值换行 */
@@ -1116,8 +1142,9 @@
 /* 输出变量新布局样式 */
 .output-variable {
   display: flex;
-  justify-content: space-between;
+  justify-content: start;
   align-items: center;
+  gap: 12px;
   padding: 1px 0; /* 原来是8px，减去7px变为1px */
   border-bottom: 1px solid rgba(125, 225, 234, 0.1);
 }
@@ -1134,20 +1161,5 @@
 
 .output-right {
   flex-shrink: 0;
-  text-align: right;
-}
-
-.output-variable-name {
-  font-weight: 600;
-  font-family: 'JetBrains Mono', 'AlimamaFangYuanTi', monospace;
-}
-
-.output-variable-type {
-  font-family: 'JetBrains Mono', 'AlimamaFangYuanTi', monospace;
-  font-size: 13px;
-}
-
-.output-variable-value {
-  font-family: 'JetBrains Mono', 'AlimamaFangYuanTi', monospace;
-  font-weight: 500;
+  text-align: left;
 }
