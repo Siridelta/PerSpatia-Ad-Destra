@@ -248,7 +248,6 @@ const createEvalStore = (input: CanvasEvalInput) => {
 
 export const useCanvasEval = (input: CanvasEvalInput): CanvasEvalController => {
   // Canvas 持久化控制缓存
-  const controlsCache = useCanvasStore((state) => state.controlsCache);
   const setNodeControlsCache = useCanvasStore((state) => state.setNodeControlsCache);
 
   // 内部 evaluation store（每个 Canvas 单独实例）
@@ -273,6 +272,7 @@ export const useCanvasEval = (input: CanvasEvalInput): CanvasEvalController => {
     // 3. 计算所有节点
     const runSyncAndEvaluate = async () => {
       const snapshot = store.getState();
+      const { controlsCache } = useCanvasStore.getState();
       const nextData: CanvasEvalData = {};
 
       input.nodes.forEach(({ id, code }) => {
@@ -308,7 +308,7 @@ export const useCanvasEval = (input: CanvasEvalInput): CanvasEvalController => {
     };
 
     runSyncAndEvaluate();
-  }, [store, input.nodes, input.edges, controlsCache, persistControls]);
+  }, [store, input.nodes, input.edges, persistControls]);
 
   const controller = useMemo<CanvasEvalController>(() => {
     const getSnapshot = () => store.getState().data;
@@ -369,6 +369,7 @@ export const useCanvasEval = (input: CanvasEvalInput): CanvasEvalController => {
 
     const syncGraph = async (nextInput: CanvasEvalInput) => {
       const current = store.getState();
+      const { controlsCache } = useCanvasStore.getState();
       const nextData: CanvasEvalData = {};
 
       nextInput.nodes.forEach(({ id, code }) => {
@@ -410,7 +411,7 @@ export const useCanvasEval = (input: CanvasEvalInput): CanvasEvalController => {
       evaluateNode,
       evaluateAll,
     };
-  }, [store, controlsCache, persistControls]);
+  }, [store, persistControls]);
 
   return controller;
 };

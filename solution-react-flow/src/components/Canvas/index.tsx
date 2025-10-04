@@ -175,7 +175,6 @@ const Canvas: React.FC = () => {
       target: edge.target,
     })),
   }), [nodes, edges]);
-
   const canvasEvalController = useCanvasEval(canvasEvalInput);
 
   // 重置画布为默认状态
