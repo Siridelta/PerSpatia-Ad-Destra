@@ -24,6 +24,9 @@ export const useCanvasState = () => {
     clearCanvas,
     resetToDefault,
     viewport,
+    controlsCache,
+    setNodeControlsCache,
+    setControlsCache,
   } = useCanvasStore();
 
   // 便捷的节点操作
@@ -78,6 +81,7 @@ export const useCanvasState = () => {
     // 状态
     nodes,
     edges,
+    controlsCache,
     
     // 节点操作
     addNode,
@@ -106,5 +110,9 @@ export const useCanvasState = () => {
     importCanvasData,
     exportCanvasData,
     viewport,
+
+    // 控件缓存
+    setNodeControlsCache,
+    setControlsCache,
   };
 }; 

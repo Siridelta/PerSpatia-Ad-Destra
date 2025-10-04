@@ -2,6 +2,7 @@ import { useEffect, useMemo, useRef } from 'react';
 import { createStore } from 'zustand/vanilla';
 import { useStore } from 'zustand';
 import { jsExecutor, ControlInfo, ExecutionResult } from '@/services/jsExecutor';
+import { useCanvasStore } from '@/store/canvasStore';
 
 export interface ErrorInfo {
   message: string;
@@ -111,6 +112,7 @@ const executeNode = async (
   nodeId: string,
   getState: () => EvalStoreState,
   setState: (updater: (prev: EvalStoreState) => EvalStoreState) => void,
+  onControlsPersist?: (nodeId: string, controls: ControlInfo[]) => void,
 ) => {
   const currentState = getState();
   const currentNode = currentState.data[nodeId];
@@ -169,7 +171,7 @@ const executeNode = async (
           [nodeId]: {
             ...prev.data[nodeId],
             isEvaluating: false,
-            controls: mergeControls(prev.data[nodeId].controls, result.controls),
+            controls: result.controls,
             outputs: result.outputs,
             logs: result.logs,
             errors: [],
@@ -177,6 +179,7 @@ const executeNode = async (
           },
         },
       }));
+      onControlsPersist?.(nodeId, result.controls);
     } else {
       setState((prev) => ({
         ...prev,
@@ -214,16 +217,17 @@ const evaluateNodeAndDownstream = async (
   nodeId: string,
   getState: () => EvalStoreState,
   setState: (updater: (prev: EvalStoreState) => EvalStoreState) => void,
+  onControlsPersist?: (nodeId: string, controls: ControlInfo[]) => void,
   visited: Set<string> = new Set(),
 ) => {
   if (visited.has(nodeId)) return;
   visited.add(nodeId);
 
-  await executeNode(nodeId, getState, setState);
+  await executeNode(nodeId, getState, setState, onControlsPersist);
 
   const downstream = getState().outgoingBySource[nodeId] || [];
   for (const targetId of downstream) {
-    await evaluateNodeAndDownstream(targetId, getState, setState, visited);
+    await evaluateNodeAndDownstream(targetId, getState, setState, onControlsPersist, visited);
   }
 };
 
@@ -243,26 +247,50 @@ const createEvalStore = (input: CanvasEvalInput) => {
 };
 
 export const useCanvasEval = (input: CanvasEvalInput): CanvasEvalController => {
+  // Canvas 持久化控制缓存
+  const controlsCache = useCanvasStore((state) => state.controlsCache);
+  const setNodeControlsCache = useCanvasStore((state) => state.setNodeControlsCache);
 
-  //
-  // 内部数据 store, 持久
-  //
+  // 内部 evaluation store（每个 Canvas 单独实例）
   const storeRef = useRef<ReturnType<typeof createEvalStore>>(null);
-
   if (!storeRef.current) {
     storeRef.current = createEvalStore(input);
   }
 
   const store = storeRef.current;
+  const persistControls = useMemo(
+    () => (nodeId: string, controls: ControlInfo[]) => {
+      console.log('persistControls', nodeId, controls);
+      setNodeControlsCache(nodeId, controls.length ? controls : undefined);
+    },
+    [setNodeControlsCache]
+  );
 
   useEffect(() => {
+    // runSyncAndEvaluate
+    // 1. 同步图结构和 node.code 数据
+    // 2. 更新 controls cache
+    // 3. 计算所有节点
     const runSyncAndEvaluate = async () => {
       const snapshot = store.getState();
       const nextData: CanvasEvalData = {};
 
       input.nodes.forEach(({ id, code }) => {
         const prev = snapshot.data[id];
-        nextData[id] = prev ? (prev.code === code ? prev : { ...prev, code }) : createInitialNodeState(code);
+        const cachedControls = controlsCache[id];
+
+        if (prev) {
+          nextData[id] = {
+            ...prev,
+            code,
+            controls: cachedControls ? cachedControls.map((control) => ({ ...control })) : prev.controls,
+          };
+        } else {
+          nextData[id] = {
+            ...createInitialNodeState(code),
+            controls: cachedControls ? cachedControls.map((control) => ({ ...control })) : [],
+          };
+        }
       });
 
       const maps = buildGraphMaps(input.edges);
@@ -275,12 +303,12 @@ export const useCanvasEval = (input: CanvasEvalInput): CanvasEvalController => {
 
       const ids = Object.keys(store.getState().data);
       for (const nodeId of ids) {
-        await evaluateNodeAndDownstream(nodeId, store.getState, (updater) => store.setState(updater));
+        await evaluateNodeAndDownstream(nodeId, store.getState, (updater) => store.setState(updater), persistControls);
       }
     };
 
     runSyncAndEvaluate();
-  }, [store, input.nodes, input.edges]);
+  }, [store, input.nodes, input.edges, controlsCache, persistControls]);
 
   const controller = useMemo<CanvasEvalController>(() => {
     const getSnapshot = () => store.getState().data;
@@ -321,12 +349,15 @@ export const useCanvasEval = (input: CanvasEvalInput): CanvasEvalController => {
       });
 
       if (changed) {
-        await evaluateNodeAndDownstream(nodeId, store.getState, (updater) => store.setState(updater));
+        await evaluateNodeAndDownstream(nodeId, store.getState, (updater) => store.setState(updater), persistControls);
+      } else {
+        const current = store.getState().data[nodeId];
+        if (current) persistControls(nodeId, current.controls);
       }
     };
 
     const evaluateNode = async (nodeId: string) => {
-      await evaluateNodeAndDownstream(nodeId, store.getState, (updater) => store.setState(updater));
+      await evaluateNodeAndDownstream(nodeId, store.getState, (updater) => store.setState(updater), persistControls);
     };
 
     const evaluateAll = async () => {
@@ -342,7 +373,19 @@ export const useCanvasEval = (input: CanvasEvalInput): CanvasEvalController => {
 
       nextInput.nodes.forEach(({ id, code }) => {
         const prev = current.data[id];
-        nextData[id] = prev ? (prev.code === code ? prev : { ...prev, code }) : createInitialNodeState(code);
+        const cachedControls = controlsCache[id];
+        if (prev) {
+          nextData[id] = {
+            ...prev,
+            code,
+            controls: cachedControls ? cachedControls.map((control) => ({ ...control })) : prev.controls,
+          };
+        } else {
+          nextData[id] = {
+            ...createInitialNodeState(code),
+            controls: cachedControls ? cachedControls.map((control) => ({ ...control })) : [],
+          };
+        }
       });
 
       const maps = buildGraphMaps(nextInput.edges);
@@ -367,7 +410,7 @@ export const useCanvasEval = (input: CanvasEvalInput): CanvasEvalController => {
       evaluateNode,
       evaluateAll,
     };
-  }, [store]);
+  }, [store, controlsCache, persistControls]);
 
   return controller;
 };

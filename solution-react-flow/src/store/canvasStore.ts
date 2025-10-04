@@ -3,6 +3,7 @@ import { persist } from 'zustand/middleware';
 import type { Viewport } from '@xyflow/react';
 import { Node } from '@/models/Node';
 import { Edge } from '@/models/Edge';
+import type { ControlInfo } from '@/services/jsExecutor';
 
 /**
  * 画布状态管理 Store
@@ -29,6 +30,7 @@ interface CanvasState {
   nodes: Node[];
   edges: Edge[];
   viewport: Viewport;
+  controlsCache: Record<string, ControlInfo[]>;
 
   // 节点操作
   addNode: (node: Node) => void;
@@ -48,6 +50,10 @@ interface CanvasState {
   // 画布操作
   resetToDefault: () => void;
   setViewport: (viewport: Viewport) => void;
+
+  // 控件缓存操作
+  setNodeControlsCache: (nodeId: string, controls?: ControlInfo[]) => void;
+  setControlsCache: (cache: Record<string, ControlInfo[]>) => void;
 }
 
 // 默认节点和边的数据
@@ -60,6 +66,7 @@ export const useCanvasStore = create<CanvasState>()(
       nodes: defaultCanvas.nodes,
       edges: defaultCanvas.edges,
       viewport: defaultCanvas.viewport ?? defaultViewport,
+      controlsCache: {},
 
       // 节点操作
       addNode: (node) =>
@@ -102,16 +109,27 @@ export const useCanvasStore = create<CanvasState>()(
         })),
 
       // 批量操作
-      setNodes: (nodes) => set({ nodes }),
+      setNodes: (nodes) => set((state) => {
+        // 更新控件缓存, 只保留更新后仍然存在的节点
+        const validIds = new Set(nodes.map((node) => node.id));
+        const nextCache: Record<string, ControlInfo[]> = {};
+        Object.entries(state.controlsCache).forEach(([id, controls]) => {
+          if (validIds.has(id)) {
+            nextCache[id] = controls;
+          }
+        });
+        return { nodes, controlsCache: nextCache };
+      }),
       setEdges: (edges) => set({ edges }),
 
-      clearCanvas: () => set({ nodes: [], edges: [], viewport: defaultViewport }),
+      clearCanvas: () => set({ nodes: [], edges: [], viewport: defaultViewport, controlsCache: {} }),
 
       // 画布操作
       resetToDefault: () => set({
         nodes: defaultCanvas.nodes,
         edges: defaultCanvas.edges,
-        viewport: defaultCanvas.viewport ?? defaultViewport
+        viewport: defaultCanvas.viewport ?? defaultViewport,
+        controlsCache: {},
       }),
 
       // 视角同步
@@ -121,16 +139,30 @@ export const useCanvasStore = create<CanvasState>()(
             ? {}
             : { viewport }
         )),
+
+      setNodeControlsCache: (nodeId, controls) =>
+        set((state) => {
+          const nextCache = { ...state.controlsCache };
+          if (!controls || controls.length === 0) {
+            delete nextCache[nodeId];
+          } else {
+            nextCache[nodeId] = controls;
+          }
+          return { controlsCache: nextCache };
+        }),
+
+      setControlsCache: (cache) => set({ controlsCache: cache }),
     }),
     {
       name: 'desmos-canvas-flow-state', // localStorage key
-      version: 3, // 版本号，便于未来兼容
+      version: 4, // 版本号，便于未来兼容
       migrate: (persistedState: any, version) => {
         if (!persistedState) {
           return {
             nodes: defaultCanvas.nodes,
             edges: defaultCanvas.edges,
             viewport: defaultCanvas.viewport ?? defaultViewport,
+            controlsCache: {},
           };
         }
 
@@ -153,6 +185,13 @@ export const useCanvasStore = create<CanvasState>()(
                 code: typeof node.data?.label === 'string' ? node.data.label : '',
               },
             })),
+          };
+        }
+
+        if (version < 4 || !newState.controlsCache) {
+          newState = {
+            ...newState,
+            controlsCache: {},
           };
         }
 

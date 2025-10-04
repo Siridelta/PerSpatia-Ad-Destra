@@ -18,6 +18,13 @@ export const useTheme = () => {
     
     root.style.setProperty('--canvas-background', colors.canvasBackground);
     root.style.setProperty('--canvas-grid', colors.canvasGrid);
+
+    root.style.setProperty('--xy-controls-button-background-color', colors.cardBackground);
+    root.style.setProperty('--xy-controls-button-background-color-hover', colors.cardBackground);
+    root.style.setProperty('--xy-controls-button-border-color', colors.cardBackground);
+    root.style.setProperty('--xy-controls-button-color', colors.cardAccent);
+    root.style.setProperty('--xy-controls-button-color-hover', colors.cardText);
+
     
     root.style.setProperty('--primary-text', colors.primaryText);
     root.style.setProperty('--secondary-text', colors.secondaryText);
