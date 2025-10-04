@@ -1,4 +1,4 @@
-import React, { useCallback, useEffect } from 'react';
+import React, { useCallback, useEffect, useMemo } from 'react';
 import { ReactFlow, Node, Connection, EdgeTypes, Controls, Background, BackgroundVariant, useReactFlow, EdgeChange } from '@xyflow/react';
 import '@xyflow/react/dist/style.css';
 
@@ -14,6 +14,8 @@ import { useTheme } from '@/hooks/useTheme';
 import CustomConnectionLine from './CustomConnectionLine';
 import useInertialPan from '@/utils/useInertialPan';
 import { useCanvasState } from '@/hooks/useCanvasState';
+import { useCanvasEval } from '@/hooks/useCanvasEval';
+import { CanvasEvalProvider } from '@/contexts/CanvasEvalContext';
 
 // 默认节点和边现在由 canvasStore 管理
 
@@ -145,6 +147,20 @@ const Canvas: React.FC = () => {
     },
   }), []);
 
+  // use memo, cuz nodes.map and edges.map will generate new array every time
+  const canvasEvalInput = useMemo(() => ({
+    nodes: nodes.map((node) => ({
+      id: node.id,
+      code: typeof node.data?.label === 'string' ? node.data.label : '',
+    })),
+    edges: edges.map((edge) => ({
+      source: edge.source,
+      target: edge.target,
+    })),
+  }), [nodes, edges]);
+
+  const canvasEvalController = useCanvasEval(canvasEvalInput);
+
   // 处理画布空白点击事件
   const handlePaneClick = useCallback((event: React.MouseEvent) => {
     if (activeTool === 'text') {
@@ -177,15 +193,7 @@ const Canvas: React.FC = () => {
 
       // 延迟一点时间确保连接已经添加到edges中
       setTimeout(() => {
-        const updateEvent = new CustomEvent('node-upstream-changed', {
-          detail: {
-            nodeId: connection.target,
-            sourceNodeId: connection.source,
-            timestamp: Date.now(),
-            reason: 'new-connection'
-          }
-        });
-        document.dispatchEvent(updateEvent);
+        canvasEvalController.evaluateNode(connection.target);
       }, 50);
     }
 
@@ -218,15 +226,7 @@ const Canvas: React.FC = () => {
 
         // 连接建立后，立即通知目标节点更新
         setTimeout(() => {
-          const updateEvent = new CustomEvent('node-upstream-changed', {
-            detail: {
-              nodeId: node.id,
-              sourceNodeId: connectionStartNode,
-              timestamp: Date.now(),
-              reason: 'new-connection'
-            }
-          });
-          document.dispatchEvent(updateEvent);
+          canvasEvalController.evaluateNode(node.id);
         }, 50);
 
         // 重置连接状态并退出连接模式
@@ -235,59 +235,6 @@ const Canvas: React.FC = () => {
       }
     }
   }, [activeTool, connectionStartNode, setConnectionStartNode, setEdges, setActiveTool]);
-
-  // 节点依赖更新逻辑：当节点输出改变时，更新所有下游节点
-  const triggerDownstreamUpdate = useCallback((sourceNodeId: string) => {
-    console.log('触发下游节点更新，源节点:', sourceNodeId);
-
-    // 找到所有从sourceNodeId出发的边
-    const downstreamEdges = edges.filter(edge => edge.source === sourceNodeId);
-
-    if (downstreamEdges.length === 0) {
-      console.log('没有下游节点需要更新');
-      return;
-    }
-
-    // 获取所有下游节点ID
-    const downstreamNodeIds = downstreamEdges.map(edge => edge.target);
-    console.log('需要更新的下游节点:', downstreamNodeIds);
-
-    // 为每个下游节点触发更新
-    downstreamNodeIds.forEach(nodeId => {
-      // 通过自定义事件通知节点更新
-      const updateEvent = new CustomEvent('node-upstream-changed', {
-        detail: {
-          nodeId,
-          sourceNodeId,
-          timestamp: Date.now()
-        }
-      });
-      document.dispatchEvent(updateEvent);
-    });
-  }, [edges]);
-
-  // 监听节点变化，检测输出变化并触发下游更新
-  useEffect(() => {
-    // 检查节点输出是否发生变化
-    nodes.forEach(node => {
-      if (node.type === 'textNode' && node.data.outputs) {
-        const nodeId = node.id;
-        const currentOutputs = node.data.outputs;
-
-        // 使用ref来存储上一次的输出，避免无限循环
-        const prevOutputsKey = `prevOutputs_${nodeId}`;
-        const prevOutputs = (window as any)[prevOutputsKey];
-
-        if (prevOutputs && JSON.stringify(currentOutputs) !== JSON.stringify(prevOutputs)) {
-          console.log('检测到节点输出变化:', nodeId, currentOutputs);
-          triggerDownstreamUpdate(nodeId);
-        }
-
-        // 更新缓存的输出
-        (window as any)[prevOutputsKey] = JSON.parse(JSON.stringify(currentOutputs));
-      }
-    });
-  }, [nodes, triggerDownstreamUpdate]);
 
   // 导出画布数据
   const handleExport = useCallback(() => {
@@ -395,15 +342,7 @@ const Canvas: React.FC = () => {
 
           // 延迟一点时间确保边已经从edges中删除
           setTimeout(() => {
-            const updateEvent = new CustomEvent('node-upstream-changed', {
-              detail: {
-                nodeId: removedEdge.target,
-                sourceNodeId: removedEdge.source,
-                timestamp: Date.now(),
-                reason: 'connection-removed'
-              }
-            });
-            document.dispatchEvent(updateEvent);
+            canvasEvalController.evaluateNode(removedEdge.target);
           }, 50);
         }
       }
@@ -417,7 +356,8 @@ const Canvas: React.FC = () => {
 
 
   return (
-    <div className={`canvas-container ${activeTool}-mode`}>
+    <CanvasEvalProvider controller={canvasEvalController}>
+      <div className={`canvas-container ${activeTool}-mode`}>
       <ReactFlow
         nodes={nodes}
         edges={edges}
@@ -480,7 +420,8 @@ const Canvas: React.FC = () => {
         isOpen={isSettingsPanelOpen}
         onClose={closeSettingsPanel}
       />
-    </div>
+      </div>
+    </CanvasEvalProvider>
   );
 };
 

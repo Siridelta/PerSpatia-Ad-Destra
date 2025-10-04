@@ -2,12 +2,12 @@ import React, { useState, useCallback, useEffect, useRef } from 'react';
 import { Handle, Position, NodeProps, Node, useReactFlow, NodeResizeControl, useKeyPress } from '@xyflow/react';
 import './styles.css';
 import '@/styles/syntax-highlighting.css';
-import { jsExecutor, ControlInfo } from '@/services/jsExecutor';
+import { ControlInfo } from '@/services/jsExecutor';
 import { useToolStore } from '@/store/toolStore';
 import { SliderControl, ToggleControl, TextControl } from './controls';
 import { ErrorDisplay, WarningDisplay, LogDisplay, OutputDisplay } from './displays';
 import CodeEditor from '../CodeEditor';
-import { useNodeExecution } from './hooks/useNodeExecution';
+import { useNodeEval } from '@/contexts/CanvasEvalContext';
 
 // ============================================================================
 // 类型定义
@@ -16,9 +16,7 @@ import { useNodeExecution } from './hooks/useNodeExecution';
 export type TextNodeData = {
   label: string;
   result?: string;
-  controls?: ControlInfo[];
   showControls?: boolean;
-  outputs?: Record<string, any>;
   consoleLogs?: string[];
   constants?: Record<string, any>;
   width?: number;
@@ -31,18 +29,6 @@ export type TextNodeData = {
     logs?: boolean;
     errors?: boolean;
   };
-  errors?: Array<{
-    message: string;
-    line?: number;
-    column?: number;
-    stack?: string;
-  }>;
-  warnings?: Array<{
-    message: string;
-    line?: number;
-    column?: number;
-    stack?: string;
-  }>;
 };
 
 export type TextNodeType = Node<TextNodeData, 'text'>;
@@ -98,137 +84,22 @@ const TextNode: React.FC<NodeProps<TextNodeType>> = ({ id, data, selected }) => 
   // ============================================================================
 
   const activeTool = useToolStore((state) => state.activeTool);
-  const { setNodes, getNodes, getEdges } = useReactFlow();
+  const { setNodes } = useReactFlow();
   const nameInputRef = useRef<HTMLInputElement>(null);
 
   // ============================================================================
-  // 节点执行相关逻辑
+  // 节点评估相关逻辑
   // ============================================================================
 
-  // 获取连接节点数据
-  const getConnectedNodeData = useCallback(() => {
-    const edges = getEdges();
-    const nodes = getNodes();
-    const connectedData: Record<string, any> = {};
-
-    const incomingEdges = edges.filter(edge => edge.target === id);
-    for (const edge of incomingEdges) {
-      const sourceNode = nodes.find(node => node.id === edge.source);
-      if (sourceNode && sourceNode.data && sourceNode.data.outputs) {
-        const sourceOutputs = sourceNode.data.outputs as Record<string, any>;
-        Object.assign(connectedData, sourceOutputs);
-      }
-    }
-
-    console.log('从连接节点获取的数据:', connectedData);
-    return connectedData;
-  }, [id, getNodes, getEdges]);
-
-  // 使用节点执行Hook
-  const {
-    isExecuting,
-    controls,
-    outputs,
-    consoleLogs,
-    errors,
-    warnings,
-    executeCode,
-    setControls,
-    setOutputs,
-    setConsoleLogs,
-    setErrors,
-    setWarnings,
-  } = useNodeExecution({
-    id,
-    onControlsChange: (newControls) => updateNodeData({ controls: newControls }),
-    onOutputsChange: (newOutputs) => updateNodeData({ outputs: newOutputs }),
-    onLogsChange: (newLogs) => updateNodeData({ consoleLogs: newLogs }),
-    onErrorsChange: (newErrors) => updateNodeData({ errors: newErrors }),
-    onWarningsChange: (newWarnings) => updateNodeData({ warnings: newWarnings }),
-    getConnectedNodeData,
-  });
-
-  // derived, but independent state
-  const [controlValues, _setControlValues] = useState<Record<string, any>>({});
-
-  const setControlValues = useCallback((values: Record<string, any>) => {
-    console.log('setControlValues', values);
-    const newControls = controls.map((c: ControlInfo) => ({
-      ...c,
-      value: values[c.name] ?? c.defaultValue
-    }));
-    console.log('setControls', controls, newControls);
-    setControls(newControls);
-  }, [controls, setControls]);
-
-  // 通过 useEffect 管理 controlValues 的更新，进行精确的数据比较
-  useEffect(() => {
-    const newControlValues = controls.reduce((acc, control) => {
-      acc[control.name] = control.value ?? control.defaultValue;
-      return acc;
-    }, {} as Record<string, any>);
-
-    // 比较新旧值是否真正发生了变化
-    const hasChanged = Object.keys(newControlValues).some(key =>
-      newControlValues[key] !== controlValues[key]
-    ) || Object.keys(controlValues).some(key =>
-      !(key in newControlValues)
-    );
-    if (hasChanged) {
-      console.log('controlValues has changed', newControlValues);
-      _setControlValues(newControlValues);
-    }
-  }, [controls, controlValues, _setControlValues]);
-
-  // 使用 useRef 存储 executeCode 的最新实例，避免依赖循环
-  const executeCodeRef = useRef(executeCode);
-  executeCodeRef.current = executeCode;
-
-
-  // ============================================================================
-  // 代码执行逻辑, 响应式更新逻辑 (集中管理)
-  // ============================================================================
-
-  // 上游节点变化监听, 重新执行代码
-  useEffect(() => {
-    const handleUpstreamChange = (event: CustomEvent) => {
-      const { nodeId, sourceNodeId, timestamp, reason } = event.detail;
-
-      if (nodeId === id) {
-        console.log(`节点 ${id} 收到上游节点 ${sourceNodeId} 的更新通知，原因: ${reason || 'data-change'}，时间戳: ${timestamp}`);
-
-        const currentText = data.label || '';
-        if (currentText.trim()) {
-          executeCodeRef.current(currentText);
-        }
-      }
-    };
-
-    const handleSaveAllChanges = (event: CustomEvent) => {
-      const currentText = data.label || '';
-      if (hasUnsavedChanges && currentText.trim()) {
-        console.log(`节点 ${id} 收到全局保存命令，重新执行代码`);
-        setHasUnsavedChanges(false);
-        executeCodeRef.current(currentText);
-      }
-    };
-
-    document.addEventListener('node-upstream-changed', handleUpstreamChange as EventListener);
-    document.addEventListener('save-all-changes', handleSaveAllChanges as EventListener);
-
-    return () => {
-      document.removeEventListener('node-upstream-changed', handleUpstreamChange as EventListener);
-      document.removeEventListener('save-all-changes', handleSaveAllChanges as EventListener);
-    };
-  }, [id, data.label, hasUnsavedChanges]);
-
-  // 监听 controlValues 和代码内容变化，重新执行代码
-  useEffect(() => {
-    const currentText = data.label || '';
-    if (currentText.trim()) {
-      executeCodeRef.current(currentText);
-    }
-  }, [controlValues, data.label]); // 不依赖 executeCode，避免循环
+  const nodeEval = useNodeEval(id);
+  const controls = nodeEval.controls;
+  const outputs = nodeEval.outputs;
+  const consoleLogs = nodeEval.logs;
+  const errors = nodeEval.errors;
+  const warnings = nodeEval.warnings;
+  const isEvaluating = nodeEval.isEvaluating;
+  const setControlValues = nodeEval.setControlValues;
+  const evaluateNode = nodeEval.evaluate;
 
   // 监听代码变化, 自动调整节点宽度
   useEffect(() => {
@@ -355,10 +226,10 @@ const TextNode: React.FC<NodeProps<TextNodeType>> = ({ id, data, selected }) => 
 
   // 重置输入到默认值
   const resetInputsToDefault = useCallback(() => {
-    const defaultValues = controls.reduce((acc, control) => {
+    const defaultValues = controls.reduce<Record<string, unknown>>((acc, control) => {
       acc[control.name] = control.defaultValue;
       return acc;
-    }, {} as Record<string, any>);
+    }, {});
     setControlValues(defaultValues);
   }, [controls, setControlValues]);
 
@@ -371,11 +242,9 @@ const TextNode: React.FC<NodeProps<TextNodeType>> = ({ id, data, selected }) => 
     }
   }, [data.label]);
 
-  // 变量值变化处理
   const handleVariableChange = useCallback((name: string, value: any) => {
-    const updatedValues = { ...controlValues, [name]: value };
-    setControlValues(updatedValues);
-  }, [setControlValues, controlValues]);
+    setControlValues({ [name]: value });
+  }, [setControlValues]);
 
   // ============================================================================
   // 动画管理逻辑 (集中管理)

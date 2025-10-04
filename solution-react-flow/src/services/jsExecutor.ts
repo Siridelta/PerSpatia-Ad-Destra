@@ -255,6 +255,7 @@ export class JSExecutor {
 
   // 执行JS代码 - 简化版本，无沙箱限制
   public async executeCode(code: string, inputValues: Record<string, any> = {}): Promise<ExecutionResult> {
+
     // 重置状态
     this.logs = [];
     this.warnings = [];
