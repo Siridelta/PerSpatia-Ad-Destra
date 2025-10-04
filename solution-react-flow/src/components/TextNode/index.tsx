@@ -327,10 +327,10 @@ const TextNode: React.FC<NodeProps<TextNodeType>> = ({ id, data, selected }) => 
   const hiddenSections = data.hiddenSections || {};
 
   // ------------------
-  // 按住 Shift 键，强制进入全部位可拖动状态
+  // 按住 Ctrl 键，强制进入全部位可拖动状态
   // ------------------
   // 使用 React Flow 的内置按键监听 hook，避免手动注册全局事件
-  const isShiftPressed = useKeyPress('Shift');
+  const isCtrlPressed = useKeyPress('Control');
 
   // ============================================================================
   // 渲染JSX
@@ -345,7 +345,7 @@ const TextNode: React.FC<NodeProps<TextNodeType>> = ({ id, data, selected }) => 
         boxSizing: 'border-box',
         // cursor: isCollapsed ? 'default' : 'text',
         minWidth: isCollapsed ? '200px' : '300px',
-        pointerEvents: isShiftPressed ? 'none' : 'auto'
+        pointerEvents: isCtrlPressed ? 'none' : 'auto'
       }}
     >
       {/* 节点头部 */}
@@ -354,7 +354,7 @@ const TextNode: React.FC<NodeProps<TextNodeType>> = ({ id, data, selected }) => 
           {isEditingName ? (
             <input
               ref={nameInputRef}
-              className={`text-node-name-input ${isShiftPressed ? 'drag' : 'nodrag'}`}
+              className={`text-node-name-input ${isCtrlPressed ? 'drag' : 'nodrag'}`}
               value={nodeName}
               onChange={(e) => setNodeName(e.target.value)}
               onBlur={handleNameSubmit}
@@ -496,7 +496,7 @@ const TextNode: React.FC<NodeProps<TextNodeType>> = ({ id, data, selected }) => 
       {!isCollapsed && (
         <div className="text-node-section text-node-code-section animate-fade-in-up">
           <CodeEditor
-            className={isShiftPressed ? 'drag' : 'nodrag'}
+            className={isCtrlPressed ? 'drag' : 'nodrag'}
             initialText={data.code || ''}
             onTextChange={handleTextChange}
             onExitEdit={handleExitEdit}

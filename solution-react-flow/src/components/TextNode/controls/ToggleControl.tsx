@@ -17,7 +17,7 @@ const ToggleControl: React.FC<ToggleControlProps> = ({ control, value, onChange 
     onChange(control.name, !value);
   };
 
-  const isShiftPressed = useKeyPress('Shift');
+  const isCtrlPressed = useKeyPress('Control');
 
   return (
     <div className="toggle-container">
@@ -27,7 +27,7 @@ const ToggleControl: React.FC<ToggleControlProps> = ({ control, value, onChange 
         {value ? 'true' : 'false'}
       </span>
       <div
-        className={`toggle-switch ${isShiftPressed ? 'drag' : 'nodrag'} ${value ? 'active' : ''}`}
+        className={`toggle-switch ${isCtrlPressed ? 'drag' : 'nodrag'} ${value ? 'active' : ''}`}
         onClick={handleToggleClick}
       >
         <div className="toggle-knob"></div>

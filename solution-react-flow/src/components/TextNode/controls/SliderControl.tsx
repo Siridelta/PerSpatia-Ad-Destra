@@ -26,7 +26,7 @@ const SliderControl: React.FC<SliderControlProps> = ({ control, value, onChange 
     step
   });
 
-  const isShiftPressed = useKeyPress('Shift');
+  const isCtrlPressed = useKeyPress('Control');
 
   // 处理数值点击 - 切换到设置界面
   const handleValueClick = (e: React.MouseEvent) => {
@@ -79,7 +79,7 @@ const SliderControl: React.FC<SliderControlProps> = ({ control, value, onChange 
   if (isEditingSettings) {
     return (
       <div
-        className={`slider-settings-panel ${isShiftPressed ? 'drag' : 'nodrag'}`}
+        className={`slider-settings-panel ${isCtrlPressed ? 'drag' : 'nodrag'}`}
       >
         <div className="slider-settings-row">
           <span>最小</span>
@@ -131,7 +131,7 @@ const SliderControl: React.FC<SliderControlProps> = ({ control, value, onChange 
   // 正常的滑动条显示
   return (
     <div
-      className={`slider-container ${isShiftPressed ? 'drag' : 'nodrag'}`}
+      className={`slider-container ${isCtrlPressed ? 'drag' : 'nodrag'}`}
 
     >
       <div className="slider-layout">

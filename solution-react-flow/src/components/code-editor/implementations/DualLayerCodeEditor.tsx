@@ -97,7 +97,7 @@ export const DualLayerCodeEditor: CodeEditorComponent = ({
         onChange={handleChange}
         onBlur={onExitEdit}
         spellCheck={false}
-        autoFocus={true}
+        // autoFocus={true}
         style={{
           position: 'absolute',
           inset: 0,

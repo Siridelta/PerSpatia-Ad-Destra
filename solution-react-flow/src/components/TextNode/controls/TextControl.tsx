@@ -24,7 +24,7 @@ const TextControl: React.FC<TextControlProps> = ({ control, value, onChange }) =
     onChange(control.name, e.target.value);
   };
 
-  const isShiftPressed = useKeyPress('Shift');
+  const isCtrlPressed = useKeyPress('Control');
 
   return (
     <div className="text-input-container">
@@ -33,7 +33,7 @@ const TextControl: React.FC<TextControlProps> = ({ control, value, onChange }) =
         value={value}
         onChange={handleTextChange}
         onContextMenu={handleTextRightClick}
-        className={`text-input ${isShiftPressed ? 'drag' : 'nodrag'}`}
+        className={`text-input ${isCtrlPressed ? 'drag' : 'nodrag'}`}
         placeholder="输入文本..."
         title="右键清空"
       />
