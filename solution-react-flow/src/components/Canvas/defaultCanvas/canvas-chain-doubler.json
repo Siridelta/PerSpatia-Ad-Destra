@@ -1,0 +1,186 @@
+{
+  "nodes": [
+    {
+      "id": "1",
+      "position": {
+        "x": -631.1660221502196,
+        "y": 1226.4460992357313
+      },
+      "data": {
+        "code": "let speed = node_input(new Slider(50, 0, 100, 1), \"speed\");\n\nlet result = speed * 2;\n\nnode_output(result, \"result\");",
+        "result": "结果计算中...",
+        "width": 571,
+        "controls": [
+          {
+            "name": "speed",
+            "type": "slider",
+            "defaultValue": 50,
+            "min": 0,
+            "max": 100,
+            "step": 1,
+            "value": 66
+          },
+          {
+            "name": "name",
+            "type": "input",
+            "defaultValue": "测试",
+            "value": "61"
+          },
+          {
+            "name": "enabled",
+            "type": "switch",
+            "defaultValue": true,
+            "value": true
+          }
+        ],
+        "outputs": {
+          "result": 132
+        },
+        "consoleLogs": [
+          "速度: 66 名称: 61 启用: true"
+        ],
+        "errors": [],
+        "warnings": [],
+        "nodeName": "node-0"
+      },
+      "type": "textNode",
+      "measured": {
+        "width": 571,
+        "height": 309
+      },
+      "selected": false,
+      "resizing": false,
+      "dragging": false
+    },
+    {
+      "id": "2",
+      "position": {
+        "x": -563.2357446071003,
+        "y": 1738.8942039094538
+      },
+      "data": {
+        "code": "let result = node_input(\"result\");\n\nlet doubled = result * 2;\nlet message = `结果的两倍是: ${doubled}`;\nconsole.log(message);\n\nnode_output(doubled, \"result\");",
+        "result": "doubled计算中...",
+        "width": 400,
+        "controls": [],
+        "outputs": {
+          "result": 264
+        },
+        "consoleLogs": [
+          "结果的两倍是: 264"
+        ],
+        "errors": [],
+        "warnings": []
+      },
+      "type": "textNode",
+      "measured": {
+        "width": 400,
+        "height": 348
+      },
+      "selected": false,
+      "dragging": false
+    },
+    {
+      "id": "node-1759423082366",
+      "type": "textNode",
+      "position": {
+        "x": -20.094097989768102,
+        "y": 1759.1394136295605
+      },
+      "data": {
+        "code": "let result = node_input(\"result\");\n\nlet doubled = result * 2;\nlet message = `结果的两倍是: ${doubled}`;\nconsole.log(message);\n\nnode_output(doubled, \"result\");",
+        "initialEditing": true,
+        "width": 400,
+        "controls": [],
+        "outputs": {
+          "result": 528
+        },
+        "consoleLogs": [
+          "结果的两倍是: 528"
+        ],
+        "errors": [],
+        "warnings": [],
+        "nodeName": "未命名节点"
+      },
+      "measured": {
+        "width": 400,
+        "height": 348
+      },
+      "selected": false,
+      "dragging": false
+    },
+    {
+      "id": "node-1759575419816",
+      "type": "textNode",
+      "position": {
+        "x": 505.1480651484583,
+        "y": 1776.9177292753363
+      },
+      "data": {
+        "code": "let result = node_input(\"result\");\n\nlet doubled = result * 2;\nlet message = `结果的两倍是: ${doubled}`;\nconsole.log(message);\n\nnode_output(doubled, \"result\");",
+        "initialEditing": true,
+        "width": 400
+      },
+      "measured": {
+        "width": 400,
+        "height": 348
+      },
+      "selected": false,
+      "dragging": false
+    },
+    {
+      "id": "node-1759575423551",
+      "type": "textNode",
+      "position": {
+        "x": 1010.0898447619527,
+        "y": 1788.9355578910597
+      },
+      "data": {
+        "code": "let result = node_input(\"result\");\n\nlet doubled = result * 2;\nlet message = `结果的两倍是: ${doubled}`;\nconsole.log(message);\n\nnode_output(doubled, \"result\");",
+        "initialEditing": true,
+        "width": 400
+      },
+      "measured": {
+        "width": 400,
+        "height": 348
+      },
+      "selected": false,
+      "dragging": false
+    }
+  ],
+  "edges": [
+    {
+      "id": "e1-2",
+      "source": "1",
+      "target": "2",
+      "type": "custom",
+      "selected": false
+    },
+    {
+      "id": "edge-1759423176992",
+      "source": "2",
+      "target": "node-1759423082366",
+      "type": "custom",
+      "selected": false
+    },
+    {
+      "id": "edge-1759575432597",
+      "source": "node-1759423082366",
+      "target": "node-1759575419816",
+      "type": "custom",
+      "selected": false
+    },
+    {
+      "id": "edge-1759575434861",
+      "source": "node-1759575419816",
+      "target": "node-1759575423551",
+      "type": "custom",
+      "selected": false
+    }
+  ],
+  "viewport": {
+    "x": 704.0657351089782,
+    "y": -578.2759671478752,
+    "zoom": 0.757858283255196
+  }
+}

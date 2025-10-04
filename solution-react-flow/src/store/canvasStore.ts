@@ -1,5 +1,6 @@
 import { create } from 'zustand';
 import { persist } from 'zustand/middleware';
+import type { Viewport } from '@xyflow/react';
 import { Node } from '@/models/Node';
 import { Edge } from '@/models/Edge';
 
@@ -12,10 +13,22 @@ import { Edge } from '@/models/Edge';
  * - 支持版本控制和数据迁移
  */
 
+// 默认视角（React Flow 默认值）
+const defaultViewport: Viewport = { x: 0, y: 0, zoom: 1 };
+
+// 判断视角是否几乎相等，避免重复写入触发额外渲染
+const VIEWPORT_EPSILON = 0.0001;
+const isSameViewport = (a: Viewport, b: Viewport) => (
+  Math.abs(a.x - b.x) < VIEWPORT_EPSILON &&
+  Math.abs(a.y - b.y) < VIEWPORT_EPSILON &&
+  Math.abs(a.zoom - b.zoom) < VIEWPORT_EPSILON
+);
+
 interface CanvasState {
   // 状态数据
   nodes: Node[];
   edges: Edge[];
+  viewport: Viewport;
 
   // 节点操作
   addNode: (node: Node) => void;
@@ -34,17 +47,19 @@ interface CanvasState {
 
   // 画布操作
   resetToDefault: () => void;
+  setViewport: (viewport: Viewport) => void;
 }
 
 // 默认节点和边的数据
-import { defaultNodes, defaultEdges } from '@/components/Canvas/defaultGraph';
+import defaultCanvas from '@/components/Canvas/defaultCanvas';
 
 export const useCanvasStore = create<CanvasState>()(
   persist(
     (set) => ({
       // 初始状态 - 这些会被 persist 中间件覆盖（如果 localStorage 中有数据）
-      nodes: defaultNodes,
-      edges: defaultEdges,
+      nodes: defaultCanvas.nodes,
+      edges: defaultCanvas.edges,
+      viewport: defaultCanvas.viewport ?? defaultViewport,
 
       // 节点操作
       addNode: (node) =>
@@ -90,17 +105,59 @@ export const useCanvasStore = create<CanvasState>()(
       setNodes: (nodes) => set({ nodes }),
       setEdges: (edges) => set({ edges }),
 
-      clearCanvas: () => set({ nodes: [], edges: [] }),
+      clearCanvas: () => set({ nodes: [], edges: [], viewport: defaultViewport }),
 
       // 画布操作
       resetToDefault: () => set({
-        nodes: defaultNodes,
-        edges: defaultEdges
+        nodes: defaultCanvas.nodes,
+        edges: defaultCanvas.edges,
+        viewport: defaultCanvas.viewport ?? defaultViewport
       }),
+
+      // 视角同步
+      setViewport: (viewport) =>
+        set((state) => (
+          isSameViewport(state.viewport, viewport)
+            ? {}
+            : { viewport }
+        )),
     }),
     {
       name: 'desmos-canvas-flow-state', // localStorage key
-      version: 1, // 版本号，便于未来兼容
+      version: 3, // 版本号，便于未来兼容
+      migrate: (persistedState: any, version) => {
+        if (!persistedState) {
+          return {
+            nodes: defaultCanvas.nodes,
+            edges: defaultCanvas.edges,
+            viewport: defaultCanvas.viewport ?? defaultViewport,
+          };
+        }
+
+        let newState = persistedState;
+
+        if (version < 2 || !persistedState.viewport) {
+          newState = {
+            ...newState,
+            viewport: defaultViewport,
+          };
+        }
+        
+        if (version < 3) {
+          newState = {
+            ...newState,
+            nodes: newState.nodes.map((node: Node) => ({
+              ...node,
+              data: {
+                ...node.data,
+                code: typeof node.data?.label === 'string' ? node.data.label : '',
+              },
+            })),
+          };
+        }
+
+        return newState;
+      },
       storage: {
         getItem: (name) => {
           const str = localStorage.getItem(name);

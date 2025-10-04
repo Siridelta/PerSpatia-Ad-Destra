@@ -149,15 +149,10 @@ node_output("result", x + y);`);
                 <TextNode 
                   id="sizing-test-node"
                   data={{
-                    label: testCode,
+                    code: testCode,
                     nodeName: '尺寸测试节点',
                     width: 600,
                     height: 500,
-                    errors: hasError ? [{
-                      message: errorMessage,
-                      line: 1,
-                      column: 1
-                    }] : undefined
                   }}
                   selected={false}
                   type="text"

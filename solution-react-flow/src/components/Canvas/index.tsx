@@ -1,7 +1,9 @@
 import React, { useCallback, useEffect, useMemo } from 'react';
-import { ReactFlow, Node, Connection, EdgeTypes, Controls, Background, BackgroundVariant, useReactFlow, EdgeChange } from '@xyflow/react';
+import { ReactFlow, Connection, EdgeTypes, Controls, Background, BackgroundVariant, useReactFlow, EdgeChange, ReactFlowInstance } from '@xyflow/react';
 import '@xyflow/react/dist/style.css';
 
+import { Node } from '@/models/Node';
+import { Edge } from '@/models/Edge';
 import TextNode from '@/components/TextNode';
 import FloatingEdge from '@/components/CustomEdge';
 import Toolbar from '@/components/Toolbar';
@@ -38,12 +40,15 @@ const Canvas: React.FC = () => {
     edges,
     setNodes,
     setEdges,
+    setViewport,
+    viewport,
     removeNode,
     removeEdge,
     onNodesChange,
     onEdgesChange,
     importCanvasData,
     exportCanvasData,
+    resetToDefault,
   } = useCanvasState();
 
   // 当前活动工具（全局）
@@ -58,10 +63,22 @@ const Canvas: React.FC = () => {
   const closeSettingsPanel = useSettingsStore((state) => state.closeSettingsPanel);
 
   // ReactFlow 实例引用
-  const { screenToFlowPosition, setViewport, getViewport } = useReactFlow();
+  const { screenToFlowPosition, setViewport: setFlowViewport, getViewport } = useReactFlow();
 
   // 惯性/缓动式视野移动（WASD）
-  useInertialPan({ setViewport, getViewport });
+  useInertialPan({ setViewport: setFlowViewport, getViewport });
+
+  // 初始化时同步状态中的视角到 React Flow
+  useEffect(() => {
+    if (!viewport) return;
+    setFlowViewport(viewport);
+  }, [viewport, setFlowViewport]);
+
+  // onInit 时主动推送一次视角，避免首次渲染时闪烁
+  const handleInit = useCallback((reactFlowInstance: ReactFlowInstance<Node, Edge>) => {
+    if (!viewport) return;
+    reactFlowInstance.setViewport(viewport);
+  }, [viewport]);
 
   // 应用主题设置
   useTheme();
@@ -141,7 +158,7 @@ const Canvas: React.FC = () => {
     type: 'textNode',
     position,
     data: {
-      label: '',
+      code: '',
       initialEditing: true,
       width: 400  // 默认宽度
     },
@@ -151,7 +168,7 @@ const Canvas: React.FC = () => {
   const canvasEvalInput = useMemo(() => ({
     nodes: nodes.map((node) => ({
       id: node.id,
-      code: typeof node.data?.label === 'string' ? node.data.label : '',
+      code: typeof node.data?.code === 'string' ? node.data.code : '',
     })),
     edges: edges.map((edge) => ({
       source: edge.source,
@@ -160,6 +177,13 @@ const Canvas: React.FC = () => {
   }), [nodes, edges]);
 
   const canvasEvalController = useCanvasEval(canvasEvalInput);
+
+  // 重置画布为默认状态
+  const handleReset = useCallback(() => {
+    resetToDefault();
+    setActiveTool('select');
+    setConnectionStartNode(null);
+  }, [resetToDefault, setActiveTool, setConnectionStartNode]);
 
   // 处理画布空白点击事件
   const handlePaneClick = useCallback((event: React.MouseEvent) => {
@@ -366,13 +390,15 @@ const Canvas: React.FC = () => {
         onConnect={onConnect}
         onPaneClick={handlePaneClick}
         onNodeClick={onNodeClick}
+        onInit={handleInit}
+        onMove={(_event, newViewport) => { if (newViewport) setViewport(newViewport);}}
+        onMoveEnd={(_event, newViewport) => { if (newViewport) setViewport(newViewport);}}
         nodeTypes={nodeTypes}
         edgeTypes={edgeTypes}
         defaultEdgeOptions={defaultEdgeOptions}
         connectionLineComponent={CustomConnectionLine}
         connectionLineStyle={connectionLineStyle}
         className="reactflow-canvas"
-        fitView
         fitViewOptions={{ padding: 0.2 }}
         elementsSelectable={true}
         selectNodesOnDrag={false}
@@ -413,6 +439,7 @@ const Canvas: React.FC = () => {
         onExport={handleExport}
         onImportReplace={handleImportReplace}
         onImportAdd={handleImportAdd}
+        onReset={handleReset}
       />
 
       {/* 设置面板 */}

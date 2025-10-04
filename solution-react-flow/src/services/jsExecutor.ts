@@ -181,14 +181,18 @@ export class JSExecutor {
 
   // node_output函数实现 - 新格式：node_output(变量名, 值)
   private node_output = (nameOrValue: string | any, value?: any): void => {
-    if (typeof nameOrValue === 'string' && value !== undefined) {
-      // 新格式：node_output(变量名, 值)
-      this.outputs[nameOrValue] = value;
-    } else {
-      // 兼容旧格式：node_output(值, 变量名?)
-      const actualName = (typeof value === 'string') ? value : `output_${Object.keys(this.outputs).length}`;
-      this.outputs[actualName] = nameOrValue;
-    }
+    // if (typeof nameOrValue === 'string' && value !== undefined) {
+    //   // 新格式：node_output(变量名, 值)
+    //   this.outputs[nameOrValue] = value;
+    // } else {
+    //   // 兼容旧格式：node_output(值, 变量名?)
+    //   const actualName = (typeof value === 'string') ? value : `output_${Object.keys(this.outputs).length}`;
+    //   this.outputs[actualName] = nameOrValue;
+    // }
+
+    // 先换回旧格式
+    const actualName = (typeof value === 'string') ? value : `output_${Object.keys(this.outputs).length}`;
+    this.outputs[actualName] = nameOrValue;
   };
 
   // 解析错误信息，提取行号和列号

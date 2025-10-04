@@ -6,7 +6,7 @@ export interface Node {
     y: number;
   };
   data: {
-    label: string;
+    code: string;
     [key: string]: any;
   };
   selected?: boolean; // 添加选中状态支持

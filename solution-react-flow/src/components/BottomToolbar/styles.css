@@ -7,6 +7,7 @@
   display: flex;
   align-items: center;
   justify-content: space-between;
+  gap: 8px;
   background: transparent; /* 移除背景 */
   border: none; /* 移除边框 */
   border-radius: 0; /* 方形美学 */
@@ -22,7 +23,7 @@
 /* 模式选择器 */
 .mode-selector {
   display: flex;
-  gap: 8px;
+  gap: 0px;
   pointer-events: auto; /* 恢复子元素的鼠标事件 */
 }
 
@@ -30,7 +31,7 @@
 .import-export-section {
   display: flex;
   align-items: center;
-  gap: 8px;
+  gap: 0px;
   pointer-events: auto;
 }
 

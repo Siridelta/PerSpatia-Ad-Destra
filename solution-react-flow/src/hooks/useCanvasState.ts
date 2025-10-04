@@ -1,5 +1,5 @@
 import { useCallback } from 'react';
-import { NodeChange, EdgeChange, applyNodeChanges, applyEdgeChanges } from '@xyflow/react';
+import { NodeChange, EdgeChange, Viewport, applyNodeChanges, applyEdgeChanges } from '@xyflow/react';
 import { useCanvasStore } from '@/store/canvasStore';
 import { Node } from '@/models/Node';
 import { Edge } from '@/models/Edge';
@@ -20,8 +20,10 @@ export const useCanvasState = () => {
     removeEdge,
     setNodes,
     setEdges,
+    setViewport,
     clearCanvas,
     resetToDefault,
+    viewport,
   } = useCanvasStore();
 
   // 便捷的节点操作
@@ -48,15 +50,18 @@ export const useCanvasState = () => {
   }, [addEdge]);
 
   // 批量导入数据
-  const importCanvasData = useCallback((data: { nodes: Node[]; edges: Edge[] }) => {
+  const importCanvasData = useCallback((data: { nodes: Node[]; edges: Edge[]; viewport?: Viewport }) => {
     setNodes(data.nodes);
     setEdges(data.edges);
-  }, [setNodes, setEdges]);
+    if (data.viewport) {
+      setViewport(data.viewport);
+    }
+  }, [setNodes, setEdges, setViewport]);
 
   // 导出数据
   const exportCanvasData = useCallback(() => {
-    return { nodes, edges };
-  }, [nodes, edges]);
+    return { nodes, edges, viewport };
+  }, [nodes, edges, viewport]);
 
   // React Flow 集成
   const onNodesChange = useCallback((changes: NodeChange[]) => {
@@ -89,6 +94,7 @@ export const useCanvasState = () => {
     // 批量操作
     setNodes,
     setEdges,
+    setViewport,
     clearCanvas,
     resetToDefault,
     
@@ -99,5 +105,6 @@ export const useCanvasState = () => {
     // 导入导出
     importCanvasData,
     exportCanvasData,
+    viewport,
   };
 }; 

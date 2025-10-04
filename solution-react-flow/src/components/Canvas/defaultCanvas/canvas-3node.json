@@ -1,0 +1,133 @@
+{
+  "nodes": [
+    {
+      "id": "1",
+      "position": {
+        "x": 460.3665629749392,
+        "y": -277.2021982756676
+      },
+      "data": {
+        "code": "let speed = node_input(new Slider(50, 0, 100, 1), \"speed\");\nlet name = node_input(new InputBox(\"测试\"), \"name\");\nlet enabled = node_input(new Switch(true), \"enabled\");\n\nlet result = speed * 2;\nconsole.log(\"速度:\", speed, \"名称:\", name, \"启用:\", enabled);\n\nnode_output(result, \"result\");",
+        "result": "结果计算中...",
+        "width": 575,
+        "controls": [
+          {
+            "name": "input_0",
+            "type": "slider",
+            "defaultValue": 50,
+            "min": 0,
+            "max": 100,
+            "step": 1,
+            "value": 50
+          },
+          {
+            "name": "input_1",
+            "type": "input",
+            "defaultValue": "测试",
+            "value": "测试"
+          },
+          {
+            "name": "input_2",
+            "type": "switch",
+            "defaultValue": true,
+            "value": true
+          }
+        ],
+        "outputs": {
+          "output_0": 100
+        },
+        "consoleLogs": [
+          "速度: 50 名称: 测试 启用: true"
+        ],
+        "errors": [],
+        "warnings": []
+      },
+      "type": "textNode",
+      "measured": {
+        "width": 575,
+        "height": 535
+      },
+      "selected": false,
+      "dragging": false,
+      "resizing": false
+    },
+    {
+      "id": "2",
+      "position": {
+        "x": 155.4046347893904,
+        "y": 354.6868561455326
+      },
+      "data": {
+        "code": "let result = node_input(\"result\");\n\nlet doubled = result * 2;\nconsole.log(`结果的两倍是: ${doubled}`);\n\nnode_output(doubled, \"doubled\");",
+        "result": "doubled计算中...",
+        "width": 400,
+        "errors": [
+          {
+            "message": "result is not defined",
+            "line": 2,
+            "column": 15,
+            "stack": "ReferenceError: result is not defined\n    at eval (eval at executeCode (http://localhost:5175/src/services/jsExecutor.ts?t=1759490089082:175:7), <anonymous>:2:15)\n    at JSExecutor.executeCode (http://localhost:5175/src/services/jsExecutor.ts?t=1759490089082:175:7)\n    at Object.current (http://localhost:5175/src/components/TextNode/hooks/useNodeExecution.ts?t=1759490089082:48:39)\n    at http://localhost:5175/src/components/TextNode/index.tsx?t=1759490089081:148:22\n    at react-stack-bottom-frame (http://localhost:5175/node_modules/.vite/deps/react-dom_client.js?v=aaafe8bf:16242:20)\n    at runWithFiberInDEV (http://localhost:5175/node_modules/.vite/deps/react-dom_client.js?v=aaafe8bf:726:18)\n    at commitHookEffectListMount (http://localhost:5175/node_modules/.vite/deps/react-dom_client.js?v=aaafe8bf:7767:122)\n    at commitHookPassiveMountEffects (http://localhost:5175/node_modules/.vite/deps/react-dom_client.js?v=aaafe8bf:7825:60)\n    at commitPassiveMountOnFiber (http://localhost:5175/node_modules/.vite/deps/react-dom_client.js?v=aaafe8bf:9182:29)\n    at recursivelyTraversePassiveMountEffects (http://localhost:5175/node_modules/.vite/deps/react-dom_client.js?v=aaafe8bf:9163:13)"
+          }
+        ],
+        "warnings": []
+      },
+      "type": "textNode",
+      "measured": {
+        "width": 400,
+        "height": 327
+      },
+      "selected": false,
+      "dragging": false
+    },
+    {
+      "id": "3",
+      "position": {
+        "x": 993.6964103605472,
+        "y": 324.3846401804435
+      },
+      "data": {
+        "code": "let message = node_input(new InputBox(\"Hello World\"), \"message\");\n\nlet length = message.length;\nconsole.log(\"消息:\", message, \"长度:\", length);\n\nnode_output(message, \"message\");",
+        "result": "消息处理中...",
+        "width": 595,
+        "controls": [
+          {
+            "name": "input_0",
+            "type": "input",
+            "defaultValue": "Hello World",
+            "value": "Hello World"
+          }
+        ],
+        "outputs": {
+          "output_0": "Hello World"
+        },
+        "consoleLogs": [
+          "消息: Hello World 长度: 11"
+        ],
+        "errors": [],
+        "warnings": []
+      },
+      "type": "textNode",
+      "measured": {
+        "width": 595,
+        "height": 419
+      },
+      "selected": false,
+      "dragging": false,
+      "resizing": false
+    }
+  ],
+  "edges": [
+    {
+      "id": "e1-2",
+      "source": "1",
+      "target": "2",
+      "type": "custom",
+      "selected": false
+    }
+  ],
+  "viewport": {
+    "x": 131.82174414488486,
+    "y": 442.1789634044447,
+    "zoom": 0.9999999999999952
+  }
+}

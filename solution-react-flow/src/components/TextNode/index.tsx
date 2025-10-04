@@ -14,7 +14,7 @@ import { useNodeEval } from '@/contexts/CanvasEvalContext';
 // ============================================================================
 
 export type TextNodeData = {
-  label: string;
+  code: string;
   result?: string;
   showControls?: boolean;
   consoleLogs?: string[];
@@ -103,7 +103,7 @@ const TextNode: React.FC<NodeProps<TextNodeType>> = ({ id, data, selected }) => 
 
   // 监听代码变化, 自动调整节点宽度
   useEffect(() => {
-    const currentText = data.label || '';
+    const currentText = data.code || '';
     if (currentText) {
       // 自动调整节点宽度
       setTimeout(() => {
@@ -145,7 +145,7 @@ const TextNode: React.FC<NodeProps<TextNodeType>> = ({ id, data, selected }) => 
         });
       }, 100);
     }
-  }, [data.label, data.width, id, setNodes]);
+  }, [data.code, data.width, id, setNodes]);
 
   // ============================================================================
   // UI交互逻辑 (集中管理)
@@ -164,15 +164,15 @@ const TextNode: React.FC<NodeProps<TextNodeType>> = ({ id, data, selected }) => 
 
   // 文本变化处理
   const handleTextChange = (newText: string) => {
-    updateNodeData({ label: newText });
-    const originalText = data.label || '';
+    updateNodeData({ code: newText });
+    const originalText = data.code || '';
     setHasUnsavedChanges(newText !== originalText);
   };
 
   // 退出编辑处理
   const handleExitEdit = () => {
     setHasUnsavedChanges(false);
-    // const finalCode = data.label || '';
+    // const finalCode = data.code || '';
     // if (finalCode.trim()) {
     //   executeCode(finalCode);
     // }
@@ -236,11 +236,11 @@ const TextNode: React.FC<NodeProps<TextNodeType>> = ({ id, data, selected }) => 
   // 复制代码
   const copyCode = useCallback(async () => {
     try {
-      await navigator.clipboard.writeText(data.label || '');
+      await navigator.clipboard.writeText(data.code || '');
     } catch (err) {
       console.error('复制代码失败:', err);
     }
-  }, [data.label]);
+  }, [data.code]);
 
   const handleVariableChange = useCallback((name: string, value: any) => {
     setControlValues({ [name]: value });
@@ -497,7 +497,7 @@ const TextNode: React.FC<NodeProps<TextNodeType>> = ({ id, data, selected }) => 
         <div className="text-node-section text-node-code-section animate-fade-in-up">
           <CodeEditor
             className={isShiftPressed ? 'drag' : 'nodrag'}
-            initialText={data.label || ''}
+            initialText={data.code || ''}
             onTextChange={handleTextChange}
             onExitEdit={handleExitEdit}
             style={{

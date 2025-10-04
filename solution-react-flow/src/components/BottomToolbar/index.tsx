@@ -7,13 +7,15 @@ interface BottomToolbarProps {
   onExport?: () => void;
   onImportReplace?: () => void;
   onImportAdd?: () => void;
+  onReset?: () => void;
 }
 
 const BottomToolbar: React.FC<BottomToolbarProps> = ({ 
   onSettingsClick, 
   onExport, 
   onImportReplace, 
-  onImportAdd 
+  onImportAdd,
+  onReset
 }) => {
   const { activeTool, setActiveTool, connectionStartNode, setConnectionStartNode } = useToolStore();
 
@@ -103,6 +105,17 @@ const BottomToolbar: React.FC<BottomToolbarProps> = ({
             </button>
           </div>
         </div>
+        {/* 重置按钮，快速恢复默认画布 */}
+        <button
+          className="utility-button"
+          onClick={onReset}
+          title="重置为默认画布"
+        >
+          <svg viewBox="0 0 24 24" width="16" height="16">
+            <path fill="currentColor" d="M12,5V2L8,6L12,10V7A5,5 0 0,1 17,12C17,13 16.75,13.94 16.3,14.75L17.76,16.21C18.5,15.07 19,13.6 19,12A7,7 0 0,0 12,5M6.24,7.79C5.5,8.93 5,10.4 5,12A7,7 0 0,0 12,19V22L16,18L12,14V17A5,5 0 0,1 7,12C7,11 7.25,10.06 7.7,9.25L6.24,7.79Z" />
+          </svg>
+          <span>重置</span>
+        </button>
       </div>
 
       {/* 右侧设置按钮 */}

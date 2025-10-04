@@ -25,7 +25,8 @@ export const DualLayerCodeEditor: CodeEditorComponent = ({
     if (!code) return ' &nbsp;';
 
     try {
-      return Prism.highlight(code, Prism.languages.javascript, 'javascript');
+      const highlighted = Prism.highlight(code, Prism.languages.javascript, 'javascript');
+      return highlighted + ' &nbsp;';
     } catch (error) {
       console.warn('DualLayerCodeEditor 语法高亮失败', error);
       // 回退到基础的 HTML 转义，避免破坏显示层
@@ -86,6 +87,7 @@ export const DualLayerCodeEditor: CodeEditorComponent = ({
           border: 'none',
           background: 'rgba(12, 74, 110, 0.06)',
           color: 'rgba(255, 255, 255, 0.8)',
+          pointerEvents: 'none',
         }}
       />
       <textarea
@@ -95,6 +97,7 @@ export const DualLayerCodeEditor: CodeEditorComponent = ({
         onChange={handleChange}
         onBlur={onExitEdit}
         spellCheck={false}
+        autoFocus={true}
         style={{
           position: 'absolute',
           inset: 0,
