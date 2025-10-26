@@ -1,6 +1,8 @@
 import { useCallback, useEffect, useMemo, useRef } from 'react';
 import { createStore } from 'zustand/vanilla';
 import { useStore } from 'zustand';
+import { immer } from 'zustand/middleware/immer';
+import type { Draft } from 'immer';
 import { jsExecutor, ControlInfo, ExecutionResult } from '@/services/jsExecutor';
 import { useCanvasStore } from '@/store/canvasStore';
 
@@ -110,8 +112,8 @@ const collectInputValues = (nodeId: string, state: EvalStoreState) => {
 
 const executeNode = async (
   nodeId: string,
-  getState: () => EvalStoreState,
-  setState: (updater: (prev: EvalStoreState) => EvalStoreState) => void,
+  getState: EvalStore['getState'],
+  setState: EvalStore['setState'],
   onControlsPersist?: (nodeId: string, controls: ControlInfo[]) => void,
 ) => {
   const currentState = getState();
@@ -121,34 +123,26 @@ const executeNode = async (
   const code = currentNode.code.trim();
 
   if (!code) {
-    setState((prev) => ({
-      ...prev,
-      data: {
-        ...prev.data,
-        [nodeId]: {
-          ...prev.data[nodeId],
-          outputs: {},
-          logs: [],
-          errors: [],
-          warnings: [],
-        },
-      },
-    }));
+    setState((draft) => {
+      const node = draft.data[nodeId];
+      if (node) {
+        node.outputs = {};
+        node.logs = [];
+        node.errors = [];
+        node.warnings = [];
+      }
+    });
     return;
   }
 
   if (currentNode.isEvaluating) return;
 
-  setState((prev) => ({
-    ...prev,
-    data: {
-      ...prev.data,
-      [nodeId]: {
-        ...prev.data[nodeId],
-        isEvaluating: true,
-      },
-    },
-  }));
+  setState((draft) => {
+    const node = draft.data[nodeId];
+    if (node) {
+      node.isEvaluating = true;
+    }
+  });
 
   try {
     const upstreamInputs = collectInputValues(nodeId, getState());
@@ -164,59 +158,47 @@ const executeNode = async (
     });
 
     if (result.success) {
-      setState((prev) => ({
-        ...prev,
-        data: {
-          ...prev.data,
-          [nodeId]: {
-            ...prev.data[nodeId],
-            isEvaluating: false,
-            controls: result.controls,
-            outputs: result.outputs,
-            logs: result.logs,
-            errors: [],
-            warnings: result.warnings || [],
-          },
-        },
-      }));
+      setState((draft) => {
+        const node = draft.data[nodeId];
+        if (node) {
+          node.isEvaluating = false;
+          node.controls = result.controls;
+          node.outputs = result.outputs;
+          node.logs = result.logs;
+          node.errors = [];
+          node.warnings = result.warnings || [];
+        }
+      });
       onControlsPersist?.(nodeId, result.controls);
     } else {
-      setState((prev) => ({
-        ...prev,
-        data: {
-          ...prev.data,
-          [nodeId]: {
-            ...prev.data[nodeId],
-            isEvaluating: false,
-            controls: mergeControls(prev.data[nodeId].controls, result.controls),
-            outputs: {},
-            logs: result.logs,
-            errors: result.errors || [{ message: 'Unknown execution error' }],
-            warnings: result.warnings || [],
-          },
-        },
-      }));
+      setState((draft) => {
+        const node = draft.data[nodeId];
+        if (node) {
+          node.isEvaluating = false;
+          node.controls = mergeControls(node.controls, result.controls);
+          node.outputs = {};
+          node.logs = result.logs;
+          node.errors = result.errors || [{ message: 'Unknown execution error' }];
+          node.warnings = result.warnings || [];
+        }
+      });
     }
   } catch (error) {
     const message = error instanceof Error ? error.message : String(error);
-    setState((prev) => ({
-      ...prev,
-      data: {
-        ...prev.data,
-        [nodeId]: {
-          ...prev.data[nodeId],
-          isEvaluating: false,
-          errors: [{ message, stack: error instanceof Error ? error.stack : undefined }],
-        },
-      },
-    }));
+    setState((draft) => {
+      const node = draft.data[nodeId];
+      if (node) {
+        node.isEvaluating = false;
+        node.errors = [{ message, stack: error instanceof Error ? error.stack : undefined }];
+      }
+    });
   }
 };
 
 const evaluateNodeAndDownstream = async (
   nodeId: string,
-  getState: () => EvalStoreState,
-  setState: (updater: (prev: EvalStoreState) => EvalStoreState) => void,
+  getState: EvalStore['getState'],
+  setState: EvalStore['setState'],
   onControlsPersist?: (nodeId: string, controls: ControlInfo[]) => void,
   visited: Set<string> = new Set(),
 ) => {
@@ -239,12 +221,15 @@ const createEvalStore = (input: CanvasEvalInput) => {
 
   const maps = buildGraphMaps(input.edges);
 
-  return createStore<EvalStoreState>()(() => ({
-    data: initialData,
-    incomingByTarget: maps.incoming,
-    outgoingBySource: maps.outgoing,
-  }));
+  return createStore<EvalStoreState>()(
+    immer(() => ({
+      data: initialData,
+      incomingByTarget: maps.incoming,
+      outgoingBySource: maps.outgoing,
+    })),
+  );
 };
+type EvalStore = ReturnType<typeof createEvalStore>;
 
 export const useCanvasEval = (input: CanvasEvalInput): CanvasEvalController => {
 
@@ -303,7 +288,7 @@ export const useCanvasEval = (input: CanvasEvalInput): CanvasEvalController => {
 
       const ids = Object.keys(store.getState().data);
       for (const nodeId of ids) {
-        await evaluateNodeAndDownstream(nodeId, store.getState, (updater) => store.setState(updater), persistControls);
+        await evaluateNodeAndDownstream(nodeId, store.getState, store.setState, persistControls);
       }
     };
 
@@ -319,9 +304,9 @@ export const useCanvasEval = (input: CanvasEvalInput): CanvasEvalController => {
     const updateNodeControls = async (nodeId: string, nextValues: Record<string, unknown>) => {
       let changed = false;
 
-      store.setState((prev) => {
-        const node = prev.data[nodeId];
-        if (!node) return prev;
+      store.setState((draft) => {
+        const node = draft.data[nodeId];
+        if (!node) return;
 
         const updatedControls = node.controls.map((control) => {
           if (Object.prototype.hasOwnProperty.call(nextValues, control.name)) {
@@ -334,22 +319,13 @@ export const useCanvasEval = (input: CanvasEvalInput): CanvasEvalController => {
           return control;
         });
 
-        if (!changed) return prev;
-
-        return {
-          ...prev,
-          data: {
-            ...prev.data,
-            [nodeId]: {
-              ...node,
-              controls: updatedControls,
-            },
-          },
-        };
+        if (changed) {
+          node.controls = updatedControls;
+        }
       });
 
       if (changed) {
-        await evaluateNodeAndDownstream(nodeId, store.getState, (updater) => store.setState(updater), persistControls);
+        await evaluateNodeAndDownstream(nodeId, store.getState, store.setState, persistControls);
       } else {
         const current = store.getState().data[nodeId];
         if (current) persistControls(nodeId, current.controls);
@@ -357,7 +333,7 @@ export const useCanvasEval = (input: CanvasEvalInput): CanvasEvalController => {
     };
 
     const evaluateNode = async (nodeId: string) => {
-      await evaluateNodeAndDownstream(nodeId, store.getState, (updater) => store.setState(updater), persistControls);
+      await evaluateNodeAndDownstream(nodeId, store.getState, store.setState, persistControls);
     };
 
     const evaluateAll = async () => {
