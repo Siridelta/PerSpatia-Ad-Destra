@@ -1,7 +1,7 @@
 import { create } from 'zustand';
 import { persist } from 'zustand/middleware';
 import type { Viewport } from '@xyflow/react';
-import { Node } from '@/models/Node';
+import type { AnyNode, Node } from '@/models/Node';
 import { Edge } from '@/models/Edge';
 import type { ControlInfo } from '@/services/jsExecutor';
 
@@ -25,17 +25,31 @@ const isSameViewport = (a: Viewport, b: Viewport) => (
   Math.abs(a.zoom - b.zoom) < VIEWPORT_EPSILON
 );
 
+interface DesmosPreviewLink {
+  previewNodeId: string;
+  outputName: string;
+}
+
+interface CreateDesmosPreviewParams {
+  sourceNodeId: string;
+  sourceOutputName: string;
+  desmosState: any;
+}
+
 interface CanvasState {
   // 状态数据
-  nodes: Node[];
+  nodes: AnyNode[];
   edges: Edge[];
   viewport: Viewport;
   controlsCache: Record<string, ControlInfo[]>;
+  desmosPreviewLinks: Record<string, DesmosPreviewLink>;
 
   // 节点操作
   addNode: (node: Node) => void;
   updateNode: (id: string, updates: Partial<Node>) => void;
   removeNode: (id: string) => void;
+  createDesmosPreviewNode: (params: CreateDesmosPreviewParams) => void;
+  updateDesmosPreviewState: (sourceNodeId: string, desmosState: any) => void;
 
   // 边操作
   addEdge: (edge: Edge) => void;
@@ -43,7 +57,7 @@ interface CanvasState {
   removeEdge: (id: string) => void;
 
   // 批量操作
-  setNodes: (nodes: Node[]) => void;
+  setNodes: (nodes: AnyNode[]) => void;
   setEdges: (edges: Edge[]) => void;
   clearCanvas: () => void;
 
@@ -67,6 +81,7 @@ export const useCanvasStore = create<CanvasState>()(
       edges: defaultCanvas.edges,
       viewport: defaultCanvas.viewport ?? defaultViewport,
       controlsCache: {},
+      desmosPreviewLinks: {},
 
       // 节点操作
       addNode: (node) =>
@@ -82,13 +97,133 @@ export const useCanvasStore = create<CanvasState>()(
         })),
 
       removeNode: (id) =>
-        set((state) => ({
-          nodes: state.nodes.filter((node) => node.id !== id),
-          // 同时移除相关的边
-          edges: state.edges.filter((edge) =>
-            edge.source !== id && edge.target !== id
-          ),
-        })),
+        set((state) => {
+          const { nodes, edges, desmosPreviewLinks } = state;
+          const nextLinks: Record<string, DesmosPreviewLink> = { ...desmosPreviewLinks };
+
+          const cleanedNodes = nodes.filter((node) => node.id !== id);
+          const cleanedEdges = edges.filter((edge) => edge.source !== id && edge.target !== id);
+
+          // 如果这是源节点，删除其预览节点及映射
+          if (nextLinks[id]) {
+            const previewId = nextLinks[id].previewNodeId;
+            delete nextLinks[id];
+            return {
+              nodes: cleanedNodes.filter((node) => node.id !== previewId),
+              edges: cleanedEdges.filter((edge) => edge.source !== previewId && edge.target !== previewId),
+              desmosPreviewLinks: nextLinks,
+            };
+          }
+
+          // 如果这是预览节点，找到对应源节点，移除映射
+          const sourceEntry = Object.entries(nextLinks).find(([, link]) => link.previewNodeId === id);
+          if (sourceEntry) {
+            const [sourceId] = sourceEntry;
+            delete nextLinks[sourceId];
+          }
+
+          return {
+            nodes: cleanedNodes,
+            edges: cleanedEdges,
+            desmosPreviewLinks: nextLinks,
+          };
+        }),
+
+      createDesmosPreviewNode: ({ sourceNodeId, sourceOutputName, desmosState }) =>
+        set((state) => {
+          if (state.desmosPreviewLinks[sourceNodeId]) {
+            return state;
+          }
+
+          const sourceNode = state.nodes.find((node) => node.id === sourceNodeId);
+          if (!sourceNode) {
+            return state;
+          }
+
+          const clonedState = (() => {
+            try {
+              return desmosState && typeof structuredClone === 'function'
+                ? structuredClone(desmosState)
+                : JSON.parse(JSON.stringify(desmosState ?? {}));
+            } catch {
+              return desmosState ?? {};
+            }
+          })();
+
+          const previewNodeId = `desmos-preview-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
+          const offsetX = 420;
+          const offsetY = 60;
+          const previewIndex = Object.keys(state.desmosPreviewLinks).length;
+          const previewNode: Node = {
+            id: previewNodeId,
+            type: 'desmosPreviewNode',
+            position: {
+              x: sourceNode.position.x + offsetX,
+              y: sourceNode.position.y + previewIndex * offsetY,
+            },
+            data: {
+              sourceNodeId,
+              sourceOutputName,
+              desmosState: clonedState,
+            },
+          };
+
+          const previewEdge: Edge = {
+            id: `edge-${sourceNodeId}-desmos-${Date.now()}`,
+            source: sourceNodeId,
+            target: previewNodeId,
+            type: 'custom',
+          };
+
+          return {
+            nodes: [...state.nodes, previewNode],
+            edges: [...state.edges, previewEdge],
+            desmosPreviewLinks: {
+              ...state.desmosPreviewLinks,
+              [sourceNodeId]: {
+                previewNodeId,
+                outputName: sourceOutputName,
+              },
+            },
+          };
+        }),
+
+      updateDesmosPreviewState: (sourceNodeId, desmosState) =>
+        set((state) => {
+          const link = state.desmosPreviewLinks[sourceNodeId];
+          if (!link) {
+            return state;
+          }
+
+          const previewNodeId = link.previewNodeId;
+          const cloneState = (() => {
+            try {
+              return desmosState && typeof structuredClone === 'function'
+                ? structuredClone(desmosState)
+                : JSON.parse(JSON.stringify(desmosState ?? {}));
+            } catch {
+              return desmosState ?? {};
+            }
+          })();
+
+          const updatedNodes = state.nodes.map((node) => {
+            if (node.id !== previewNodeId) {
+              return node;
+            }
+            return {
+              ...node,
+              data: {
+                ...node.data,
+                desmosState: cloneState,
+              },
+            };
+          });
+
+          return {
+            ...state,
+            nodes: updatedNodes,
+          };
+        }),
 
       // 边操作
       addEdge: (edge) =>
@@ -110,19 +245,37 @@ export const useCanvasStore = create<CanvasState>()(
 
       // 批量操作
       setNodes: (nodes) => set((state) => {
-        // 更新控件缓存, 只保留更新后仍然存在的节点
         const validIds = new Set(nodes.map((node) => node.id));
+
         const nextCache: Record<string, ControlInfo[]> = {};
         Object.entries(state.controlsCache).forEach(([id, controls]) => {
           if (validIds.has(id)) {
             nextCache[id] = controls;
           }
         });
-        return { nodes, controlsCache: nextCache };
+
+        const nextPreviewLinks: Record<string, DesmosPreviewLink> = {};
+        Object.entries(state.desmosPreviewLinks).forEach(([sourceId, link]) => {
+          if (validIds.has(sourceId) && validIds.has(link.previewNodeId)) {
+            nextPreviewLinks[sourceId] = link;
+          }
+        });
+
+        return {
+          nodes,
+          controlsCache: nextCache,
+          desmosPreviewLinks: nextPreviewLinks,
+        };
       }),
       setEdges: (edges) => set({ edges }),
 
-      clearCanvas: () => set({ nodes: [], edges: [], viewport: defaultViewport, controlsCache: {} }),
+      clearCanvas: () => set({
+        nodes: [],
+        edges: [],
+        viewport: defaultViewport,
+        controlsCache: {},
+        desmosPreviewLinks: {},
+      }),
 
       // 画布操作
       resetToDefault: () => set({
@@ -130,6 +283,7 @@ export const useCanvasStore = create<CanvasState>()(
         edges: defaultCanvas.edges,
         viewport: defaultCanvas.viewport ?? defaultViewport,
         controlsCache: {},
+        desmosPreviewLinks: {},
       }),
 
       // 视角同步
@@ -155,7 +309,7 @@ export const useCanvasStore = create<CanvasState>()(
     }),
     {
       name: 'desmos-canvas-flow-state', // localStorage key
-      version: 4, // 版本号，便于未来兼容
+      version: 5, // 版本号，便于未来兼容
       migrate: (persistedState: any, version) => {
         if (!persistedState) {
           return {
@@ -163,6 +317,7 @@ export const useCanvasStore = create<CanvasState>()(
             edges: defaultCanvas.edges,
             viewport: defaultCanvas.viewport ?? defaultViewport,
             controlsCache: {},
+            desmosPreviewLinks: {},
           };
         }
 
@@ -192,6 +347,13 @@ export const useCanvasStore = create<CanvasState>()(
           newState = {
             ...newState,
             controlsCache: {},
+          };
+        }
+
+        if (version < 5 || !newState.desmosPreviewLinks) {
+          newState = {
+            ...newState,
+            desmosPreviewLinks: {},
           };
         }
 

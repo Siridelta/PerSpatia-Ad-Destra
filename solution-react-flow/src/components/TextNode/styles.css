@@ -774,6 +774,7 @@
   font-family: 'JetBrains Mono', 'AlimamaFangYuanTi', monospace;
   font-size: 14px;
   flex-wrap: wrap;
+  gap: 6px;
 }
 
 .output-variable-name {
@@ -800,6 +801,30 @@
   color: #1e3b5e;
   width: 70px;
   flex-shrink: 1;
+}
+
+.output-export-button {
+  background: rgba(125, 225, 234, 0.15);
+  border: 1px solid rgba(125, 225, 234, 0.4);
+  color: #7de1ea;
+  width: 24px;
+  height: 24px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  transition: all 0.2s ease;
+}
+
+.output-export-button:hover {
+  background: rgba(125, 225, 234, 0.25);
+  color: #ffffff;
+}
+
+.output-export-button:disabled {
+  opacity: 0.4;
+  cursor: not-allowed;
+  background: rgba(125, 225, 234, 0.1);
 }
 
 /* 当变量名过长时，值换行 */

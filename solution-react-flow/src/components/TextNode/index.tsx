@@ -1,5 +1,5 @@
 import React, { useState, useCallback, useEffect, useRef } from 'react';
-import { Handle, Position, NodeProps, Node, useReactFlow, NodeResizeControl, useKeyPress } from '@xyflow/react';
+import { Handle, Position, NodeProps, Node as FlowNode, useReactFlow, NodeResizeControl, useKeyPress } from '@xyflow/react';
 import './styles.css';
 import '@/styles/syntax-highlighting.css';
 import { ControlInfo } from '@/services/jsExecutor';
@@ -31,7 +31,7 @@ export type TextNodeData = {
   };
 };
 
-export type TextNodeType = Node<TextNodeData, 'text'>;
+export type TextNodeType = FlowNode<TextNodeData, 'text'>;
 
 // ============================================================================
 // 工具函数
@@ -542,7 +542,11 @@ const TextNode: React.FC<NodeProps<TextNodeType>> = ({ id, data, selected }) => 
 
       {/* 输出区域 */}
       {!isCollapsed && (!hiddenSections.outputs || animatingOut.outputs) && Object.keys(outputs).length > 0 && (
-        <OutputDisplay outputs={outputs} isAnimatingOut={animatingOut.outputs} />
+        <OutputDisplay
+          outputs={outputs}
+          isAnimatingOut={animatingOut.outputs}
+          nodeId={id}
+        />
       )}
 
       {/* 连接handle */}

@@ -1,7 +1,7 @@
 import { useCallback } from 'react';
 import { NodeChange, EdgeChange, Viewport, applyNodeChanges, applyEdgeChanges } from '@xyflow/react';
 import { useCanvasStore } from '@/store/canvasStore';
-import { Node } from '@/models/Node';
+import { AnyNode } from '@/models/Node';
 import { Edge } from '@/models/Edge';
 
 /**
@@ -15,6 +15,8 @@ export const useCanvasState = () => {
     addNode,
     updateNode,
     removeNode,
+    createDesmosPreviewNode,
+    updateDesmosPreviewState,
     addEdge,
     updateEdge,
     removeEdge,
@@ -25,13 +27,14 @@ export const useCanvasState = () => {
     resetToDefault,
     viewport,
     controlsCache,
+    desmosPreviewLinks,
     setNodeControlsCache,
     setControlsCache,
   } = useCanvasStore();
 
   // 便捷的节点操作
-  const createNode = useCallback((nodeData: Omit<Node, 'id'>) => {
-    const newNode: Node = {
+  const createNode = useCallback((nodeData: Omit<AnyNode, 'id'>) => {
+    const newNode: AnyNode = {
       id: `node-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`,
       ...nodeData,
     };
@@ -53,7 +56,7 @@ export const useCanvasState = () => {
   }, [addEdge]);
 
   // 批量导入数据
-  const importCanvasData = useCallback((data: { nodes: Node[]; edges: Edge[]; viewport?: Viewport }) => {
+  const importCanvasData = useCallback((data: { nodes: AnyNode[]; edges: Edge[]; viewport?: Viewport }) => {
     setNodes(data.nodes);
     setEdges(data.edges);
     if (data.viewport) {
@@ -68,7 +71,7 @@ export const useCanvasState = () => {
 
   // React Flow 集成
   const onNodesChange = useCallback((changes: NodeChange[]) => {
-    const updatedNodes = applyNodeChanges(changes, nodes) as Node[];
+    const updatedNodes = applyNodeChanges(changes, nodes) as AnyNode[];
     setNodes(updatedNodes);
   }, [setNodes, nodes]);
 
@@ -114,5 +117,10 @@ export const useCanvasState = () => {
     // 控件缓存
     setNodeControlsCache,
     setControlsCache,
+
+    // Desmos 预览
+    desmosPreviewLinks,
+    createDesmosPreviewNode,
+    updateDesmosPreviewState,
   };
 }; 

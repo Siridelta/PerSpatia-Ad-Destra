@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useRef } from 'react';
+import { useCallback, useEffect, useMemo, useRef } from 'react';
 import { createStore } from 'zustand/vanilla';
 import { useStore } from 'zustand';
 import { jsExecutor, ControlInfo, ExecutionResult } from '@/services/jsExecutor';
@@ -247,18 +247,18 @@ const createEvalStore = (input: CanvasEvalInput) => {
 };
 
 export const useCanvasEval = (input: CanvasEvalInput): CanvasEvalController => {
-  // Canvas 持久化控制缓存
-  const setNodeControlsCache = useCanvasStore((state) => state.setNodeControlsCache);
 
   // 内部 evaluation store（每个 Canvas 单独实例）
   const storeRef = useRef<ReturnType<typeof createEvalStore>>(null);
   if (!storeRef.current) {
     storeRef.current = createEvalStore(input);
   }
-
   const store = storeRef.current;
-  const persistControls = useMemo(
-    () => (nodeId: string, controls: ControlInfo[]) => {
+  
+  // CanvasStore 中的 controls 缓存，用于尽量持久化 controls 状态
+  const setNodeControlsCache = useCanvasStore((state) => state.setNodeControlsCache);
+  const persistControls = useCallback(
+    (nodeId: string, controls: ControlInfo[]) => {
       console.log('persistControls', nodeId, controls);
       setNodeControlsCache(nodeId, controls.length ? controls : undefined);
     },
