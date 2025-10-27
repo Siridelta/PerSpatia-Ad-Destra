@@ -9,6 +9,7 @@ import { ErrorDisplay, WarningDisplay, LogDisplay, OutputDisplay } from './displ
 import CodeEditor from '../CodeEditor';
 import { useNodeEval } from '@/contexts/CanvasEvalContext';
 import { produce } from 'immer';
+import { TextNodeType } from '@/types/canvas';
 
 // ============================================================================
 // 类型定义
@@ -31,8 +32,6 @@ export type TextNodeData = {
     errors?: boolean;
   };
 };
-
-export type TextNodeType = FlowNode<TextNodeData, 'text'>;
 
 // ============================================================================
 // 工具函数

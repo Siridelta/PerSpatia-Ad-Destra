@@ -1,8 +1,8 @@
 import { useCallback } from 'react';
-import { NodeChange, EdgeChange, Viewport, applyNodeChanges, applyEdgeChanges } from '@xyflow/react';
+import type { Node, Edge, Viewport } from '@xyflow/react';
+import { NodeChange, EdgeChange, applyNodeChanges, applyEdgeChanges } from '@xyflow/react';
 import { useCanvasStore } from '@/store/canvasStore';
-import { AnyNode } from '@/models/Node';
-import { Edge } from '@/models/Edge';
+import { CanvasEdge, CanvasNode, DesmosPreviewNodeType, TextNodeType } from '@/types/canvas';
 
 /**
  * 画布状态管理 Hook
@@ -33,8 +33,9 @@ export const useCanvasState = () => {
   } = useCanvasStore();
 
   // 便捷的节点操作
-  const createNode = useCallback((nodeData: Omit<AnyNode, 'id'>) => {
-    const newNode: AnyNode = {
+  type CreateNodeData = Omit<TextNodeType, 'id'> | Omit<DesmosPreviewNodeType, 'id'>;
+  const createNode = useCallback((nodeData: CreateNodeData) => {
+    const newNode: CanvasNode = {
       id: `node-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`,
       ...nodeData,
     };
@@ -43,8 +44,8 @@ export const useCanvasState = () => {
   }, [addNode]);
 
   // 便捷的边操作
-  const createEdge = useCallback((source: string, target: string, edgeData?: Partial<Edge>) => {
-    const newEdge: Edge = {
+  const createEdge = useCallback((source: string, target: string, edgeData?: Partial<CanvasEdge>) => {
+    const newEdge: CanvasEdge = {
       id: `edge-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`,
       source,
       target,
@@ -56,7 +57,7 @@ export const useCanvasState = () => {
   }, [addEdge]);
 
   // 批量导入数据
-  const importCanvasData = useCallback((data: { nodes: AnyNode[]; edges: Edge[]; viewport?: Viewport }) => {
+  const importCanvasData = useCallback((data: { nodes: CanvasNode[]; edges: CanvasEdge[]; viewport?: Viewport }) => {
     setNodes(data.nodes);
     setEdges(data.edges);
     if (data.viewport) {
@@ -70,13 +71,13 @@ export const useCanvasState = () => {
   }, [nodes, edges, viewport]);
 
   // React Flow 集成
-  const onNodesChange = useCallback((changes: NodeChange[]) => {
-    const updatedNodes = applyNodeChanges(changes, nodes) as AnyNode[];
+  const handleNodesChange = useCallback((changes: NodeChange[]) => {
+    const updatedNodes = applyNodeChanges(changes, nodes) as CanvasNode[];
     setNodes(updatedNodes);
   }, [setNodes, nodes]);
 
-  const onEdgesChange = useCallback((changes: EdgeChange[]) => {
-    const updatedEdges = applyEdgeChanges(changes, edges) as Edge[];
+  const handleEdgesChange = useCallback((changes: EdgeChange[]) => {
+    const updatedEdges = applyEdgeChanges(changes, edges) as CanvasEdge[];
     setEdges(updatedEdges);
   }, [setEdges, edges]);
 
@@ -106,8 +107,8 @@ export const useCanvasState = () => {
     resetToDefault,
     
     // React Flow 集成
-    onNodesChange,
-    onEdgesChange,
+    handleNodesChange,
+    handleEdgesChange,
     
     // 导入导出
     importCanvasData,

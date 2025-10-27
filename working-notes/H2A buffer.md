@@ -1,5 +1,43 @@
 
 
+// desmos state json
+let a = {
+    "version": 11,
+    "randomSeed": "e5bacb2381b1f334e35ba20b08ad752e",
+    "graph": {
+        "viewport": {
+            "xmin": -10,
+            "ymin": -7.447777467843553,
+            "xmax": 10,
+            "ymax": 7.447777467843553
+        },
+        "__v12ViewportLatexStash": {
+            "xmin": "-10",
+            "xmax": "10",
+            "ymin": "-7.447777467843553",
+            "ymax": "7.447777467843553"
+        }
+    },
+    "expressions": {
+        "list": [
+            {
+                "type": "expression",
+                "latex": "y = x ^ 2",
+                "id": "1",
+                "color": "#004440"
+            }
+        ]
+    },
+    "includeFunctionParametersInRandomSeed": true,
+    "doNotMigrateMovablePointStyle": true
+};
+const apiKey = "992e835e9326468b897214ac3c89e04a";
+node_output(a, "ab")
+
+
+
+---
+
 好的，我完全理解。你现在正处在一个典型的、非常真实的大型重构项目的十字路口：你知道正确的架构方向，但通往那里的路上布满了需要优先处理的既有技术债和逻辑 bug。
 
 这非常好，说明我们的思考是同步的。直接进行架构重构而忽略这些底层问题，只会把不稳定的地基带到新房子里。

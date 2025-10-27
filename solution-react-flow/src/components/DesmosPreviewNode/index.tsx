@@ -1,10 +1,11 @@
 /// <reference types="desmos" />
 
 import React, { useEffect, useMemo, useRef, useState } from 'react';
-import { Handle, Position, NodeProps, Node as FlowNode } from '@xyflow/react';
+import { Handle, Position, NodeProps } from '@xyflow/react';
 import { useCanvasState } from '@/hooks/useCanvasState';
 
 import './styles.css';
+import { DesmosPreviewNodeType } from '@/types/canvas';
 
 // ============================================================================
 // 类型定义
@@ -15,10 +16,6 @@ export interface DesmosPreviewNodeData extends Record<string, unknown> {
   sourceOutputName: string;
   desmosState?: Desmos.GraphState;
 }
-
-export type DesmosPreviewNodeType = FlowNode<DesmosPreviewNodeData, 'desmosPreview'>;
-
-type DesmosPreviewNodeProps = NodeProps<DesmosPreviewNodeType>;
 
 // ============================================================================
 // Desmos 脚本加载工具
@@ -65,7 +62,7 @@ const ensureDesmosLoaded = (): Promise<void> => {
 // 主组件实现
 // ============================================================================
 
-const DesmosPreviewNode: React.FC<DesmosPreviewNodeProps> = ({ id, data, selected }) => {
+const DesmosPreviewNode: React.FC<NodeProps<DesmosPreviewNodeType>> = ({ id, data, selected }) => {
   const [isReady, setIsReady] = useState<boolean>(typeof window !== 'undefined' && !!window.Desmos);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
   const containerRef = useRef<HTMLDivElement | null>(null);

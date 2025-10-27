@@ -1,29 +1,41 @@
-import React, { useCallback, useEffect, useMemo } from 'react';
-import { ReactFlow, Connection, EdgeTypes, Controls, Background, BackgroundVariant, useReactFlow, EdgeChange, ReactFlowInstance } from '@xyflow/react';
+import {
+  Background,
+  BackgroundVariant,
+  Connection,
+  Controls,
+  EdgeTypes,
+  Node,
+  NodeTypes,
+  ReactFlow,
+  ReactFlowInstance,
+  useReactFlow
+} from '@xyflow/react';
 import '@xyflow/react/dist/style.css';
+import React, { useCallback, useEffect, useMemo } from 'react';
 
-import { Node } from '@/models/Node';
-import { Edge } from '@/models/Edge';
-import TextNode from '@/components/TextNode';
-import FloatingEdge from '@/components/CustomEdge';
-import Toolbar from '@/components/Toolbar';
 import BottomToolbar from '@/components/BottomToolbar';
+import FloatingEdge from '@/components/CustomEdge';
+import DesmosPreviewNode from '@/components/DesmosPreviewNode';
 import SettingsPanel from '@/components/SettingsPanel';
-import './styles.css';
-import { useToolStore } from '@/store/toolStore';
-import { useSettingsStore } from '@/store/settingsStore';
-import { useTheme } from '@/hooks/useTheme';
-import CustomConnectionLine from './CustomConnectionLine';
-import useInertialPan from '@/utils/useInertialPan';
-import { useCanvasState } from '@/hooks/useCanvasState';
-import { useCanvasEval } from '@/hooks/useCanvasEval';
+import TextNode from '@/components/TextNode';
+import Toolbar from '@/components/Toolbar';
 import { CanvasEvalProvider } from '@/contexts/CanvasEvalContext';
+import { useCanvasEval } from '@/hooks/useCanvasEval';
+import { useCanvasState } from '@/hooks/useCanvasState';
+import { useTheme } from '@/hooks/useTheme';
+import { useSettingsStore } from '@/store/settingsStore';
+import { useToolStore } from '@/store/toolStore';
+import { CanvasEdge, CanvasNode, TextNodeType } from '@/types/canvas';
+import useInertialPan from '@/utils/useInertialPan';
+import CustomConnectionLine from './CustomConnectionLine';
+import './styles.css';
 
 // 默认节点和边现在由 canvasStore 管理
 
 // 注册自定义节点类型
-const nodeTypes = {
+const nodeTypes: NodeTypes = {
   textNode: TextNode,
+  desmosPreviewNode: DesmosPreviewNode,
 };
 
 // 注册自定义边类型
@@ -44,8 +56,8 @@ const Canvas: React.FC = () => {
     viewport,
     removeNode,
     removeEdge,
-    onNodesChange,
-    onEdgesChange,
+    handleNodesChange,
+    handleEdgesChange,
     importCanvasData,
     exportCanvasData,
     resetToDefault,
@@ -75,7 +87,7 @@ const Canvas: React.FC = () => {
   }, [viewport, setFlowViewport]);
 
   // onInit 时主动推送一次视角，避免首次渲染时闪烁
-  const handleInit = useCallback((reactFlowInstance: ReactFlowInstance<Node, Edge>) => {
+  const handleInit = useCallback((reactFlowInstance: ReactFlowInstance<CanvasNode, CanvasEdge>) => {
     if (!viewport) return;
     reactFlowInstance.setViewport(viewport);
   }, [viewport]);
@@ -153,7 +165,7 @@ const Canvas: React.FC = () => {
   }, [setActiveTool, activeTool, setConnectionStartNode, setNodes, setEdges]);
 
   // 复用的创建新节点函数
-  const createTextNode = useCallback((position: { x: number; y: number }) => ({
+  const createTextNode = useCallback((position: { x: number; y: number }): TextNodeType => ({
     id: `node-${Date.now()}`,
     type: 'textNode',
     position,
@@ -203,7 +215,7 @@ const Canvas: React.FC = () => {
 
   // 处理连接事件
   const onConnect = useCallback((connection: Connection) => {
-    const edge = {
+    const edge: CanvasEdge = {
       ...connection,
       id: `edge-${Date.now()}`,
       type: 'custom',
@@ -238,7 +250,7 @@ const Canvas: React.FC = () => {
         console.log('设置连接起始节点:', node.id);
       } else if (connectionStartNode !== node.id) {
         // 创建连接
-        const newEdge = {
+        const newEdge: CanvasEdge = {
           id: `edge-${Date.now()}`,
           source: connectionStartNode,
           target: node.id,
@@ -348,30 +360,6 @@ const Canvas: React.FC = () => {
     type: 'custom',
   };
 
-  // 自定义边变化处理
-  const handleEdgesChange = useCallback((changes: EdgeChange[]) => {
-    // 先获取当前边的信息，用于检测删除
-    const currentEdges = edges;
-
-    // 处理边变化
-    onEdgesChange(changes);
-
-    // 检查是否有边被删除
-    // changes.forEach(change => {
-    //   if (change.type === 'remove') {
-    //     const removedEdge = currentEdges.find(edge => edge.id === change.id);
-    //     if (removedEdge && removedEdge.target) {
-    //       console.log('连接被删除，通知目标节点更新:', removedEdge.source, '->', removedEdge.target);
-
-    //       // 延迟一点时间确保边已经从edges中删除
-    //       setTimeout(() => {
-    //         canvasEvalController.evaluateNode(removedEdge.target);
-    //       }, 50);
-    //     }
-    //   }
-    // });
-  }, [edges, onEdgesChange]);
-
   
 
   /*
@@ -381,71 +369,71 @@ const Canvas: React.FC = () => {
   return (
     <CanvasEvalProvider controller={canvasEvalController}>
       <div className={`canvas-container ${activeTool}-mode`}>
-      <ReactFlow
-        nodes={nodes}
-        edges={edges}
-        onNodesChange={onNodesChange}
-        onEdgesChange={handleEdgesChange}
-        onConnect={onConnect}
-        onPaneClick={handlePaneClick}
-        onNodeClick={onNodeClick}
-        onInit={handleInit}
-        onMove={(_event, newViewport) => { if (newViewport) setViewport(newViewport);}}
-        onMoveEnd={(_event, newViewport) => { if (newViewport) setViewport(newViewport);}}
-        nodeTypes={nodeTypes}
-        edgeTypes={edgeTypes}
-        defaultEdgeOptions={defaultEdgeOptions}
-        connectionLineComponent={CustomConnectionLine}
-        connectionLineStyle={connectionLineStyle}
-        className="reactflow-canvas"
-        fitViewOptions={{ padding: 0.2 }}
-        elementsSelectable={true}
-        selectNodesOnDrag={false}
-        deleteKeyCode={['Delete', 'Backspace']}
-        maxZoom={10}
-        minZoom={0.1}
-      >
-        <Background variant={BackgroundVariant.Dots} gap={20} size={1} />
-        <Controls position="bottom-right" />
+        <ReactFlow
+          nodes={nodes}
+          edges={edges}
+          onNodesChange={handleNodesChange}
+          onEdgesChange={handleEdgesChange}
+          onConnect={onConnect}
+          onPaneClick={handlePaneClick}
+          onNodeClick={onNodeClick}
+          onInit={handleInit}
+          onMove={(_event, newViewport) => { if (newViewport) setViewport(newViewport); }}
+          onMoveEnd={(_event, newViewport) => { if (newViewport) setViewport(newViewport); }}
+          nodeTypes={nodeTypes}
+          edgeTypes={edgeTypes}
+          defaultEdgeOptions={defaultEdgeOptions}
+          connectionLineComponent={CustomConnectionLine}
+          connectionLineStyle={connectionLineStyle}
+          className="reactflow-canvas"
+          fitViewOptions={{ padding: 0.2 }}
+          elementsSelectable={true}
+          selectNodesOnDrag={false}
+          deleteKeyCode={['Delete', 'Backspace']}
+          maxZoom={10}
+          minZoom={0.1}
+        >
+          <Background variant={BackgroundVariant.Dots} gap={20} size={1} />
+          <Controls position="bottom-right" />
 
-        {/* 自定义箭头标记 */}
-        <svg>
-          <defs>
-            <marker
-              id="custom-edge-arrow"
-              markerWidth={8}
-              markerHeight={8}
-              refX={6}
-              refY={2}
-              orient="auto"
-              markerUnits="strokeWidth"
-            >
-              <path
-                d="M0,0 L0,4 L6,2 z"
-                fill="rgba(100, 200, 255, 0.8)"
-                stroke="rgba(100, 200, 255, 0.8)"
-              />
-            </marker>
-          </defs>
-        </svg>
-      </ReactFlow>
+          {/* 自定义箭头标记 */}
+          <svg>
+            <defs>
+              <marker
+                id="custom-edge-arrow"
+                markerWidth={8}
+                markerHeight={8}
+                refX={6}
+                refY={2}
+                orient="auto"
+                markerUnits="strokeWidth"
+              >
+                <path
+                  d="M0,0 L0,4 L6,2 z"
+                  fill="rgba(100, 200, 255, 0.8)"
+                  stroke="rgba(100, 200, 255, 0.8)"
+                />
+              </marker>
+            </defs>
+          </svg>
+        </ReactFlow>
 
-      <Toolbar />
+        <Toolbar />
 
-      {/* 底部工具栏 */}
-      <BottomToolbar
-        onSettingsClick={toggleSettingsPanel}
-        onExport={handleExport}
-        onImportReplace={handleImportReplace}
-        onImportAdd={handleImportAdd}
-        onReset={handleReset}
-      />
+        {/* 底部工具栏 */}
+        <BottomToolbar
+          onSettingsClick={toggleSettingsPanel}
+          onExport={handleExport}
+          onImportReplace={handleImportReplace}
+          onImportAdd={handleImportAdd}
+          onReset={handleReset}
+        />
 
-      {/* 设置面板 */}
-      <SettingsPanel
-        isOpen={isSettingsPanelOpen}
-        onClose={closeSettingsPanel}
-      />
+        {/* 设置面板 */}
+        <SettingsPanel
+          isOpen={isSettingsPanelOpen}
+          onClose={closeSettingsPanel}
+        />
       </div>
     </CanvasEvalProvider>
   );

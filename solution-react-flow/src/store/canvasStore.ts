@@ -1,9 +1,8 @@
 import { create } from 'zustand';
 import { persist } from 'zustand/middleware';
-import type { Viewport } from '@xyflow/react';
-import type { AnyNode, Node } from '@/models/Node';
-import { Edge } from '@/models/Edge';
+import type { Node, Viewport } from '@xyflow/react';
 import type { ControlInfo } from '@/services/jsExecutor';
+import type { CanvasNode, CanvasEdge, DesmosPreviewNodeType, TextNodeType } from '@/types/canvas';
 
 /**
  * 画布状态管理 Store
@@ -38,27 +37,27 @@ interface CreateDesmosPreviewParams {
 
 interface CanvasState {
   // 状态数据
-  nodes: AnyNode[];
-  edges: Edge[];
+  nodes: CanvasNode[];
+  edges: CanvasEdge[];
   viewport: Viewport;
   controlsCache: Record<string, ControlInfo[]>;
   desmosPreviewLinks: Record<string, DesmosPreviewLink>;
 
   // 节点操作
-  addNode: (node: Node) => void;
-  updateNode: (id: string, updates: Partial<Node>) => void;
+  addNode: (node: CanvasNode) => void;
+  updateNode: (id: string, updates: Partial<CanvasNode>) => void;
   removeNode: (id: string) => void;
   createDesmosPreviewNode: (params: CreateDesmosPreviewParams) => void;
   updateDesmosPreviewState: (sourceNodeId: string, desmosState: any) => void;
 
   // 边操作
-  addEdge: (edge: Edge) => void;
-  updateEdge: (id: string, updates: Partial<Edge>) => void;
+  addEdge: (edge: CanvasEdge) => void;
+  updateEdge: (id: string, updates: Partial<CanvasEdge>) => void;
   removeEdge: (id: string) => void;
 
   // 批量操作
-  setNodes: (nodes: AnyNode[]) => void;
-  setEdges: (edges: Edge[]) => void;
+  setNodes: (nodes: CanvasNode[]) => void;
+  setEdges: (edges: CanvasEdge[]) => void;
   clearCanvas: () => void;
 
   // 画布操作
@@ -72,10 +71,12 @@ interface CanvasState {
 
 // 默认节点和边的数据
 import defaultCanvas from '@/components/Canvas/defaultCanvas';
+import { produce } from 'immer';
+import { immer } from 'zustand/middleware/immer';
 
 export const useCanvasStore = create<CanvasState>()(
   persist(
-    (set) => ({
+    immer((set) => ({
       // 初始状态 - 这些会被 persist 中间件覆盖（如果 localStorage 中有数据）
       nodes: defaultCanvas.nodes,
       edges: defaultCanvas.edges,
@@ -90,10 +91,11 @@ export const useCanvasStore = create<CanvasState>()(
         })),
 
       updateNode: (id, updates) =>
-        set((state) => ({
-          nodes: state.nodes.map((node) =>
-            node.id === id ? { ...node, ...updates } : node
-          ),
+        set((state) => produce(state, (draft) => {
+          const node = draft.nodes.find((node) => node.id === id);
+          if (node) {
+            node.data = { ...node.data, ...updates };
+          }
         })),
 
       removeNode: (id) =>
@@ -154,7 +156,7 @@ export const useCanvasStore = create<CanvasState>()(
           const offsetX = 420;
           const offsetY = 60;
           const previewIndex = Object.keys(state.desmosPreviewLinks).length;
-          const previewNode: Node = {
+          const previewNode: DesmosPreviewNodeType = {
             id: previewNodeId,
             type: 'desmosPreviewNode',
             position: {
@@ -168,7 +170,7 @@ export const useCanvasStore = create<CanvasState>()(
             },
           };
 
-          const previewEdge: Edge = {
+          const previewEdge: CanvasEdge = {
             id: `edge-${sourceNodeId}-desmos-${Date.now()}`,
             source: sourceNodeId,
             target: previewNodeId,
@@ -306,7 +308,7 @@ export const useCanvasStore = create<CanvasState>()(
         }),
 
       setControlsCache: (cache) => set({ controlsCache: cache }),
-    }),
+    })),
     {
       name: 'desmos-canvas-flow-state', // localStorage key
       version: 5, // 版本号，便于未来兼容
