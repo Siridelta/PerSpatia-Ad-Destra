@@ -8,6 +8,7 @@ import { SliderControl, ToggleControl, TextControl } from './controls';
 import { ErrorDisplay, WarningDisplay, LogDisplay, OutputDisplay } from './displays';
 import CodeEditor from '../CodeEditor';
 import { useNodeEval } from '@/contexts/CanvasEvalContext';
+import { produce } from 'immer';
 
 // ============================================================================
 // 类型定义
@@ -130,13 +131,19 @@ const TextNode: React.FC<NodeProps<TextNodeType>> = ({ id, data, selected }) => 
 
         const minNodeWidth = Math.max(contentWidth + 60, 300);
 
-        setNodes((nodes) =>
-          nodes.map((node) =>
-            node.id === id
-              ? { ...node, data: { ...node.data, width: minNodeWidth } }
-              : node
-          )
-        );
+        // setNodes((nodes) =>
+        //   nodes.map((node) =>
+        //     node.id === id
+        //       ? { ...node, data: { ...node.data, width: minNodeWidth } }
+        //       : node
+        //   )
+        // );
+        setNodes(nodes => produce(nodes, draft => {
+          const node = draft.find(node => node.id === id);
+          if (node) {
+            node.data.width = minNodeWidth;
+          }
+        }));
 
         console.log('自动调整节点宽度:', {
           contentWidth,

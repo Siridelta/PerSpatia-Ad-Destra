@@ -2,7 +2,6 @@ import { useCallback, useEffect, useMemo, useRef } from 'react';
 import { createStore } from 'zustand/vanilla';
 import { useStore } from 'zustand';
 import { immer } from 'zustand/middleware/immer';
-import type { Draft } from 'immer';
 import { jsExecutor, ControlInfo, ExecutionResult } from '@/services/jsExecutor';
 import { useCanvasStore } from '@/store/canvasStore';
 

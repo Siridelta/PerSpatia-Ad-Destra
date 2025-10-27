@@ -5,6 +5,7 @@ import { immer } from 'zustand/middleware/immer';
 import { jsExecutor, ControlInfo, ExecutionResult } from '@/services/jsExecutor';
 import { useCanvasStore } from '@/store/canvasStore';
 import { usePrevious } from './usePrevious';
+import { produce } from 'immer';
 
 export interface ErrorInfo {
   message: string;
@@ -20,22 +21,22 @@ export interface WarningInfo {
   stack?: string;
 }
 
-export interface CanvasEvalNodeInput {
+export interface CanvasEvalInputNode {
   id: string;
   code: string;
 }
 
-export interface CanvasEvalEdgeInput {
+export interface CanvasEvalInputEdge {
   source: string;
   target: string;
 }
 
 export interface CanvasEvalInput {
-  nodes: CanvasEvalNodeInput[];
-  edges: CanvasEvalEdgeInput[];
+  nodes: CanvasEvalInputNode[];
+  edges: CanvasEvalInputEdge[];
 }
 
-export interface CanvasNodeEvalState {
+export interface CanvasEvalNodeData {
   code: string;
   isEvaluating: boolean;
   controls: ControlInfo[];
@@ -45,9 +46,9 @@ export interface CanvasNodeEvalState {
   warnings: WarningInfo[];
 }
 
-export type CanvasEvalData = Record<string, CanvasNodeEvalState>;
+export type CanvasEvalData = Record<string, CanvasEvalNodeData>;
 
-interface EvalStoreState {
+interface CanvasEvalStoreState {
   data: CanvasEvalData;
   incomingByTarget: Record<string, string[]>;
   outgoingBySource: Record<string, string[]>;
@@ -62,7 +63,7 @@ export interface CanvasEvalController {
   evaluateAll: () => Promise<void>;
 }
 
-const createInitialNodeState = (code: string): CanvasNodeEvalState => ({
+const createInitialNodeData = (code: string): CanvasEvalNodeData => ({
   code,
   isEvaluating: false,
   controls: [],
@@ -81,7 +82,7 @@ const mergeControls = (prevControls: ControlInfo[], nextControls: ControlInfo[])
   });
 };
 
-const buildGraphMaps = (edges: CanvasEvalEdgeInput[]) => {
+const buildGraphIOReprs = (edges: CanvasEvalInputEdge[]) => {
   const incoming: Record<string, string[]> = {};
   const outgoing: Record<string, string[]> = {};
 
@@ -96,26 +97,32 @@ const buildGraphMaps = (edges: CanvasEvalEdgeInput[]) => {
   return { incoming, outgoing };
 };
 
+
+
+
+// --- 增量更新解析相关 ---
+
+
 // 为边生成唯一键，便于在 diff 过程中进行集合对比
-const edgeKey = ({ source, target }: CanvasEvalEdgeInput) => `${source}->${target}`;
+const createEdgeKey = ({ source, target }: CanvasEvalInputEdge) => `${source}->${target}`;
 
 // 描述一次 CanvasEvalInput 变化中我们关心的增量信息
-interface CanvasDelta {
+interface InputDelta {
   addedNodeIds: string[];
   removedNodeIds: string[];
   updatedNodeIds: string[];
-  addedEdges: CanvasEvalEdgeInput[];
-  removedEdges: CanvasEvalEdgeInput[];
+  addedEdges: CanvasEvalInputEdge[];
+  removedEdges: CanvasEvalInputEdge[];
   impactedNodeIds: string[];
   hasChanges: boolean;
 }
 
 // 计算前后两次输入之间的差异，并推断需要重新计算的节点集合
-const diffCanvasInput = (
+// 须满足约束：当前边的 source 和 target 必须是 current 中实际存在的节点
+const resolveInputDelta = (
   previous: CanvasEvalInput,
   current: CanvasEvalInput,
-  prevState: EvalStoreState,
-): CanvasDelta => {
+): InputDelta => {
   const prevNodeMap = new Map(previous.nodes.map((node) => [node.id, node]));
   const currentNodeMap = new Map(current.nodes.map((node) => [node.id, node]));
 
@@ -142,20 +149,20 @@ const diffCanvasInput = (
     }
   });
 
-  const prevEdgeSet = new Set(previous.edges.map(edgeKey));
-  const currentEdgeSet = new Set(current.edges.map(edgeKey));
+  const prevEdgeSet = new Set(previous.edges.map(createEdgeKey));
+  const currentEdgeSet = new Set(current.edges.map(createEdgeKey));
 
-  const addedEdges: CanvasEvalEdgeInput[] = [];
-  const removedEdges: CanvasEvalEdgeInput[] = [];
+  const addedEdges: CanvasEvalInputEdge[] = [];
+  const removedEdges: CanvasEvalInputEdge[] = [];
 
   current.edges.forEach((edge) => {
-    if (!prevEdgeSet.has(edgeKey(edge))) {
+    if (!prevEdgeSet.has(createEdgeKey(edge))) {
       addedEdges.push(edge);
     }
   });
 
   previous.edges.forEach((edge) => {
-    if (!currentEdgeSet.has(edgeKey(edge))) {
+    if (!currentEdgeSet.has(createEdgeKey(edge))) {
       removedEdges.push(edge);
     }
   });
@@ -169,12 +176,14 @@ const diffCanvasInput = (
   removedEdges.forEach((edge) => impacted.add(edge.target));
 
   // 节点被移除时，其下游节点同样需要重新计算
+  // （兜底，以防输入数据不良，删除节点时没删除边而遗漏下游节点）
   removedNodeIds.forEach((nodeId) => {
-    const downstream = prevState.outgoingBySource[nodeId] || [];
+    const downstream = current.edges.filter((edge) => edge.source === nodeId).map((edge) => edge.target);
     downstream.forEach((targetId) => impacted.add(targetId));
   });
 
   // 仅保留当前图中实际存在的节点，避免无效计算
+  // （removeEdges 等可能会向 impacted 添加不存在的节点，需要过滤掉）
   const currentNodeIds = new Set(current.nodes.map((node) => node.id));
   const impactedNodeIds = Array.from(impacted).filter((id) => currentNodeIds.has(id));
 
@@ -196,29 +205,17 @@ const diffCanvasInput = (
   };
 };
 
-// 根据最新输入构建下一版 eval 数据，尽量复用已有状态
-const buildNextEvalData = (
-  snapshot: EvalStoreState,
-  input: CanvasEvalInput,
+// 根据最新输入构建下一版 eval 数据 --- 全量更新版，用于首次运行
+const createInitialEvalData = (
+  currentInput: CanvasEvalInput,
   controlsCache: Record<string, ControlInfo[] | undefined>,
 ): CanvasEvalData => {
   const nextData: CanvasEvalData = {};
 
-  input.nodes.forEach(({ id, code }) => {
-    const prev = snapshot.data[id];
+  currentInput.nodes.forEach(({ id, code }) => {
     const cachedControls = controlsCache[id];
-
-    if (prev) {
-      nextData[id] = {
-        ...prev,
-        code,
-        controls: cachedControls ? cachedControls.map((control) => ({ ...control })) : prev.controls,
-      };
-      return;
-    }
-
     nextData[id] = {
-      ...createInitialNodeState(code),
+      ...createInitialNodeData(code),
       controls: cachedControls ? cachedControls.map((control) => ({ ...control })) : [],
     };
   });
@@ -226,7 +223,27 @@ const buildNextEvalData = (
   return nextData;
 };
 
-const collectInputValues = (nodeId: string, state: EvalStoreState) => {
+// 根据最新输入构建下一版 eval 数据 --- 增量更新版，用于非初次运行
+const buildNextEvalData = (
+  currentData: CanvasEvalData,
+  currentInput: CanvasEvalInput,
+  delta: InputDelta,
+): CanvasEvalData =>
+  produce(currentData, (draft) => {
+    delta.addedNodeIds.forEach((id) => {
+      draft[id] = createInitialNodeData(currentInput.nodes.find((node) => node.id === id)!.code);
+    });
+
+    delta.removedNodeIds.forEach((id) => {
+      delete draft[id];
+    });
+
+    delta.updatedNodeIds.forEach((id) => {
+      draft[id]!.code = currentInput.nodes.find((node) => node.id === id)!.code;
+    });
+  });
+
+const collectInputValues = (nodeId: string, state: CanvasEvalStoreState) => {
   const inputs: Record<string, any> = {};
   const sources = state.incomingByTarget[nodeId] || [];
 
@@ -346,12 +363,12 @@ const evaluateNodeAndDownstream = async (
 const createEvalStore = (input: CanvasEvalInput) => {
   const initialData: CanvasEvalData = {};
   input.nodes.forEach(({ id, code }) => {
-    initialData[id] = createInitialNodeState(code);
+    initialData[id] = createInitialNodeData(code);
   });
 
-  const maps = buildGraphMaps(input.edges);
+  const maps = buildGraphIOReprs(input.edges);
 
-  return createStore<EvalStoreState>()(
+  return createStore<CanvasEvalStoreState>()(
     immer(() => ({
       data: initialData,
       incomingByTarget: maps.incoming,
@@ -371,7 +388,7 @@ export const useCanvasEval = (input: CanvasEvalInput): CanvasEvalController => {
     storeRef.current = createEvalStore(currentInput);
   }
   const store = storeRef.current;
-  
+
   // CanvasStore 中的 controls 缓存，用于尽量持久化 controls 状态
   const setNodeControlsCache = useCanvasStore((state) => state.setNodeControlsCache);
   const persistControls = useCallback(
@@ -383,24 +400,60 @@ export const useCanvasEval = (input: CanvasEvalInput): CanvasEvalController => {
   );
 
   useEffect(() => {
-    let cancelled = false;
+    let cancelled = false;  // cancel on cleanup
 
-    // 统一的同步入口：基于 delta 只评估受影响节点
     const runSyncAndEvaluate = async () => {
-      const snapshot = store.getState();
-      const nextInput = currentInput;
+      const currentState = store.getState();
 
       const { controlsCache } = useCanvasStore.getState();
 
-      // 初次运行时直接全量同步与计算
-      if (!previousInput) {
-        const nextData = buildNextEvalData(snapshot, nextInput, controlsCache);
-        const maps = buildGraphMaps(nextInput.edges);
+      // clarify:
+      // previous, current, next 形容词并不完全对齐.
+      // previousInput -> currentInput
+      // currentState -> nextData/nextState
+
+      // 注：
+      // 一个能让信息来源更单纯的方案是不使用缓存缓存 previousInput，而是每次直接根据 currentState 计算(复原)出 previousInput，
+      // 或者直接用 currentInput diff currentState 来计算 delta.
+      // 但是有一定计算量在.
+
+      if (previousInput) {
+        // 非初次运行时增量更新与计算
+
+        // 基于前后状态计算 delta
+        const delta = resolveInputDelta(previousInput, currentInput);
+        if (!delta.hasChanges) {
+          return;
+        }
+
+        const nextData = buildNextEvalData(currentState.data, currentInput, delta);
+        const graphIOReprs = buildGraphIOReprs(currentInput.edges);
 
         store.setState({
           data: nextData,
-          incomingByTarget: maps.incoming,
-          outgoingBySource: maps.outgoing,
+          incomingByTarget: graphIOReprs.incoming,
+          outgoingBySource: graphIOReprs.outgoing,
+        });
+
+        if (!delta.impactedNodeIds.length) {
+          return;
+        }
+
+        const visited = new Set<string>();
+        for (const nodeId of delta.impactedNodeIds) {
+          if (cancelled) return;
+          await evaluateNodeAndDownstream(nodeId, store.getState, store.setState, persistControls, visited);
+        }
+
+      } else {
+        // 初次运行时直接全量同步与计算
+        const nextData = createInitialEvalData(currentInput, controlsCache);
+        const graphIOReprs = buildGraphIOReprs(currentInput.edges);
+
+        store.setState({
+          data: nextData,
+          incomingByTarget: graphIOReprs.incoming,
+          outgoingBySource: graphIOReprs.outgoing,
         });
 
         const allNodeIds = Object.keys(nextData);
@@ -414,36 +467,12 @@ export const useCanvasEval = (input: CanvasEvalInput): CanvasEvalController => {
         return;
       }
 
-      // 基于前后状态计算增量
-      const delta = diffCanvasInput(previousInput, nextInput, snapshot);
-      if (!delta.hasChanges) {
-        return;
-      }
-
-      const nextData = buildNextEvalData(snapshot, nextInput, controlsCache);
-      const maps = buildGraphMaps(nextInput.edges);
-
-      store.setState({
-        data: nextData,
-        incomingByTarget: maps.incoming,
-        outgoingBySource: maps.outgoing,
-      });
-
-      if (!delta.impactedNodeIds.length) {
-        return;
-      }
-
-      const visited = new Set<string>();
-      for (const nodeId of delta.impactedNodeIds) {
-        if (cancelled) return;
-        await evaluateNodeAndDownstream(nodeId, store.getState, store.setState, persistControls, visited);
-      }
     };
 
     runSyncAndEvaluate();
 
     return () => {
-      cancelled = true;
+      cancelled = true;  // cleanup
     };
   }, [store, previousInput, currentInput, persistControls]);
 
@@ -511,13 +540,13 @@ export const useCanvasEval = (input: CanvasEvalInput): CanvasEvalController => {
           };
         } else {
           nextData[id] = {
-            ...createInitialNodeState(code),
+            ...createInitialNodeData(code),
             controls: cachedControls ? cachedControls.map((control) => ({ ...control })) : [],
           };
         }
       });
 
-      const maps = buildGraphMaps(nextInput.edges);
+      const maps = buildGraphIOReprs(nextInput.edges);
 
       store.setState({
         data: nextData,

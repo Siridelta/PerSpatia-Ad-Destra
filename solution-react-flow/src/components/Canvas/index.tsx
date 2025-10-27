@@ -348,7 +348,7 @@ const Canvas: React.FC = () => {
     type: 'custom',
   };
 
-  // 自定义边变化处理，增加删除连接时的更新逻辑
+  // 自定义边变化处理
   const handleEdgesChange = useCallback((changes: EdgeChange[]) => {
     // 先获取当前边的信息，用于检测删除
     const currentEdges = edges;
@@ -357,26 +357,26 @@ const Canvas: React.FC = () => {
     onEdgesChange(changes);
 
     // 检查是否有边被删除
-    changes.forEach(change => {
-      if (change.type === 'remove') {
-        const removedEdge = currentEdges.find(edge => edge.id === change.id);
-        if (removedEdge && removedEdge.target) {
-          console.log('连接被删除，通知目标节点更新:', removedEdge.source, '->', removedEdge.target);
+    // changes.forEach(change => {
+    //   if (change.type === 'remove') {
+    //     const removedEdge = currentEdges.find(edge => edge.id === change.id);
+    //     if (removedEdge && removedEdge.target) {
+    //       console.log('连接被删除，通知目标节点更新:', removedEdge.source, '->', removedEdge.target);
 
-          // 延迟一点时间确保边已经从edges中删除
-          setTimeout(() => {
-            canvasEvalController.evaluateNode(removedEdge.target);
-          }, 50);
-        }
-      }
-    });
+    //       // 延迟一点时间确保边已经从edges中删除
+    //       setTimeout(() => {
+    //         canvasEvalController.evaluateNode(removedEdge.target);
+    //       }, 50);
+    //     }
+    //   }
+    // });
   }, [edges, onEdgesChange]);
 
+  
 
   /*
   *      ----------- 组件结构 ------------
   */
-
 
   return (
     <CanvasEvalProvider controller={canvasEvalController}>
