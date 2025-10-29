@@ -54,7 +54,7 @@ interface CanvasEvalStoreState {
   outgoingBySource: Record<string, string[]>;
 }
 
-export interface CanvasEvalController {
+export interface CanvasEvalApi {
   getSnapshot: () => CanvasEvalData;
   useEvalStore: <T>(selector: (state: CanvasEvalData) => T) => T;
   syncGraph: (input: CanvasEvalInput) => Promise<void>;
@@ -443,7 +443,7 @@ const createEvalStore = (input: CanvasEvalInput) => {
 };
 type EvalStore = ReturnType<typeof createEvalStore>;
 
-export const useCanvasEval = (input: CanvasEvalInput): CanvasEvalController => {
+export const useCanvasEval = (input: CanvasEvalInput): CanvasEvalApi => {
   const previousInput = usePrevious(input);
   const currentInput = input;
 
@@ -540,7 +540,7 @@ export const useCanvasEval = (input: CanvasEvalInput): CanvasEvalController => {
     runSyncAndEvaluate();
   }, [store, previousInput, currentInput, persistControls]);
 
-  const controller = useMemo<CanvasEvalController>(() => {
+  const api = useMemo<CanvasEvalApi>(() => {
     const getSnapshot = () => store.getState().data;
 
     const useEvalStore = <T>(selector: (state: CanvasEvalData) => T) =>
@@ -662,6 +662,6 @@ export const useCanvasEval = (input: CanvasEvalInput): CanvasEvalController => {
     };
   }, [store, persistControls]);
 
-  return controller;
+  return api;
 };
 

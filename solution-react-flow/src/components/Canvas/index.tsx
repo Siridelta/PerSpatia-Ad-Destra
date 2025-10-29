@@ -187,7 +187,7 @@ const Canvas: React.FC = () => {
       target: edge.target,
     })),
   }), [nodes, edges]);
-  const canvasEvalController = useCanvasEval(canvasEvalInput);
+  const evalApi = useCanvasEval(canvasEvalInput);
 
   // 重置画布为默认状态
   const handleReset = useCallback(() => {
@@ -228,7 +228,7 @@ const Canvas: React.FC = () => {
 
       // 延迟一点时间确保连接已经添加到edges中
       setTimeout(() => {
-        canvasEvalController.evaluateNode(connection.target);
+        evalApi.evaluateNode(connection.target);
       }, 50);
     }
 
@@ -261,7 +261,7 @@ const Canvas: React.FC = () => {
 
         // 连接建立后，立即通知目标节点更新
         setTimeout(() => {
-          canvasEvalController.evaluateNode(node.id);
+          evalApi.evaluateNode(node.id);
         }, 50);
 
         // 重置连接状态并退出连接模式
@@ -367,7 +367,7 @@ const Canvas: React.FC = () => {
   */
 
   return (
-    <CanvasEvalProvider controller={canvasEvalController}>
+    <CanvasEvalProvider api={evalApi}>
       <div className={`canvas-container ${activeTool}-mode`}>
         <ReactFlow
           nodes={nodes}

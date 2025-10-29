@@ -1,37 +1,37 @@
 import { createContext, ReactNode, useContext, useMemo, useCallback } from 'react';
-import { CanvasEvalController } from '@/hooks/useCanvasEval';
+import { CanvasEvalApi } from '@/hooks/useCanvasEval';
 
 interface CanvasEvalProviderProps {
-  controller: CanvasEvalController;
+  api: CanvasEvalApi;
   children: ReactNode;
 }
 
-const CanvasEvalContext = createContext<CanvasEvalController | null>(null);
+const CanvasEvalContext = createContext<CanvasEvalApi | null>(null);
 
-export const CanvasEvalProvider = ({ controller, children }: CanvasEvalProviderProps) => (
-  <CanvasEvalContext.Provider value={controller}>{children}</CanvasEvalContext.Provider>
+export const CanvasEvalProvider = ({ api, children }: CanvasEvalProviderProps) => (
+  <CanvasEvalContext.Provider value={api}>{children}</CanvasEvalContext.Provider>
 );
 
-export const useCanvasEvalController = () => {
+export const useCanvasEvalApi = () => {
   const context = useContext(CanvasEvalContext);
   if (!context) {
-    throw new Error('useCanvasEvalController must be used within CanvasEvalProvider');
+    throw new Error('useCanvasEvalApi must be used within CanvasEvalProvider');
   }
   return context;
 };
 
 export const useNodeEval = (nodeId: string) => {
-  const controller = useCanvasEvalController();
-  const node = controller.useEvalStore((state) => state[nodeId]);
+  const evalApi = useCanvasEvalApi();
+  const node = evalApi.useEvalStore((state) => state[nodeId]);
 
   const setControlValues = useCallback(
     (values: Record<string, unknown>) => {
-      controller.updateNodeControls(nodeId, values);
+      evalApi.updateNodeControls(nodeId, values);
     },
-    [controller, nodeId]
+    [evalApi, nodeId]
   );
 
-  const evaluate = useCallback(() => controller.evaluateNode(nodeId), [controller, nodeId]);
+  const evaluate = useCallback(() => evalApi.evaluateNode(nodeId), [evalApi, nodeId]);
 
   return useMemo(
     () => ({
