@@ -4,7 +4,6 @@ import { useStore } from 'zustand';
 import { immer } from 'zustand/middleware/immer';
 import { jsExecutor, ControlInfo, ExecutionResult } from '@/services/jsExecutor';
 import { useCanvasStore } from '@/store/canvasStore';
-import { usePrevious } from './usePrevious';
 import { produce } from 'immer';
 
 export interface ErrorInfo {
@@ -116,6 +115,40 @@ interface InputDelta {
   impactedNodeIds: string[];
   hasChanges: boolean;
 }
+
+const cloneCanvasEvalInput = (input: CanvasEvalInput): CanvasEvalInput => ({
+  nodes: input.nodes.map(({ id, code }) => ({ id, code })),
+  edges: input.edges.map(({ source, target }) => ({ source, target })),
+});
+
+const cloneCanvasEvalStoreState = (state: CanvasEvalStoreState): CanvasEvalStoreState => ({
+  data: Object.entries(state.data).reduce<CanvasEvalData>((acc, [nodeId, node]) => {
+    acc[nodeId] = {
+      code: node.code,
+      isEvaluating: node.isEvaluating,
+      controls: node.controls.map((control) => ({ ...control })),
+      outputs: { ...node.outputs },
+      logs: [...node.logs],
+      errors: node.errors.map((error) => ({ ...error })),
+      warnings: node.warnings.map((warning) => ({ ...warning })),
+    };
+    return acc;
+  }, {}),
+  incomingByTarget: Object.entries(state.incomingByTarget).reduce<Record<string, string[]>>(
+    (acc, [targetId, sources]) => {
+      acc[targetId] = [...sources];
+      return acc;
+    },
+    {},
+  ),
+  outgoingBySource: Object.entries(state.outgoingBySource).reduce<Record<string, string[]>>(
+    (acc, [sourceId, targets]) => {
+      acc[sourceId] = [...targets];
+      return acc;
+    },
+    {},
+  ),
+});
 
 // 计算前后两次输入之间的差异，并推断需要重新计算的节点集合
 // 须满足约束：当前边的 source 和 target 必须是 current 中实际存在的节点
@@ -450,11 +483,18 @@ const createEvalStore = (input: CanvasEvalInput) => {
 type EvalStore = ReturnType<typeof createEvalStore>;
 
 export const useCanvasEval = (input: CanvasEvalInput): CanvasEvalApi => {
-  const previousInput = usePrevious(input);
   const currentInput = input;
 
   // 内部 evaluation store（每个 Canvas 单独实例）
   const [store] = useState(() => createEvalStore(currentInput));
+
+  const evaluationVersionRef = useRef(0);
+  const lastCompletedInputRef = useRef<CanvasEvalInput | null>(null);
+  const lastCompletedStateRef = useRef<CanvasEvalStoreState | null>(null);
+
+  if (!lastCompletedStateRef.current) {
+    lastCompletedStateRef.current = cloneCanvasEvalStoreState(store.getState());
+  }
 
   // CanvasStore 中的 controls 缓存，用于尽量持久化 controls 状态
   const setNodeControlsCache = useCanvasStore((state) => state.setNodeControlsCache);
@@ -466,17 +506,19 @@ export const useCanvasEval = (input: CanvasEvalInput): CanvasEvalApi => {
     [setNodeControlsCache]
   );
 
-  const evaluationVersionRef = useRef(0);
-
   const runEvaluationTask = useCallback(
-    async (entryNodeIds: string[], baseState: CanvasEvalStoreState, version: number) => {
+    async (
+      entryNodeIds: string[],
+      baseState: CanvasEvalStoreState,
+      version: number,
+    ): Promise<CanvasEvalStoreState | null> => {
       if (!entryNodeIds.length) {
-        return;
+        return null;
       }
 
       const plan = createEvaluationPlan(entryNodeIds, baseState);
       if (!plan.order.length) {
-        return;
+        return baseState;
       }
 
       const interimResults = await runEvaluationPlan(
@@ -488,7 +530,7 @@ export const useCanvasEval = (input: CanvasEvalInput): CanvasEvalApi => {
       );
 
       if (!interimResults || evaluationVersionRef.current !== version) {
-        return;
+        return null;
       }
 
       const nextState = produce(baseState, (draft) => {
@@ -497,65 +539,85 @@ export const useCanvasEval = (input: CanvasEvalInput): CanvasEvalApi => {
         });
       });
 
-      store.setState(nextState);
+      return nextState;
     },
-    [store, persistControls],
+    [persistControls],
   );
 
   useEffect(() => {
-    evaluationVersionRef.current += 1;
-    const currentVersion = evaluationVersionRef.current;
-
-    const runSyncAndEvaluate = async () => {
-      const currentStateSnapshot = store.getState();
-      const { controlsCache } = useCanvasStore.getState();
-
-      if (previousInput) {
-        const delta = resolveInputDelta(previousInput, currentInput);
-        if (!delta.hasChanges) {
-          return;
-        }
-
-        const nextData = buildNextEvalData(currentStateSnapshot.data, currentInput, delta);
-        const graphIOReprs = buildGraphIOReprs(currentInput.edges);
-
-        const nextState: CanvasEvalStoreState = {
-          data: nextData,
-          incomingByTarget: graphIOReprs.incoming,
-          outgoingBySource: graphIOReprs.outgoing,
-        };
-
-        store.setState(nextState);
-
-        if (!delta.impactedNodeIds.length) {
-          return;
-        }
-
-        await runEvaluationTask(delta.impactedNodeIds, nextState, currentVersion);
-        
-      } else {
-        const nextData = createInitialEvalData(currentInput, controlsCache);
-        const graphIOReprs = buildGraphIOReprs(currentInput.edges);
-
-        const nextState: CanvasEvalStoreState = {
-          data: nextData,
-          incomingByTarget: graphIOReprs.incoming,
-          outgoingBySource: graphIOReprs.outgoing,
-        };
-
-        store.setState(nextState);
-
-        const allNodeIds = Object.keys(nextData);
-        if (!allNodeIds.length) {
-          return;
-        }
-
-        await runEvaluationTask(allNodeIds, nextState, currentVersion);
-      }
-    };
-
-    runSyncAndEvaluate();
-  }, [store, previousInput, currentInput, persistControls, runEvaluationTask]);
+     evaluationVersionRef.current += 1;
+     const currentVersion = evaluationVersionRef.current;
+ 
+     const runSyncAndEvaluate = async () => {
+       const currentStateSnapshot = store.getState();
+       const { controlsCache } = useCanvasStore.getState();
+       const baseInput = lastCompletedInputRef.current;
+       const baseState = lastCompletedStateRef.current ?? currentStateSnapshot;
+ 
+       if (baseInput) {
+         const delta = resolveInputDelta(baseInput, currentInput);
+         if (!delta.hasChanges) {
+           const restoredState = cloneCanvasEvalStoreState(baseState);
+           store.setState(restoredState);
+           lastCompletedInputRef.current = cloneCanvasEvalInput(currentInput);
+           lastCompletedStateRef.current = cloneCanvasEvalStoreState(restoredState);
+           return;
+         }
+ 
+         const nextData = buildNextEvalData(baseState.data, currentInput, delta);
+         const graphIOReprs = buildGraphIOReprs(currentInput.edges);
+ 
+         const nextState: CanvasEvalStoreState = {
+           data: nextData,
+           incomingByTarget: graphIOReprs.incoming,
+           outgoingBySource: graphIOReprs.outgoing,
+         };
+ 
+         store.setState(nextState);
+ 
+         if (!delta.impactedNodeIds.length) {
+           lastCompletedInputRef.current = cloneCanvasEvalInput(currentInput);
+           lastCompletedStateRef.current = cloneCanvasEvalStoreState(nextState);
+           return;
+         }
+ 
+         const completedState = await runEvaluationTask(delta.impactedNodeIds, nextState, currentVersion);
+         if (completedState) {
+           store.setState(completedState);
+           lastCompletedInputRef.current = cloneCanvasEvalInput(currentInput);
+           lastCompletedStateRef.current = cloneCanvasEvalStoreState(completedState);
+         }
+         return;
+       }
+ 
+       const nextData = createInitialEvalData(currentInput, controlsCache);
+       const graphIOReprs = buildGraphIOReprs(currentInput.edges);
+ 
+       const nextState: CanvasEvalStoreState = {
+         data: nextData,
+         incomingByTarget: graphIOReprs.incoming,
+         outgoingBySource: graphIOReprs.outgoing,
+       };
+ 
+       store.setState(nextState);
+ 
+       const allNodeIds = Object.keys(nextData);
+       if (!allNodeIds.length) {
+         lastCompletedInputRef.current = cloneCanvasEvalInput(currentInput);
+         lastCompletedStateRef.current = cloneCanvasEvalStoreState(nextState);
+         return;
+       }
+ 
+       const completedState = await runEvaluationTask(allNodeIds, nextState, currentVersion);
+       if (completedState) {
+         store.setState(completedState);
+         lastCompletedInputRef.current = cloneCanvasEvalInput(currentInput);
+         lastCompletedStateRef.current = cloneCanvasEvalStoreState(completedState);
+       }
+     };
+ 
+     runSyncAndEvaluate();
+   }, [store, currentInput, persistControls, runEvaluationTask]);
 
   const api = useMemo<CanvasEvalApi>(() => {
     const getSnapshot = () => store.getState().data;
@@ -570,8 +632,11 @@ export const useCanvasEval = (input: CanvasEvalInput): CanvasEvalApi => {
       const currentVersion = evaluationVersionRef.current;
 
       const baseState = store.getState();
-
-      await runEvaluationTask(entryNodeIds, baseState, currentVersion);
+      const completedState = await runEvaluationTask(entryNodeIds, baseState, currentVersion);
+      if (completedState) {
+        store.setState(completedState);
+        lastCompletedStateRef.current = cloneCanvasEvalStoreState(completedState);
+      }
     };
 
     const updateNodeControls = async (nodeId: string, nextValues: Record<string, unknown>) => {
