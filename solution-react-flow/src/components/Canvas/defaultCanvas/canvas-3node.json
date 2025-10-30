@@ -82,11 +82,11 @@
     {
       "id": "3",
       "position": {
-        "x": 993.6964103605472,
-        "y": 324.3846401804435
+        "x": 848.5505401755281,
+        "y": 333.62119555585383
       },
       "data": {
-        "code": "let message = node_input(new InputBox(\"Hello World\"), \"message\");\n\nlet length = message.length;\nconsole.log(\"消息:\", message, \"长度:\", length);\n\nnode_output(message, \"message\");",
+        "code": "let message = node_input(new InputBox(\"cptbtptp棍母bcptdtptp\"), \"message\");\nlet capPos = node_input(new Slider(0, 0, message.length, 1), \"capPos\");\n\nconst newMessage = ''.concat(\n    message.slice(0, capPos),\n    message.slice(capPos, capPos + 1).toUpperCase(),\n    message.slice(capPos + 1)\n)\n    .replace(/棍母/g, '')\n\nnode_output(newMessage, \"newMessage\");",
         "result": "消息处理中...",
         "width": 595,
         "controls": [
@@ -109,7 +109,7 @@
       "type": "textNode",
       "measured": {
         "width": 595,
-        "height": 419
+        "height": 401
       },
       "selected": false,
       "dragging": false,
@@ -126,8 +126,8 @@
     }
   ],
   "viewport": {
-    "x": 131.82174414488486,
-    "y": 442.1789634044447,
-    "zoom": 0.9999999999999952
+    "x": -166.34606657627762,
+    "y": 282.1937008326808,
+    "zoom": 0.7578582832551953
   }
 }
