@@ -116,11 +116,6 @@ interface InputDelta {
   hasChanges: boolean;
 }
 
-const cloneCanvasEvalInput = (input: CanvasEvalInput): CanvasEvalInput => ({
-  nodes: input.nodes.map(({ id, code }) => ({ id, code })),
-  edges: input.edges.map(({ source, target }) => ({ source, target })),
-});
-
 const cloneCanvasEvalStoreState = (state: CanvasEvalStoreState): CanvasEvalStoreState => ({
   data: Object.entries(state.data).reduce<CanvasEvalData>((acc, [nodeId, node]) => {
     acc[nodeId] = {
@@ -150,21 +145,51 @@ const cloneCanvasEvalStoreState = (state: CanvasEvalStoreState): CanvasEvalStore
   ),
 });
 
-// 计算前后两次输入之间的差异，并推断需要重新计算的节点集合
-// 须满足约束：当前边的 source 和 target 必须是 current 中实际存在的节点
+// 从 lastCompletedState 中提取边信息，用于比较
+const extractEdgesFromState = (state: CanvasEvalStoreState): CanvasEvalInputEdge[] => {
+  const edges: CanvasEvalInputEdge[] = [];
+  Object.entries(state.outgoingBySource).forEach(([source, targets]) => {
+    targets.forEach((target) => {
+      edges.push({ source, target });
+    });
+  });
+  return edges;
+};
+
+// 计算 currentInput 与 lastCompletedState 之间的差异，并推断需要重新计算的节点集合
+// 改为基于 lastCompletedState 而非历史 input 来比较，这样能捕获所有状态变化（包括通过 requestEvaluation 等触发的）
 const resolveInputDelta = (
-  previous: CanvasEvalInput,
-  current: CanvasEvalInput,
+  lastCompletedState: CanvasEvalStoreState | null,
+  currentInput: CanvasEvalInput,
 ): InputDelta => {
-  const prevNodeMap = new Map(previous.nodes.map((node) => [node.id, node]));
-  const currentNodeMap = new Map(current.nodes.map((node) => [node.id, node]));
+  // 如果没有上次完成的状态，则认为所有节点都是新增的
+  if (!lastCompletedState) {
+    const addedNodeIds = currentInput.nodes.map((node) => node.id);
+    const impactedNodeIds = addedNodeIds;
+    return {
+      addedNodeIds,
+      removedNodeIds: [],
+      updatedNodeIds: [],
+      addedEdges: currentInput.edges,
+      removedEdges: [],
+      impactedNodeIds,
+      hasChanges: true,
+    };
+  }
+
+  // 从 lastCompletedState 中提取节点和边信息
+  const prevNodeMap = new Map(
+    Object.entries(lastCompletedState.data).map(([id, nodeData]) => [id, { id, code: nodeData.code }])
+  );
+  const prevEdges = extractEdgesFromState(lastCompletedState);
+  const currentNodeMap = new Map(currentInput.nodes.map((node) => [node.id, node]));
 
   const addedNodeIds: string[] = [];
   const removedNodeIds: string[] = [];
   const updatedNodeIds: string[] = [];
 
   // 逐一检查当前节点，识别新增与修改节点
-  current.nodes.forEach((node) => {
+  currentInput.nodes.forEach((node) => {
     const prev = prevNodeMap.get(node.id);
     if (!prev) {
       addedNodeIds.push(node.id);
@@ -176,25 +201,25 @@ const resolveInputDelta = (
   });
 
   // 找出已经不存在的节点
-  previous.nodes.forEach((node) => {
-    if (!currentNodeMap.has(node.id)) {
-      removedNodeIds.push(node.id);
+  prevNodeMap.forEach((_, nodeId) => {
+    if (!currentNodeMap.has(nodeId)) {
+      removedNodeIds.push(nodeId);
     }
   });
 
-  const prevEdgeSet = new Set(previous.edges.map(createEdgeKey));
-  const currentEdgeSet = new Set(current.edges.map(createEdgeKey));
+  const prevEdgeSet = new Set(prevEdges.map(createEdgeKey));
+  const currentEdgeSet = new Set(currentInput.edges.map(createEdgeKey));
 
   const addedEdges: CanvasEvalInputEdge[] = [];
   const removedEdges: CanvasEvalInputEdge[] = [];
 
-  current.edges.forEach((edge) => {
+  currentInput.edges.forEach((edge) => {
     if (!prevEdgeSet.has(createEdgeKey(edge))) {
       addedEdges.push(edge);
     }
   });
 
-  previous.edges.forEach((edge) => {
+  prevEdges.forEach((edge) => {
     if (!currentEdgeSet.has(createEdgeKey(edge))) {
       removedEdges.push(edge);
     }
@@ -211,13 +236,13 @@ const resolveInputDelta = (
   // 节点被移除时，其下游节点同样需要重新计算
   // （兜底，以防输入数据不良，删除节点时没删除边而遗漏下游节点）
   removedNodeIds.forEach((nodeId) => {
-    const downstream = current.edges.filter((edge) => edge.source === nodeId).map((edge) => edge.target);
+    const downstream = currentInput.edges.filter((edge) => edge.source === nodeId).map((edge) => edge.target);
     downstream.forEach((targetId) => impacted.add(targetId));
   });
 
   // 仅保留当前图中实际存在的节点，避免无效计算
   // （removeEdges 等可能会向 impacted 添加不存在的节点，需要过滤掉）
-  const currentNodeIds = new Set(current.nodes.map((node) => node.id));
+  const currentNodeIds = new Set(currentInput.nodes.map((node) => node.id));
   const impactedNodeIds = Array.from(impacted).filter((id) => currentNodeIds.has(id));
 
   const hasChanges =
@@ -489,7 +514,6 @@ export const useCanvasEval = (input: CanvasEvalInput): CanvasEvalApi => {
   const [store] = useState(() => createEvalStore(currentInput));
 
   const evaluationVersionRef = useRef(0);
-  const lastCompletedInputRef = useRef<CanvasEvalInput | null>(null);
   const lastCompletedStateRef = useRef<CanvasEvalStoreState | null>(null);
 
   if (!lastCompletedStateRef.current) {
@@ -545,79 +569,56 @@ export const useCanvasEval = (input: CanvasEvalInput): CanvasEvalApi => {
   );
 
   useEffect(() => {
-     evaluationVersionRef.current += 1;
-     const currentVersion = evaluationVersionRef.current;
- 
-     const runSyncAndEvaluate = async () => {
-       const currentStateSnapshot = store.getState();
-       const { controlsCache } = useCanvasStore.getState();
-       const baseInput = lastCompletedInputRef.current;
-       const baseState = lastCompletedStateRef.current ?? currentStateSnapshot;
- 
-       if (baseInput) {
-         const delta = resolveInputDelta(baseInput, currentInput);
-         if (!delta.hasChanges) {
-           const restoredState = cloneCanvasEvalStoreState(baseState);
-           store.setState(restoredState);
-           lastCompletedInputRef.current = cloneCanvasEvalInput(currentInput);
-           lastCompletedStateRef.current = cloneCanvasEvalStoreState(restoredState);
-           return;
-         }
- 
-         const nextData = buildNextEvalData(baseState.data, currentInput, delta);
-         const graphIOReprs = buildGraphIOReprs(currentInput.edges);
- 
-         const nextState: CanvasEvalStoreState = {
-           data: nextData,
-           incomingByTarget: graphIOReprs.incoming,
-           outgoingBySource: graphIOReprs.outgoing,
-         };
- 
-         store.setState(nextState);
- 
-         if (!delta.impactedNodeIds.length) {
-           lastCompletedInputRef.current = cloneCanvasEvalInput(currentInput);
-           lastCompletedStateRef.current = cloneCanvasEvalStoreState(nextState);
-           return;
-         }
- 
-         const completedState = await runEvaluationTask(delta.impactedNodeIds, nextState, currentVersion);
-         if (completedState) {
-           store.setState(completedState);
-           lastCompletedInputRef.current = cloneCanvasEvalInput(currentInput);
-           lastCompletedStateRef.current = cloneCanvasEvalStoreState(completedState);
-         }
-         return;
-       }
- 
-       const nextData = createInitialEvalData(currentInput, controlsCache);
-       const graphIOReprs = buildGraphIOReprs(currentInput.edges);
- 
-       const nextState: CanvasEvalStoreState = {
-         data: nextData,
-         incomingByTarget: graphIOReprs.incoming,
-         outgoingBySource: graphIOReprs.outgoing,
-       };
- 
-       store.setState(nextState);
- 
-       const allNodeIds = Object.keys(nextData);
-       if (!allNodeIds.length) {
-         lastCompletedInputRef.current = cloneCanvasEvalInput(currentInput);
-         lastCompletedStateRef.current = cloneCanvasEvalStoreState(nextState);
-         return;
-       }
- 
-       const completedState = await runEvaluationTask(allNodeIds, nextState, currentVersion);
-       if (completedState) {
-         store.setState(completedState);
-         lastCompletedInputRef.current = cloneCanvasEvalInput(currentInput);
-         lastCompletedStateRef.current = cloneCanvasEvalStoreState(completedState);
-       }
-     };
- 
-     runSyncAndEvaluate();
-   }, [store, currentInput, persistControls, runEvaluationTask]);
+    evaluationVersionRef.current += 1;
+    const currentVersion = evaluationVersionRef.current;
+
+    const runSyncAndEvaluate = async () => {
+      const { controlsCache } = useCanvasStore.getState();
+      const baseState = lastCompletedStateRef.current;
+
+      // 基于 lastCompletedState 和 currentInput 计算差异
+      const delta = resolveInputDelta(baseState, currentInput);
+
+      // 如果没有变化，直接恢复上次完成的状态
+      if (!delta.hasChanges && baseState) {
+        const restoredState = cloneCanvasEvalStoreState(baseState);
+        store.setState(restoredState);
+        lastCompletedStateRef.current = cloneCanvasEvalStoreState(restoredState);
+        return;
+      }
+
+      // 构建下一个状态
+      // 如果有 baseState，则进行增量更新；否则进行全量初始化
+      const nextData = baseState
+        ? buildNextEvalData(baseState.data, currentInput, delta)
+        : createInitialEvalData(currentInput, controlsCache);
+
+      const graphIOReprs = buildGraphIOReprs(currentInput.edges);
+
+      const nextState: CanvasEvalStoreState = {
+        data: nextData,
+        incomingByTarget: graphIOReprs.incoming,
+        outgoingBySource: graphIOReprs.outgoing,
+      };
+
+      store.setState(nextState);
+
+      // 如果没有需要重新计算的节点，直接更新 lastCompletedState
+      if (!delta.impactedNodeIds.length) {
+        lastCompletedStateRef.current = cloneCanvasEvalStoreState(nextState);
+        return;
+      }
+
+      // 执行计算任务
+      const completedState = await runEvaluationTask(delta.impactedNodeIds, nextState, currentVersion);
+      if (completedState) {
+        store.setState(completedState);
+        lastCompletedStateRef.current = cloneCanvasEvalStoreState(completedState);
+      }
+    };
+
+    runSyncAndEvaluate();
+  }, [store, currentInput, persistControls, runEvaluationTask]);
 
   const api = useMemo<CanvasEvalApi>(() => {
     const getSnapshot = () => store.getState().data;
