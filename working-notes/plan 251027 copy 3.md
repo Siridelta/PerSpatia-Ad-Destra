@@ -46,17 +46,17 @@ const Canvas = () => {
 
 #### **数据流与三大 Store**
 
-1.  **`persistenceStore` (全局单例)**
+1.  **`canvasPersistenceStore` (全局单例)**
     *   **职责**: 负责将 **单个** 画布的 UI 状态序列化（保存到 LocalStorage）和反序列化（从 LocalStorage 加载）。
     *   **实现**: 一个简单的 Zustand 全局 Store，提供 `saveState(state)` 和 `loadState()` 方法。
-    *   **生命周期**: 它是 **`useCanvasUIData` Hook 的内部实现细节**，由该 Hook 创建和管理。当未来需要支持多个、可切换的画布时，给 useCanvasUIData 传入一个 canvasId，然后让 persistenceStore 支持 loadState(canvasId) 和 saveState(canvasId, state) 即可。
+    *   **生命周期**: 它是 **`useCanvasUIData` Hook 的内部实现细节**，由该 Hook 创建和管理。当未来需要支持多个、可切换的画布时，给 useCanvasUIData 传入一个 canvasId，然后让 canvasPersistenceStore 支持 loadState(canvasId) 和 saveState(canvasId, state) 即可。
 
 2.  **`uiStore` (每个 `<Canvas>` 一个, **内部实现细节**)**
     *   **职责**: 作为用户输入的 **唯一数据源 (Source of Truth)**。管理所有用户可直接编辑的状态，如 `nodes` (及其位置、尺寸、`code` 字符串、用户更改的 `controls` 等), `edges`, `viewport`。
     *   **生命周期**: 它是 **`useCanvasUIData` Hook 的内部实现细节**，由该 Hook 创建和管理。
     *   **交互**:
-        *   初始化时，从 `persistenceStore` 加载状态。
-        *   自身状态变化时，通过 `subscribe` 触发 `persistenceStore` 进行持久化。
+        *   初始化时，从 `canvasPersistenceStore` 加载状态。
+        *   自身状态变化时，通过 `subscribe` 触发 `canvasPersistenceStore` 进行持久化。
         *   通过 `uiDataApi` 和 `CanvasUIDataProvider` 向下层提供。
         *   eval hook 里动态计算的 `controls` 发生变动时，通过 `uiDataApi` 的 `subscribeFromEval` 方法订阅到变化，并更新 `uiStore` 中的 `controls`。
 
@@ -103,7 +103,7 @@ const Canvas = () => {
 
 **目标**: 将现有的全局 `canvasStore` 拆分，实现每个画布实例拥有独立的、可自动存取的 UI 状态。为后续的 `uiDataApi` 提供内部 store 实现。
 
-1.  **创建 `persistenceStore`**:
+1.  **创建 `canvasPersistenceStore`**:
     *   新建一个 Zustand 全局 Store，只包含 `saveState` 和 `loadState` 方法，用于与 `localStorage` 交互。
 
 2.  **改造 `canvasStore` 为 `createUIStore`**:
@@ -112,8 +112,8 @@ const Canvas = () => {
 
 3.  **（此阶段可选，可合并到阶段3）创建 `UIStoreProvider` 和 `useUIStore`**:
     *   为了平滑过渡，可以先创建一个临时的 `UIStoreProvider`。它将在内部创建并持有一个 `uiStore` 实例。
-    *   在首次挂载时，`UIStoreProvider` 从 `persistenceStore` 加载数据来初始化自己的 `uiStore`。
-    *   使用 `uiStore.subscribe()` 监听变化，并在每次变化后调用 `persistenceStore` 的 `saveState` 方法。
+    *   在首次挂载时，`UIStoreProvider` 从 `canvasPersistenceStore` 加载数据来初始化自己的 `uiStore`。
+    *   使用 `uiStore.subscribe()` 监听变化，并在每次变化后调用 `canvasPersistenceStore` 的 `saveState` 方法。
     *   通过 React Context 将 `uiStore` 实例提供出去，让现有组件可以先迁移到 `useUIStore()`。
 
 **阶段产出**:
@@ -128,7 +128,7 @@ const Canvas = () => {
 **目标**: 将求值逻辑与 UI 逻辑完全剥离，各自封装在优雅的 API 背后，并在顶层组件中显式连接实现同步。
 
 1.  **创建 `useCanvasUIData` 和 `useCanvasEval` Hooks**:
-    *   **`useCanvasUIData`**: 内部使用 `createUIStore` 工厂函数创建 `uiStore` 实例，并与 `persistenceStore` 连接。返回一个包含 `subscribeFromEval`, `subscribeData`, `addNode` 等方法的 `uiDataApi` 对象。
+    *   **`useCanvasUIData`**: 内部使用 `createUIStore` 工厂函数创建 `uiStore` 实例，并与 `canvasPersistenceStore` 连接。返回一个包含 `subscribeFromEval`, `subscribeData`, `addNode` 等方法的 `uiDataApi` 对象。
     *   **`useCanvasEval`**: 内部创建 `evalStore`。返回一个包含 `subscribeFromUI`, `subscribeData`, `updateNodeControls` 等方法的 `evalApi` 对象。
 
 2.  **实现相互订阅逻辑**:

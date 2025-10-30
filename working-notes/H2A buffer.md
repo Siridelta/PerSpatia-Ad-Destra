@@ -50,3 +50,149 @@ node_output(a, "ab")
 以及在这里也有一个类似的逻辑，@DualLayerCodeEditor.tsx ，它这里输入的是initalText而不是text，这其实也是一个很勉强的办法，因为它本意是想避免逆向set text之后text的变化从上面传下来然后引发CodeEditor再次重新渲染什么的（当然这个担忧其实没有必要，因为其实字符串之间只要内容相等就能通过全等比较===，但是是这个场景启发了我应该做下面的事情）
 所以这时候假如没有这个场景里特有的字符串全等不会触发重新渲染的比较幸运的机制，那么该怎么办？传入text - 反写text，传入code - 反写code，传入controls - 反写controls，同时都避免二次计算（that is，”我自己主动发起的更新我内部肯定早准备好了，不需要react再按照它的原则上游更新必触发下游更新的原则再更新我一次了“），这三个场景其实本质都一样，我也想到一个不知道算好不好的解法：对于每一块想要能被反向回写且避免二次更新的输入组分，像useCanvasEval-v-usePrevious一样维护一个previous state（上次记录），但是再稍稍改造一下，如果上次更新时做出了应等效于反写的操作，那么这个历史值就应该也变成新值，比如如果是输入了controls但是我算完之后自己也得更新controls，那么记录的历史里面就应该是新的controls了，这样向上游反写完之后上游更新下来的时候跟历史缓存记录比对的时候，会发现，诶，历史记录也是新值，不用修改。当然这样会让我们的概念在语义上失真了，历史不是真的历史，我们”岁月史书“了，而且另外一方面我们原则上也不能直接变动历史输入值，因为这样相当于直接对它内部进行mutate，会导致。。。。。如果这个输入对象体在输入我们这边之前在上游里也被其他东西依赖着，我们改它了，会导致很多出乎意料的影响。。。。。。所以或许更合理的做法是维护一个”第三版本“，不知道起什么名好，期望值？expectation？
 以上，就是我对这个问题的一些比较个人的想法以及一个把它抽象化并设计的一个通用的解决方案。你觉得如何？
+
+
+
+
+---
+
+
+啊，那就把数据同步逻辑显式写在Canvas组件里吧
+但是我们关于订阅的理解是否有偏差，一定要把数据处理逻辑写在subscribe里面的回调函数吗，不能直接写在组件主函数本体里吗
+我理解的订阅更多是包装zustand的useStore hook，这个hook一调用一次，就建立了一个能给组件带来被触发重计算可能的连接。
+然后我的构想是这样的：
+
+```javascript
+const Canvas = () => {
+  const uiDataApi = useCanvasUIData();
+  const evalApi = useCanvasEval();
+
+  // 命名可能并非最好
+  const uiData = uiDataApi.useUIData();  // 间接订阅到 uiDataStore
+  useEffect(() => {
+    const evalUpdateFromUIData = makeEvalUpdateFromUIData(uiData); // 数据加工
+    evalApi.updateFromUIData(evalUpdateUIData); // 如果解析出实际变动则触发内部setDelta
+  }, [uiData]);
+
+  const evalData = evalApi.useEvalData();  // 间接订阅到 evalStore
+  useEffect(() => {
+    const uiDataUpdateFromEvalData = makeUIDataUpdateFromEvalData(evalData) // 数据加工
+    uiDataApi.updateFromEvalData(uiDataUpdateFromEvalData);  // 如果解析出实际变动则触发内部setDelta
+  }, [evalData]);
+  
+  return (
+    <CanvasUIDataProvider api={uiDataApi}>
+      <CanvasEvalProvider api={evalApi}>
+        <CanvasUI />
+      </CanvasEvalProvider>
+    </CanvasUIDataProvider>
+  );
+};
+```
+
+useCanvasEval内部大概这样：
+
+```javascript
+const prevUIDataUpdate = useRef(...);    // 上次update送来的全量数据
+const [uiDataDelta, setUIDataDelta] = useState(...);      // 计算得到的delta，delta as state被set则触发重计算
+const evalStoreRef = useRef();
+if(!evalStoreRef.current) {
+  evalStoreRef.current = createStore(...);
+}
+const evalStore = evalStoreRef.current;
+
+useEffect(() => {
+  if(uiDataDelta.hasChanges) {
+   // 重计算，读prevUIDataUpdate
+   // 计算结果写入evalStore
+  }
+}, [uiDataDelta]);
+
+const useEvalData = () => useStore(evalStoreRef.current, useShallow({...}))
+// useShallow 可以在 Array 对象内部第1层进行比较，而非直接比较 Array 对象本身
+const resolveUIDataDelta = (uiDataUpdate, prevUIDataUpdate) => { ... return delta; };
+const updateFromUIData = (uiDataUpdate) => {
+  const delta = resolveUIDataDelta(uiDataUpdate, prevUIDataUpdate);
+  if(delta.hasChanges) { setUIDataDelta(delta) };
+};
+
+// ... other facade hooks & normal functionss
+
+return {
+  useEvalData,
+  updateFromUIData,
+  // ....
+};
+```
+
+这里我觉得它应该是不会把Canvas组件重渲染的吧，只是触发了组件函数的重新执行而已，而增量更新逻辑可以在迭代到“判断无实际更新”后停止写入store，也就停止了zustand触发Canvas组件函数重新执行。而向下传的api对象都是稳定的，自然不会触发ui重渲染吧
+
+但是刚才你的另一个平行实例也把subscribe方案改的很好，精简了api面：
+
+```javascript
+const Canvas = () => {
+  const uiDataApi = useCanvasUIData();
+  const evalApi = useCanvasEval();
+
+  useEffect(() => {
+    // Canvas 只负责发出“连接”指令
+    // 所有复杂的订阅、delta计算、同步逻辑都被封装在了 connectToXXX 方法内部
+    const unsubscribeEvalFromUI = evalApi.subscribeFromUI(uiDataApi);
+    const unsubscribeUIFromEval = uiDataApi.subscribeFromEval(evalApi);
+
+    // 返回一个清理函数，在组件卸载时断开所有连接
+    return () => {
+      unsubscribeEvalFromUI();
+      unsubscribeUIFromEval();
+    };
+  }, [uiDataApi, evalApi]);
+  
+  return (
+    <CanvasUIDataProvider api={uiDataApi}>
+      <CanvasEvalProvider api={evalApi}>
+        <CanvasUI />
+      </CanvasEvalProvider>
+    </CanvasUIDataProvider>
+  );
+};
+
+// 在 useCanvasUIData 钩子内部...
+const uiDataApi = useMemo(() => ({
+  // ... 其他 API
+  
+  // 提供一个专门用于连接对方的方法
+  subscribeFromEval: (evalApi) => {
+    // 内部调用 store.subscribe
+    const unsubscribe = evalApi.subscribeData((evalData, prevEvalData) => {
+        // resolveDelta 和 sync 的逻辑完全封装在内部
+        const delta = resolveEvalDataDelta(evalData, prevEvalData);
+        if (delta.hasChanges) {
+            syncFromEval(delta);
+        }
+    });
+    return unsubscribe; // 返回清理函数
+  },
+
+  subscribeData: (callback) => {
+    return uiDataStore.subscribe((state) => toUIData(state), callback); // uiDataStore 上有 subscribeWithSelector 中间件，才能用这种 subscribe API
+  }
+}), []);
+
+
+// 在 useCanvasEval 钩子内部，也是对称的...
+const evalApi = useMemo(() => ({
+    // ...
+    subscribeFromUI: (uiDataApi) => {
+        const unsubscribe = uiDataApi.subscribeData((uiData, prevUIData) => {
+            const delta = resolveUIDataDelta(uiData, prevUIData);
+            if(delta.hasChanges) {
+                evalAndSyncFromUI(delta, uiData);
+            }
+        });
+        return unsubscribe;
+    },
+    subscribeData: (callback) => {
+        return evalDataStore.subscribe((state) => toEvalData(state), callback); 
+    }
+}), []);
+```
