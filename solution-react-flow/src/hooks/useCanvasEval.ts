@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useRef } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { createStore } from 'zustand/vanilla';
 import { useStore } from 'zustand';
 import { immer } from 'zustand/middleware/immer';
@@ -249,7 +249,7 @@ const collectEvaluationScope = (
 ) => {
   const existingNodeIds = new Set(Object.keys(state.data));
   const scope = new Set<string>();
-  const discoveryOrder: string[] = [];
+  const discoveryOrder: string[] = [];   // image of queue, sync operates with it, but without shifts
   const queue: string[] = [];
 
   entryNodeIds.forEach((nodeId) => {
@@ -275,6 +275,7 @@ const collectEvaluationScope = (
   return { scope, discoveryOrder };
 };
 
+// 目前暂时使用简单串行执行的计划方式
 const createEvaluationPlan = (
   entryNodeIds: string[],
   state: CanvasEvalStoreState,
@@ -284,6 +285,10 @@ const createEvaluationPlan = (
     return { scope, order: [] as string[] };
   }
 
+  // discoveryOrder 里保证：一个节点要么是 entry，要么前方出现至少一个它的 scope 内上游依赖节点
+  // 但真正的执行顺序 (plan.order) 需要保证一个非 entry 节点前方出现它的所有 scope 内上游依赖节点，之后再执行它自己
+
+  // 1. 寻找 scope 里入度为 0 的节点，加入队列；这不等于被选定为 entry 的节点范围，因为 entry 节点也可能有(scope 内的)入度
   const inDegree = new Map<string, number>();
   scope.forEach((nodeId) => {
     const incoming = state.incomingByTarget[nodeId] || [];
@@ -299,6 +304,7 @@ const createEvaluationPlan = (
     if ((inDegree.get(nodeId) ?? 0) === 0) queue.push(nodeId);
   });
 
+  // 2. 使用队列出/入循环，来构建一个能保证"计划里每个节点前方必出现它的所有 scope 内上游依赖节点"的执行顺序
   const order: string[] = [];
   const localInDegree = new Map(inDegree);
   while (queue.length) {
@@ -448,11 +454,7 @@ export const useCanvasEval = (input: CanvasEvalInput): CanvasEvalApi => {
   const currentInput = input;
 
   // 内部 evaluation store（每个 Canvas 单独实例）
-  const storeRef = useRef<ReturnType<typeof createEvalStore>>(null);
-  if (!storeRef.current) {
-    storeRef.current = createEvalStore(currentInput);
-  }
-  const store = storeRef.current;
+  const [store] = useState(() => createEvalStore(currentInput));
 
   // CanvasStore 中的 controls 缓存，用于尽量持久化 controls 状态
   const setNodeControlsCache = useCanvasStore((state) => state.setNodeControlsCache);
@@ -466,6 +468,40 @@ export const useCanvasEval = (input: CanvasEvalInput): CanvasEvalApi => {
 
   const evaluationVersionRef = useRef(0);
 
+  const runEvaluationTask = useCallback(
+    async (entryNodeIds: string[], baseState: CanvasEvalStoreState, version: number) => {
+      if (!entryNodeIds.length) {
+        return;
+      }
+
+      const plan = createEvaluationPlan(entryNodeIds, baseState);
+      if (!plan.order.length) {
+        return;
+      }
+
+      const interimResults = await runEvaluationPlan(
+        plan,
+        baseState,
+        evaluationVersionRef,
+        version,
+        persistControls,
+      );
+
+      if (!interimResults || evaluationVersionRef.current !== version) {
+        return;
+      }
+
+      const nextState = produce(baseState, (draft) => {
+        interimResults.forEach((result, nodeId) => {
+          draft.data[nodeId] = result;
+        });
+      });
+
+      store.setState(nextState);
+    },
+    [store, persistControls],
+  );
+
   useEffect(() => {
     evaluationVersionRef.current += 1;
     const currentVersion = evaluationVersionRef.current;
@@ -474,71 +510,52 @@ export const useCanvasEval = (input: CanvasEvalInput): CanvasEvalApi => {
       const currentStateSnapshot = store.getState();
       const { controlsCache } = useCanvasStore.getState();
 
-      let nextData = currentStateSnapshot.data;
-      let impactedNodeIds: string[] = [];
-
       if (previousInput) {
         const delta = resolveInputDelta(previousInput, currentInput);
         if (!delta.hasChanges) {
           return;
         }
 
-        nextData = buildNextEvalData(currentStateSnapshot.data, currentInput, delta);
-        impactedNodeIds = delta.impactedNodeIds;
+        const nextData = buildNextEvalData(currentStateSnapshot.data, currentInput, delta);
+        const graphIOReprs = buildGraphIOReprs(currentInput.edges);
+
+        const nextState: CanvasEvalStoreState = {
+          data: nextData,
+          incomingByTarget: graphIOReprs.incoming,
+          outgoingBySource: graphIOReprs.outgoing,
+        };
+
+        store.setState(nextState);
+
+        if (!delta.impactedNodeIds.length) {
+          return;
+        }
+
+        await runEvaluationTask(delta.impactedNodeIds, nextState, currentVersion);
+        
       } else {
-        nextData = createInitialEvalData(currentInput, controlsCache);
-        impactedNodeIds = Object.keys(nextData);
+        const nextData = createInitialEvalData(currentInput, controlsCache);
+        const graphIOReprs = buildGraphIOReprs(currentInput.edges);
+
+        const nextState: CanvasEvalStoreState = {
+          data: nextData,
+          incomingByTarget: graphIOReprs.incoming,
+          outgoingBySource: graphIOReprs.outgoing,
+        };
+
+        store.setState(nextState);
+
+        const allNodeIds = Object.keys(nextData);
+        if (!allNodeIds.length) {
+          return;
+        }
+
+        await runEvaluationTask(allNodeIds, nextState, currentVersion);
       }
-
-      const graphIOReprs = buildGraphIOReprs(currentInput.edges);
-
-      store.setState({
-        data: nextData,
-        incomingByTarget: graphIOReprs.incoming,
-        outgoingBySource: graphIOReprs.outgoing,
-      });
-
-      if (!impactedNodeIds.length) {
-        return;
-      }
-
-      const stateForPlanning = store.getState();
-      const plan = createEvaluationPlan(impactedNodeIds, stateForPlanning);
-
-      if (!plan.order.length) {
-        return;
-      }
-
-      store.setState((draft) => {
-        plan.order.forEach((nodeId) => {
-          const node = draft.data[nodeId];
-          if (!node) return;
-          node.isEvaluating = true;
-        });
-      });
-
-      const executionSnapshot = store.getState();
-
-      const interimResults = await runEvaluationPlan(
-        plan,
-        executionSnapshot,
-        evaluationVersionRef,
-        currentVersion,
-        persistControls,
-      );
-      if (!interimResults || evaluationVersionRef.current !== currentVersion) {
-        return;
-      }
-
-      store.setState((draft) => {
-        interimResults.forEach((result, nodeId) => {
-          draft.data[nodeId] = result;
-        });
-      });
     };
 
     runSyncAndEvaluate();
-  }, [store, previousInput, currentInput, persistControls]);
+  }, [store, previousInput, currentInput, persistControls, runEvaluationTask]);
 
   const api = useMemo<CanvasEvalApi>(() => {
     const getSnapshot = () => store.getState().data;
@@ -552,31 +569,9 @@ export const useCanvasEval = (input: CanvasEvalInput): CanvasEvalApi => {
       evaluationVersionRef.current += 1;
       const currentVersion = evaluationVersionRef.current;
 
-      const latestState = store.getState();
-      const plan = createEvaluationPlan(entryNodeIds, latestState);
+      const baseState = store.getState();
 
-      if (!plan.order.length) {
-        return;
-      }
-
-      store.setState((draft) => {
-        plan.order.forEach((nodeId) => {
-          const node = draft.data[nodeId];
-          if (!node) return;
-          node.isEvaluating = true;
-        });
-      });
-
-      const interimResults = await runEvaluationPlan(plan, store.getState(), evaluationVersionRef, currentVersion, persistControls);
-      if (!interimResults || evaluationVersionRef.current !== currentVersion) {
-        return;
-      }
-
-      store.setState((draft) => {
-        interimResults.forEach((result, nodeId) => {
-          draft.data[nodeId] = result;
-        });
-      });
+      await runEvaluationTask(entryNodeIds, baseState, currentVersion);
     };
 
     const updateNodeControls = async (nodeId: string, nextValues: Record<string, unknown>) => {
@@ -660,7 +655,7 @@ export const useCanvasEval = (input: CanvasEvalInput): CanvasEvalApi => {
       evaluateNode,
       evaluateAll,
     };
-  }, [store, persistControls]);
+  }, [store, persistControls, runEvaluationTask]);
 
   return api;
 };
