@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { useCallback, useMemo, useRef, useState } from 'react';
 import { createStore } from 'zustand/vanilla';
 import { useStore } from 'zustand';
 import { immer } from 'zustand/middleware/immer';
@@ -58,13 +58,12 @@ export interface CanvasEvalApi {
   // 订阅方法
   subscribeFromUI: (uiDataApi: CanvasUIDataApi) => () => void;
   subscribeData: (callback: (data: CanvasEvalData, prevData?: CanvasEvalData) => void) => () => void;
-  
+
   // 数据访问方法
   getSnapshot: () => CanvasEvalData;
   useEvalStore: <T>(selector: (state: CanvasEvalData) => T) => T;
-  
+
   // 计算控制方法
-  syncGraph: (input: CanvasEvalInput) => Promise<void>;
   evaluateNode: (nodeId: string) => Promise<void>;
   evaluateAll: () => Promise<void>;
 }
@@ -123,34 +122,34 @@ interface InputDelta {
   hasChanges: boolean;
 }
 
-const cloneCanvasEvalStoreState = (state: CanvasEvalStoreState): CanvasEvalStoreState => ({
-  data: Object.entries(state.data).reduce<CanvasEvalData>((acc, [nodeId, node]) => {
-    acc[nodeId] = {
-      code: node.code,
-      isEvaluating: node.isEvaluating,
-      controls: node.controls.map((control) => ({ ...control })),
-      outputs: { ...node.outputs },
-      logs: [...node.logs],
-      errors: node.errors.map((error) => ({ ...error })),
-      warnings: node.warnings.map((warning) => ({ ...warning })),
-    };
-    return acc;
-  }, {}),
-  incomingByTarget: Object.entries(state.incomingByTarget).reduce<Record<string, string[]>>(
-    (acc, [targetId, sources]) => {
-      acc[targetId] = [...sources];
-      return acc;
-    },
-    {},
-  ),
-  outgoingBySource: Object.entries(state.outgoingBySource).reduce<Record<string, string[]>>(
-    (acc, [sourceId, targets]) => {
-      acc[sourceId] = [...targets];
-      return acc;
-    },
-    {},
-  ),
-});
+// const cloneCanvasEvalStoreState = (state: CanvasEvalStoreState): CanvasEvalStoreState => ({
+//   data: Object.entries(state.data).reduce<CanvasEvalData>((acc, [nodeId, node]) => {
+//     acc[nodeId] = {
+//       code: node.code,
+//       isEvaluating: node.isEvaluating,
+//       controls: node.controls.map((control) => ({ ...control })),
+//       outputs: { ...node.outputs },
+//       logs: [...node.logs],
+//       errors: node.errors.map((error) => ({ ...error })),
+//       warnings: node.warnings.map((warning) => ({ ...warning })),
+//     };
+//     return acc;
+//   }, {}),
+//   incomingByTarget: Object.entries(state.incomingByTarget).reduce<Record<string, string[]>>(
+//     (acc, [targetId, sources]) => {
+//       acc[targetId] = [...sources];
+//       return acc;
+//     },
+//     {},
+//   ),
+//   outgoingBySource: Object.entries(state.outgoingBySource).reduce<Record<string, string[]>>(
+//     (acc, [sourceId, targets]) => {
+//       acc[sourceId] = [...targets];
+//       return acc;
+//     },
+//     {},
+//   ),
+// });
 
 // 从 lastCompletedState 中提取边信息，用于比较
 const extractEdgesFromState = (state: CanvasEvalStoreState): CanvasEvalInputEdge[] => {
@@ -211,14 +210,14 @@ const resolveInputDelta = (
       if (prevNodeData) {
         const prevControls = prevNodeData.controls || [];
         const currentControls = node.controls || [];
-        
+
         // 创建 control 值的映射，便于比较
         const prevValuesMap = new Map(prevControls.map(c => [c.name, c.value]));
         const currentValuesMap = new Map(currentControls.map(c => [c.name, c.value]));
-        
+
         // 检查是否有值的变化
         let hasValueChange = false;
-        
+
         // 检查当前 controls 是否有值变化
         for (const [name, value] of currentValuesMap.entries()) {
           if (prevValuesMap.get(name) !== value) {
@@ -226,7 +225,7 @@ const resolveInputDelta = (
             break;
           }
         }
-        
+
         // 如果 prevControls 中有 control 在当前 controls 中不存在，也算变化
         if (!hasValueChange) {
           for (const [name] of prevValuesMap.entries()) {
@@ -236,7 +235,7 @@ const resolveInputDelta = (
             }
           }
         }
-        
+
         if (hasValueChange) {
           updatedNodeIds.push(node.id);
         }
@@ -547,7 +546,6 @@ const createEvalStore = () => {
     })),
   );
 };
-type EvalStore = ReturnType<typeof createEvalStore>;
 
 export const useCanvasEval = (): CanvasEvalApi => {
   // 内部 evaluation store（每个 Canvas 单独实例）
@@ -555,10 +553,6 @@ export const useCanvasEval = (): CanvasEvalApi => {
 
   const evalTaskVerRef = useRef(0);
   const lastCompletedStateRef = useRef<CanvasEvalStoreState | null>(null);
-
-  if (!lastCompletedStateRef.current) {
-    lastCompletedStateRef.current = cloneCanvasEvalStoreState(store.getState());
-  }
 
   const runEvaluationTask = useCallback(
     async (
@@ -608,9 +602,8 @@ export const useCanvasEval = (): CanvasEvalApi => {
 
       // 如果没有变化，直接恢复上次完成的状态
       if (!delta.hasChanges && baseState) {
-        const restoredState = cloneCanvasEvalStoreState(baseState);
-        store.setState(restoredState);
-        lastCompletedStateRef.current = cloneCanvasEvalStoreState(restoredState);
+        lastCompletedStateRef.current = baseState;
+        store.setState(baseState);
         return;
       }
 
@@ -628,19 +621,20 @@ export const useCanvasEval = (): CanvasEvalApi => {
         outgoingBySource: graphIOReprs.outgoing,
       };
 
-      store.setState(nextState);
-
       // 如果没有需要重新计算的节点，直接更新 lastCompletedState
+      // lastCompletedState 一定要在 store.setState 之前更新，因为 store.setState 是**同步**的，会触发 UI 组件重新渲染，并可能回传到这里
+      // 如果 lastCompletedState 没有及时更新，则 delta 无法计算为空，导致继续计算，无限循环
       if (!delta.impactedNodeIds.length) {
-        lastCompletedStateRef.current = cloneCanvasEvalStoreState(nextState);
+        lastCompletedStateRef.current = nextState;
+        store.setState(nextState);
         return;
       }
 
       // 执行计算任务
       const completedState = await runEvaluationTask(delta.impactedNodeIds, nextState, currentVersion);
       if (completedState) {
+        lastCompletedStateRef.current = completedState;
         store.setState(completedState);
-        lastCompletedStateRef.current = cloneCanvasEvalStoreState(completedState);
       }
     },
     [store, runEvaluationTask]
@@ -656,7 +650,7 @@ export const useCanvasEval = (): CanvasEvalApi => {
     const subscribeFromUI = (uiDataApi: CanvasUIDataApi): (() => void) => {
 
       // 订阅 UI 数据变化
-      const unsubscribe = uiDataApi.subscribeData((uiData, prevUIData) => {
+      const unsubscribe = uiDataApi.subscribeData((uiData) => {
         // 转换 UI 数据为 EvalInput，从节点数据中读取 controls
         const currentInput: CanvasEvalInput = {
           nodes: uiData.nodes.map((node) => {
@@ -703,8 +697,8 @@ export const useCanvasEval = (): CanvasEvalApi => {
       const baseState = store.getState();
       const completedState = await runEvaluationTask(entryNodeIds, baseState, currentVersion);
       if (completedState) {
+        lastCompletedStateRef.current = completedState;
         store.setState(completedState);
-        lastCompletedStateRef.current = cloneCanvasEvalStoreState(completedState);
       }
     };
 
@@ -717,43 +711,11 @@ export const useCanvasEval = (): CanvasEvalApi => {
       await requestEvaluation(ids);
     };
 
-    const syncGraph = async (nextInput: CanvasEvalInput) => {
-      const current = store.getState();
-      const nextData: CanvasEvalData = {};
-
-      nextInput.nodes.forEach(({ id, code, controls }) => {
-        const prev = current.data[id];
-        if (prev) {
-          nextData[id] = {
-            ...prev,
-            code,
-            controls: controls ? mergeControls(prev.controls, controls) : prev.controls,
-          };
-        } else {
-          nextData[id] = {
-            ...createInitialNodeData(code),
-            controls: controls ? controls.map((control) => ({ ...control })) : [],
-          };
-        }
-      });
-
-      const maps = buildGraphIOReprs(nextInput.edges);
-
-      store.setState({
-        data: nextData,
-        incomingByTarget: maps.incoming,
-        outgoingBySource: maps.outgoing,
-      });
-
-      await requestEvaluation(Object.keys(nextData));
-    };
-
     return {
       subscribeFromUI,
       subscribeData,
       getSnapshot,
       useEvalStore,
-      syncGraph,
       evaluateNode,
       evaluateAll,
     };

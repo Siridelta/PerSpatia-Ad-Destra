@@ -13,7 +13,7 @@ import {
   applyEdgeChanges
 } from '@xyflow/react';
 import '@xyflow/react/dist/style.css';
-import React, { useCallback, useEffect, useMemo } from 'react';
+import React, { useCallback, useEffect } from 'react';
 
 import BottomToolbar from '@/components/BottomToolbar';
 import FloatingEdge from '@/components/CustomEdge';
@@ -32,6 +32,7 @@ import { CanvasEdge, CanvasNode, TextNodeType } from '@/types/canvas';
 import useInertialPan from '@/utils/useInertialPan';
 import CustomConnectionLine from './CustomConnectionLine';
 import './styles.css';
+import { produce } from 'immer';
 
 // 注册自定义节点类型
 const nodeTypes: NodeTypes = {
@@ -54,7 +55,7 @@ const CanvasInner: React.FC = () => {
   useEffect(() => {
     // Eval 订阅 UI 的变化（主要是 controls）
     const unsubscribeEvalFromUI = evalApi.subscribeFromUI(uiDataApi);
-    
+
     // UI 订阅 Eval 的变化
     const unsubscribeUIFromEval = uiDataApi.subscribeFromEval(evalApi);
 
@@ -168,11 +169,7 @@ const CanvasInner: React.FC = () => {
       window.removeEventListener('keydown', handleKeyDown, true);
       document.removeEventListener('mousedown', handleMouseDown);
     };
-  }, [
-    setActiveTool, activeTool, setConnectionStartNode,
-    uiDataApi.removeNode, uiDataApi.removeEdge,
-    nodes, edges,
-  ]);
+  }, [setActiveTool, activeTool, setConnectionStartNode, uiDataApi, nodes, edges]);
 
   // 复用的创建新节点函数
   const createTextNode = useCallback((position: { x: number; y: number }): TextNodeType => ({
@@ -201,7 +198,7 @@ const CanvasInner: React.FC = () => {
     uiDataApi.resetToDefault();
     setActiveTool('select');
     setConnectionStartNode(null);
-  }, [uiDataApi.resetToDefault, setActiveTool, setConnectionStartNode]);
+  }, [uiDataApi, setActiveTool, setConnectionStartNode]);
 
   // 处理画布空白点击事件
   const handlePaneClick = useCallback((event: React.MouseEvent) => {
@@ -218,7 +215,7 @@ const CanvasInner: React.FC = () => {
       const newNode = createTextNode(position);
       uiDataApi.addNode(newNode);
     }
-  }, [activeTool, screenToFlowPosition, createTextNode, uiDataApi.addNode, setActiveTool]);
+  }, [activeTool, screenToFlowPosition, createTextNode, uiDataApi, setActiveTool]);
 
   // 处理连接事件
   const onConnect = useCallback((connection: Connection) => {
@@ -244,7 +241,7 @@ const CanvasInner: React.FC = () => {
     if (activeTool === 'connect') {
       setActiveTool('select');
     }
-  }, [uiDataApi.addEdge, setConnectionStartNode, activeTool, setActiveTool, evalApi.evaluateNode]);
+  }, [uiDataApi, setConnectionStartNode, activeTool, setActiveTool, evalApi]);
 
   // 处理节点点击（用于连接模式）
   const onNodeClick = useCallback((event: React.MouseEvent, node: Node) => {
@@ -276,7 +273,7 @@ const CanvasInner: React.FC = () => {
         setActiveTool('select');
       }
     }
-  }, [activeTool, connectionStartNode, setConnectionStartNode, uiDataApi.addEdge, setActiveTool, evalApi.evaluateNode]);
+  }, [activeTool, connectionStartNode, setConnectionStartNode, uiDataApi, setActiveTool, evalApi]);
 
   // 导出画布数据
   const handleExport = useCallback(() => {
@@ -290,7 +287,7 @@ const CanvasInner: React.FC = () => {
     link.download = 'canvas-data.json';
     link.click();
     URL.revokeObjectURL(url);
-  }, [uiDataApi.exportCanvasData]);
+  }, [uiDataApi]);
 
   // 导入并替换画布数据
   const handleImportReplace = useCallback(async () => {
@@ -320,7 +317,7 @@ const CanvasInner: React.FC = () => {
       console.error('导入画布失败:', error);
       alert(error instanceof Error ? error.message : '导入失败');
     }
-  }, [uiDataApi.importCanvasData]);
+  }, [uiDataApi]);
 
   // 导入并添加节点到画布
   const handleImportAdd = useCallback(async () => {
@@ -353,7 +350,7 @@ const CanvasInner: React.FC = () => {
       console.error('导入节点失败:', error);
       alert(error instanceof Error ? error.message : '导入失败');
     }
-  }, [nodes, edges, uiDataApi.importCanvasData]);
+  }, [nodes, edges, uiDataApi]);
 
   // 连接线样式
   const connectionLineStyle = {
@@ -367,7 +364,7 @@ const CanvasInner: React.FC = () => {
     type: 'custom',
   };
 
-  
+
 
   /*
   *      ----------- 组件结构 ------------
@@ -380,7 +377,19 @@ const CanvasInner: React.FC = () => {
           <ReactFlow
             nodes={nodes}
             edges={edges}
-            onNodesChange={(changes) => uiDataApi.setNodes(applyNodeChanges(changes, nodes))}
+            onNodesChange={(changes) =>
+              uiDataApi.setNodes(
+                applyNodeChanges(
+                  changes,
+                  nodes.map((node) => {
+                    if (node.measured) {
+                      return { ...node, measured: { ...node.measured } }
+                    }
+                    return node;
+                  })
+                )
+              )
+            }
             onEdgesChange={(changes) => uiDataApi.setEdges(applyEdgeChanges(changes, edges))}
             onConnect={onConnect}
             onPaneClick={handlePaneClick}

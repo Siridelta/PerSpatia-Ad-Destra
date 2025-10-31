@@ -1,23 +1,23 @@
 import React, { useMemo } from 'react';
-import { useCanvasState } from '@/hooks/useCanvasState';
+import { useCanvasUIData } from '@/hooks/useCanvasUIData';
 
 interface ExportableOutputInfo {
   name: string;
-  value: any;
+  value: unknown;
   isExportable: boolean;
   reason?: string;
 }
 
 export interface OutputDisplayProps {
-  outputs: Record<string, any>;
+  outputs: Record<string, unknown>;
   isAnimatingOut?: boolean;
   nodeId: string;
 }
 
 const OutputDisplay: React.FC<OutputDisplayProps> = ({ outputs, isAnimatingOut = false, nodeId }) => {
-  if (Object.keys(outputs).length === 0) return null;
 
-  const { createDesmosPreviewNode, updateDesmosPreviewState, desmosPreviewLinks } = useCanvasState();
+  const { createDesmosPreviewNode, updateDesmosPreviewState, useUIData } = useCanvasUIData();
+  const desmosPreviewLinks = useUIData((data) => data.desmosPreviewLinks);
 
   const exportableOutputs = useMemo<ExportableOutputInfo[]>(() => {
     return Object.entries(outputs).map(([name, value]) => {
@@ -36,7 +36,7 @@ const OutputDisplay: React.FC<OutputDisplayProps> = ({ outputs, isAnimatingOut =
   const handleExport = (info: ExportableOutputInfo) => {
     if (!info.isExportable) return;
 
-    const resolvedSourceNodeId = info.value?._sourceNodeId ?? nodeId;
+    const resolvedSourceNodeId = (info.value as { _sourceNodeId?: string })?._sourceNodeId ?? nodeId;
 
     const existingLink = desmosPreviewLinks?.[resolvedSourceNodeId];
     if (existingLink) {

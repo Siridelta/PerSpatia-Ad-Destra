@@ -8,7 +8,15 @@
       },
       "data": {
         "code": "let speed = node_input(new Slider(50, 0, 100, 1), \"speed\");\nlet name = node_input(new InputBox(\"测试\"), \"name\");\nlet enabled = node_input(new Switch(true), \"enabled\");\n\nlet result = speed * 2;\nconsole.log(\"速度:\", speed, \"名称:\", name, \"启用:\", enabled);\n\nnode_output(result, \"result\");",
-        "result": "结果计算中...",
+        "autoResizeWidth": true,
+        "nodeName": "",
+        "isCollapsed": false,
+        "hiddenSections": {
+          "inputs": false,
+          "outputs": false,
+          "logs": false,
+          "errors": false
+        },
         "width": 575,
         "controls": [
           {
@@ -32,15 +40,7 @@
             "defaultValue": true,
             "value": true
           }
-        ],
-        "outputs": {
-          "output_0": 100
-        },
-        "consoleLogs": [
-          "速度: 50 名称: 测试 启用: true"
-        ],
-        "errors": [],
-        "warnings": []
+        ]
       },
       "type": "textNode",
       "measured": {
@@ -59,17 +59,17 @@
       },
       "data": {
         "code": "let result = node_input(\"result\");\n\nlet doubled = result * 2;\nconsole.log(`结果的两倍是: ${doubled}`);\n\nnode_output(doubled, \"doubled\");",
-        "result": "doubled计算中...",
+        "autoResizeWidth": true,
+        "nodeName": "节点2",
+        "isCollapsed": false,
+        "hiddenSections": {
+          "inputs": false,
+          "outputs": false,
+          "logs": false,
+          "errors": false
+        },
         "width": 400,
-        "errors": [
-          {
-            "message": "result is not defined",
-            "line": 2,
-            "column": 15,
-            "stack": "ReferenceError: result is not defined\n    at eval (eval at executeCode (http://localhost:5175/src/services/jsExecutor.ts?t=1759490089082:175:7), <anonymous>:2:15)\n    at JSExecutor.executeCode (http://localhost:5175/src/services/jsExecutor.ts?t=1759490089082:175:7)\n    at Object.current (http://localhost:5175/src/components/TextNode/hooks/useNodeExecution.ts?t=1759490089082:48:39)\n    at http://localhost:5175/src/components/TextNode/index.tsx?t=1759490089081:148:22\n    at react-stack-bottom-frame (http://localhost:5175/node_modules/.vite/deps/react-dom_client.js?v=aaafe8bf:16242:20)\n    at runWithFiberInDEV (http://localhost:5175/node_modules/.vite/deps/react-dom_client.js?v=aaafe8bf:726:18)\n    at commitHookEffectListMount (http://localhost:5175/node_modules/.vite/deps/react-dom_client.js?v=aaafe8bf:7767:122)\n    at commitHookPassiveMountEffects (http://localhost:5175/node_modules/.vite/deps/react-dom_client.js?v=aaafe8bf:7825:60)\n    at commitPassiveMountOnFiber (http://localhost:5175/node_modules/.vite/deps/react-dom_client.js?v=aaafe8bf:9182:29)\n    at recursivelyTraversePassiveMountEffects (http://localhost:5175/node_modules/.vite/deps/react-dom_client.js?v=aaafe8bf:9163:13)"
-          }
-        ],
-        "warnings": []
+        "controls": []
       },
       "type": "textNode",
       "measured": {
@@ -87,7 +87,15 @@
       },
       "data": {
         "code": "let message = node_input(new InputBox(\"cptbtptp棍母bcptdtptp\"), \"message\");\nlet capPos = node_input(new Slider(0, 0, message.length, 1), \"capPos\");\n\nconst newMessage = ''.concat(\n    message.slice(0, capPos),\n    message.slice(capPos, capPos + 1).toUpperCase(),\n    message.slice(capPos + 1)\n)\n    .replace(/棍母/g, '')\n\nnode_output(newMessage, \"newMessage\");",
-        "result": "消息处理中...",
+        "autoResizeWidth": true,
+        "nodeName": "节点3",
+        "isCollapsed": false,
+        "hiddenSections": {
+          "inputs": false,
+          "outputs": false,
+          "logs": false,
+          "errors": false
+        },
         "width": 595,
         "controls": [
           {
@@ -96,15 +104,7 @@
             "defaultValue": "Hello World",
             "value": "Hello World"
           }
-        ],
-        "outputs": {
-          "output_0": "Hello World"
-        },
-        "consoleLogs": [
-          "消息: Hello World 长度: 11"
-        ],
-        "errors": [],
-        "warnings": []
+        ]
       },
       "type": "textNode",
       "measured": {

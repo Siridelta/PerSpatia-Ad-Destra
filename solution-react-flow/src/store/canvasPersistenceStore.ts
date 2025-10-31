@@ -87,7 +87,7 @@ const migrateState = (persistedState: any, version: number): CanvasPersistedStat
     };
   }
 
-  // 版本 6: 将 controlsCache 迁移到节点数据中
+  // 版本 6: 将 controlsCache 迁移到节点数据中; 固定 autoResizeWidth, nodeName, isCollapsed, hiddenSections
   if (version < 6 && newState.controlsCache) {
     newState = {
       ...newState,
@@ -98,6 +98,15 @@ const migrateState = (persistedState: any, version: number): CanvasPersistedStat
             data: {
               ...node.data,
               controls: newState.controlsCache![node.id],
+              autoResizeWidth: node.data.autoResizeWidth ?? true,
+              nodeName: node.data.nodeName ?? '',
+              isCollapsed: node.data.isCollapsed ?? false,
+              hiddenSections: node.data.hiddenSections ?? {
+                inputs: false,
+                outputs: false,
+                logs: false,
+                errors: false,
+              },
             },
           };
         }

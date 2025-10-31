@@ -1,11 +1,11 @@
-import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import { create, useStore } from 'zustand';
 import { CanvasPersistedState, useCanvasPersistenceStore } from '@/store/canvasPersistenceStore';
 import { CanvasEvalApi } from './useCanvasEval';
 import type { CanvasNode, CanvasEdge, TextNodeType, DesmosPreviewNodeType, DesmosPreviewLink } from '@/types/canvas';
 import { applyEdgeChanges, applyNodeChanges, type EdgeChange, type NodeChange, type Viewport } from '@xyflow/react';
 import type { NodeControls } from '@/services/jsExecutor';
-import { TextNodeData } from '@/types/nodeData';
+import { DesmosPreviewNodeData, TextNodeData } from '@/types/nodeData';
 
 
 export interface UIStoreState {
@@ -24,6 +24,7 @@ export interface UIData {
   nodes: CanvasNode[];
   edges: CanvasEdge[];
   viewport: Viewport;
+  desmosPreviewLinks: Record<string, DesmosPreviewLink>;
 }
 
 /**
@@ -38,10 +39,12 @@ export interface CanvasUIDataApi {
   // 数据访问方法
   getSnapshot: () => UIData;
   useUIData: <T>(selector: (data: UIData) => T) => T;
+  useNodeData: (id: string) => TextNodeData | DesmosPreviewNodeData | undefined;
 
   // 节点操作
   addNode: (node: CanvasNode) => void;
   updateNode: (id: string, updates: Partial<CanvasNode>) => void;
+  updateNodeData: (id: string, updates: Record<string, unknown>) => void;
   removeNode: (id: string) => void;
   setNodes: (nodes: CanvasNode[]) => void;
 
@@ -133,6 +136,7 @@ const toUIData = (state: UIStoreState): UIData => ({
   nodes: state.nodes,
   edges: state.edges,
   viewport: state.viewport,
+  desmosPreviewLinks: state.desmosPreviewLinks,
 });
 
 /**
@@ -306,21 +310,32 @@ export const useCanvasUIData = (): CanvasUIDataApi => {
       return useStore(store, (state) => selector(toUIData(state)));
     };
 
+    const useNodeData = (id: string): TextNodeData | DesmosPreviewNodeData | undefined => {
+      return useUIData((data) => data.nodes.find((node) => node.id === id)?.data);
+    };
+
     // 节点操作
     const addNode = (node: CanvasNode) =>
       store.setState(state => ({
         nodes: [...state.nodes, node]
       }));
 
-    const updateNode = (id: string, updates: Partial<CanvasNode>) =>
+    const updateNode = <T extends TextNodeType | DesmosPreviewNodeType>(id: string, updates: Partial<T>) =>
       store.setState(state => {
         const nodeIndex = state.nodes.findIndex((node) => node.id === id);
         if (nodeIndex === -1) return;
         if (state.nodes[nodeIndex].type === 'textNode') {
-          state.nodes[nodeIndex] = { ...state.nodes[nodeIndex], ...updates as Partial<TextNodeType> };
+          state.nodes[nodeIndex] = { ...state.nodes[nodeIndex], ...updates };
         } else if (state.nodes[nodeIndex].type === 'desmosPreviewNode') {
-          state.nodes[nodeIndex] = { ...state.nodes[nodeIndex], ...updates as Partial<DesmosPreviewNodeType> };
+          state.nodes[nodeIndex] = { ...state.nodes[nodeIndex], ...updates };
         }
+      });
+    
+    const updateNodeData = (id: string, updates: Record<string, unknown>) =>
+      store.setState(state => {
+        const node = state.nodes.find((node) => node.id === id);
+        if (!node) return;
+        node.data = { ...node.data, ...updates };
       });
 
     const removeNode = (id: string) =>
@@ -444,14 +459,14 @@ export const useCanvasUIData = (): CanvasUIDataApi => {
 
     // React Flow 集成
     const handleNodesChange = (changes: NodeChange[]) => {
-      store.setState((draft) => {
-        draft.nodes = applyNodeChanges(changes, draft.nodes) as CanvasNode[];
+      store.setState((state) => {
+        state.nodes = applyNodeChanges(changes, state.nodes) as CanvasNode[];
       });
     };
 
     const handleEdgesChange = (changes: EdgeChange[]) => {
-      store.setState((draft) => {
-        draft.edges = applyEdgeChanges(changes, draft.edges) as CanvasEdge[];
+      store.setState((state) => {
+        state.edges = applyEdgeChanges(changes, state.edges) as CanvasEdge[];
       });
     };
 
@@ -602,7 +617,7 @@ export const useCanvasUIData = (): CanvasUIDataApi => {
         if (!node) return;
         if (node.type === 'textNode' && node.data.controls) {
           node.data.controls.forEach((control) => {
-            if (values.hasOwnProperty(control.name)) {
+            if (Object.prototype.hasOwnProperty.call(values, control.name)) {
               control.value = values[control.name];
             }
           });
@@ -625,8 +640,10 @@ export const useCanvasUIData = (): CanvasUIDataApi => {
       subscribeData,
       getSnapshot,
       useUIData,
+      useNodeData,
       addNode,
       updateNode,
+      updateNodeData,
       removeNode,
       setNodes,
       addEdge,

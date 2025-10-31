@@ -63,7 +63,7 @@ const defaultFonts: ThemeFonts = {
 
 export const useSettingsStore = create<SettingsStore>()(
   persist(
-    (set, _get) => ({
+    (set) => ({
       colors: defaultColors,
       fonts: defaultFonts,
       isSettingsPanelOpen: false,

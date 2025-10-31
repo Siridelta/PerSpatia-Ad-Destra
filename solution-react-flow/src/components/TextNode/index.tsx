@@ -1,5 +1,5 @@
 import React, { useState, useCallback, useEffect, useRef } from 'react';
-import { Handle, Position, NodeProps, Node as FlowNode, useReactFlow, NodeResizeControl, useKeyPress } from '@xyflow/react';
+import { Handle, Position, NodeProps, NodeResizeControl, useKeyPress } from '@xyflow/react';
 import './styles.css';
 import '@/styles/syntax-highlighting.css';
 import { NodeControls } from '@/services/jsExecutor';
@@ -8,7 +8,7 @@ import { SliderControl, ToggleControl, TextControl } from './controls';
 import { ErrorDisplay, WarningDisplay, LogDisplay, OutputDisplay } from './displays';
 import CodeEditor from '../CodeEditor';
 import { useNodeEval } from '@/contexts/CanvasEvalContext';
-import { useTextNodeData } from '@/contexts/CanvasUIDataContext';
+import { useCanvasUIData } from '@/hooks/useCanvasUIData';
 import { TextNodeType } from '@/types/canvas';
 import { TextNodeData } from '@/types/nodeData';
 
@@ -43,30 +43,9 @@ function placeCaretAtPoint(x: number, y: number) {
 // ============================================================================
 
 const TextNode: React.FC<NodeProps<TextNodeType>> = ({ id, data, selected }) => {
-  // ============================================================================
-  // 节点数据获取 - 使用新的 API
-  // ============================================================================
 
-  // 从 UI Data API 获取节点的 UI 数据
-  const nodeData = useTextNodeData(id) ?? {
-    node: null,
-    code: '',
-    controls: [],
-    nodeName: '',
-    width: undefined,
-    height: undefined,
-    autoResizeWidth: true,
-    isCollapsed: false,
-    hiddenSections: {
-      inputs: false,
-      outputs: false,
-      logs: false,
-      errors: false,
-    },
-    updateNode: () => { },
-    updateNodeControlValues: () => { },
-  }
-  const { code, nodeName, width, height, autoResizeWidth, isCollapsed, hiddenSections, updateNode, updateNodeControlValues, controls } = nodeData;
+  const { code, controls, nodeName, width, height, autoResizeWidth, isCollapsed, hiddenSections } = data;
+  const { updateNodeData, updateNodeControlValues } = useCanvasUIData();
 
   // 从 Eval API 获取节点的计算结果
   const nodeEval = useNodeEval(id);
@@ -106,6 +85,103 @@ const TextNode: React.FC<NodeProps<TextNodeType>> = ({ id, data, selected }) => 
   //   setEditingName(nodeName);
   // }, [nodeName]);
 
+  // ============================================================================
+  // UI交互逻辑 (集中管理)
+  // ============================================================================
+
+  // 节点数据更新
+  const updateData = useCallback((updates: Partial<TextNodeData>) => {
+    updateNodeData(id, updates);
+  }, [updateNodeData, id]);
+
+  // 文本变化处理
+  const handleTextChange = (newText: string) => {
+    updateData({ code: newText });
+    const originalText = code || '';
+    setHasUnsavedChanges(newText !== originalText);
+  };
+
+  // 退出编辑处理
+  const handleExitEdit = () => {
+    setHasUnsavedChanges(false);
+    // const finalCode = data.code || '';
+    // if (finalCode.trim()) {
+    //   executeCode(finalCode);
+    // }
+  };
+
+  // 节点名称编辑
+  const handleNameEdit = useCallback(() => {
+    setIsEditingName(true);
+    setTimeout(() => {
+      nameInputRef.current?.focus();
+      nameInputRef.current?.select();
+    }, 0);
+  }, []);
+
+  const handleNameSubmit = useCallback(() => {
+    setIsEditingName(false);
+    updateData({ nodeName: editingName });
+  }, [editingName, updateNodeData]);
+
+  const handleNameKeyDown = useCallback((e: React.KeyboardEvent) => {
+    if (e.key === 'Enter') {
+      handleNameSubmit();
+    } else if (e.key === 'Escape') {
+      setEditingName(nodeName);
+      setIsEditingName(false);
+    }
+  }, [handleNameSubmit, nodeName]);
+
+  // 折叠/展开逻辑
+  const toggleCollapse = useCallback(() => {
+    updateData({ isCollapsed: !isCollapsed });
+  }, [isCollapsed, updateNodeData]);
+
+  // 区域显示/隐藏逻辑
+  const toggleHideSection = useCallback((section: 'inputs' | 'outputs' | 'logs' | 'errors') => {
+    const currentHiddenSections = hiddenSections;
+    const isCurrentlyVisible = currentHiddenSections[section];
+
+    if (isCurrentlyVisible) {
+      setAnimatingOut(prev => ({ ...prev, [section]: true }));
+      setTimeout(() => {
+        const newHiddenSections = { ...currentHiddenSections, [section]: true };
+        updateData({ hiddenSections: newHiddenSections });
+        setAnimatingOut(prev => ({ ...prev, [section]: false }));
+      }, 300);
+    } else {
+      const newHiddenSections = { ...currentHiddenSections, [section]: false };
+      updateData({ hiddenSections: newHiddenSections });
+    }
+  }, [hiddenSections, updateData]);
+
+  // 重置输入到默认值
+  const resetInputsToDefault = useCallback(() => {
+    const defaultValues = controls.reduce<Record<string, unknown>>((acc, control) => {
+      acc[control.name] = control.defaultValue;
+      return acc;
+    }, {});
+    updateNodeControlValues(id, defaultValues);
+  }, [controls, updateNodeControlValues, id]);
+
+  // 复制代码
+  const copyCode = useCallback(async () => {
+    try {
+      await navigator.clipboard.writeText(code || '');
+    } catch (err) {
+      console.error('复制代码失败:', err);
+    }
+  }, [code]);
+
+  const handleVariableChange = useCallback((name: string, value: unknown) => {
+    updateNodeControlValues(id, { [name]: value });
+  }, [updateNodeControlValues, id]);
+
+  // ============================================================================
+  // 动画管理逻辑 (集中管理)
+  // ============================================================================
+
   // 监听代码变化, 自动调整节点宽度
   useEffect(() => {
     const currentText = code || '';
@@ -135,11 +211,7 @@ const TextNode: React.FC<NodeProps<TextNodeType>> = ({ id, data, selected }) => 
 
         const minNodeWidth = Math.max(contentWidth + 60, 300);
 
-        updateNode({
-          data: {
-            width: minNodeWidth,
-          },
-        } as Partial<TextNodeType>);
+        updateData({ width: minNodeWidth });
 
         console.log('自动调整节点宽度:', {
           contentWidth,
@@ -148,107 +220,7 @@ const TextNode: React.FC<NodeProps<TextNodeType>> = ({ id, data, selected }) => 
         });
       }, 100);
     }
-  }, [code, width, id, updateNode, autoResizeWidth]);
-
-  // ============================================================================
-  // UI交互逻辑 (集中管理)
-  // ============================================================================
-
-  // 节点数据更新
-  const updateNodeData = useCallback((updates: Partial<TextNodeData>) => {
-    if (!nodeData.node) return;
-    updateNode({ data: { ...nodeData.node.data, ...updates } });
-  }, [updateNode, nodeData.node]);
-
-  // 文本变化处理
-  const handleTextChange = (newText: string) => {
-    updateNodeData({ code: newText });
-    const originalText = code || '';
-    setHasUnsavedChanges(newText !== originalText);
-  };
-
-  // 退出编辑处理
-  const handleExitEdit = () => {
-    setHasUnsavedChanges(false);
-    // const finalCode = data.code || '';
-    // if (finalCode.trim()) {
-    //   executeCode(finalCode);
-    // }
-  };
-
-  // 节点名称编辑
-  const handleNameEdit = useCallback(() => {
-    setIsEditingName(true);
-    setTimeout(() => {
-      nameInputRef.current?.focus();
-      nameInputRef.current?.select();
-    }, 0);
-  }, []);
-
-  const handleNameSubmit = useCallback(() => {
-    setIsEditingName(false);
-    updateNodeData({ nodeName: editingName });
-  }, [editingName, updateNodeData]);
-
-  const handleNameKeyDown = useCallback((e: React.KeyboardEvent) => {
-    if (e.key === 'Enter') {
-      handleNameSubmit();
-    } else if (e.key === 'Escape') {
-      setEditingName(nodeName);
-      setIsEditingName(false);
-    }
-  }, [handleNameSubmit, nodeName]);
-
-  // 折叠/展开逻辑
-  const toggleCollapse = useCallback(() => {
-    updateNodeData({ isCollapsed: !isCollapsed });
-  }, [isCollapsed, updateNodeData]);
-
-  // 区域显示/隐藏逻辑
-  const toggleHideSection = useCallback((section: 'inputs' | 'outputs' | 'logs' | 'errors') => {
-    const currentHiddenSections = hiddenSections;
-    const isCurrentlyVisible = currentHiddenSections[section];
-
-    if (isCurrentlyVisible) {
-      setAnimatingOut(prev => ({ ...prev, [section]: true }));
-      setTimeout(() => {
-        const newHiddenSections = { ...currentHiddenSections, [section]: true };
-        updateNodeData({ hiddenSections: newHiddenSections });
-        setAnimatingOut(prev => ({ ...prev, [section]: false }));
-      }, 300);
-    } else {
-      const newHiddenSections = { ...currentHiddenSections, [section]: false };
-      updateNodeData({ hiddenSections: newHiddenSections });
-    }
-  }, [hiddenSections, updateNodeData]);
-
-  // 重置输入到默认值
-  const resetInputsToDefault = useCallback(() => {
-    const defaultValues = controls.reduce<Record<string, unknown>>((acc, control) => {
-      acc[control.name] = control.defaultValue;
-      return acc;
-    }, {});
-    updateNodeControlValues(defaultValues);
-  }, [controls, updateNodeControlValues]);
-
-  // 复制代码
-  const copyCode = useCallback(async () => {
-    try {
-      await navigator.clipboard.writeText(code || '');
-    } catch (err) {
-      console.error('复制代码失败:', err);
-    }
-  }, [code]);
-
-  const handleVariableChange = useCallback((name: string, value: any) => {
-    updateNodeControlValues({ [name]: value });
-  }, [updateNodeControlValues]);
-
-  // ============================================================================
-  // 动画管理逻辑 (集中管理)
-  // ============================================================================
-
-  // 节点宽度调整逻辑已内联到useEffect中
+  }, [code, width, updateData, autoResizeWidth]);
 
   // ============================================================================
   // 渲染函数 (按区域分组)
@@ -600,7 +572,7 @@ const TextNode: React.FC<NodeProps<TextNodeType>> = ({ id, data, selected }) => 
             position="left"
             minWidth={200}
             onResize={(_event, data) => {
-              updateNodeData({ width: data.width, autoResizeWidth: false });
+              updateData({ width: data.width, autoResizeWidth: false });
             }}
           />
           <NodeResizeControl
@@ -615,7 +587,7 @@ const TextNode: React.FC<NodeProps<TextNodeType>> = ({ id, data, selected }) => 
             position="right"
             minWidth={200}
             onResize={(_event, data) => {
-              updateNodeData({ width: data.width, autoResizeWidth: false });
+              updateData({ width: data.width, autoResizeWidth: false });
             }}
           />
         </>

@@ -1,3 +1,5 @@
+/*eslint no-unused-vars: "off" */
+
 import { CanvasEdge, CanvasNode } from '@/types/canvas';
 import { Viewport } from '@xyflow/react';
 

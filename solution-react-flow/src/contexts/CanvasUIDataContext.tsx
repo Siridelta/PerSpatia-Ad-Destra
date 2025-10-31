@@ -40,7 +40,7 @@ export const useTextNodeData = (nodeId: string) => {
     (updates: Partial<TextNodeType>) => {
       uiDataApi.updateNode(nodeId, updates);
     },
-    [uiDataApi.updateNode, nodeId]
+    [uiDataApi, nodeId]
   );
 
   // 更新节点的 control 值
@@ -48,7 +48,7 @@ export const useTextNodeData = (nodeId: string) => {
     (values: Record<string, unknown>) => {
       uiDataApi.updateNodeControlValues(nodeId, values);
     },
-    [uiDataApi.updateNodeControlValues, nodeId]
+    [uiDataApi, nodeId]
   );
 
   return useMemo(
@@ -96,7 +96,7 @@ export const useDesmosPreviewNodeData = (nodeId: string) => {
     (updates: Partial<CanvasNode>) => {
       uiDataApi.updateNode(nodeId, updates);
     },
-    [uiDataApi.updateNode, nodeId]
+    [uiDataApi, nodeId]
   );
 
   // 更新节点的 control 值
@@ -104,7 +104,7 @@ export const useDesmosPreviewNodeData = (nodeId: string) => {
     (values: Record<string, unknown>) => {
       uiDataApi.updateNodeControlValues(nodeId, values);
     },
-    [uiDataApi.updateNodeControlValues, nodeId]
+    [uiDataApi, nodeId]
   );
 
   return useMemo(
