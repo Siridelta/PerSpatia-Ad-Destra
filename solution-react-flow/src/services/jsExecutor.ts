@@ -173,6 +173,14 @@ export class JSExecutor {
     const value = this.inputValues[actualName] ?? controlInfo.defaultValue;
     controlInfo.value = value;
 
+    if(controlInfo.type === 'slider') {
+      if(controlInfo.min && value < controlInfo.min) {
+        controlInfo.value = controlInfo.min;
+      } else if(controlInfo.max && value > controlInfo.max) {
+        controlInfo.value = controlInfo.max;
+      }
+    }
+
     this.controls.push(controlInfo);
     
     // 返回当前输入值或默认值

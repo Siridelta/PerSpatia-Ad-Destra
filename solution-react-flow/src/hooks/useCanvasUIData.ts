@@ -173,25 +173,30 @@ const resolveEvalDataDelta = (
     if (!prevNode || prevNode.type !== 'textNode') return;
     const prevControls = prevNode.data.controls || [];
     const currentControls = nodeData.controls || [];
+    let hasChanges = false;
 
-    // 简单比较：如果长度不同或内容不同，则认为有变化
-    if (prevControls.length !== currentControls.length) {
-      updatedControls[nodeId] = currentControls;
-    } else {
-      // 深度比较 controls 的定义（不包括 value）
-      const hasDefinitionChange = prevControls.some((prev, index) => {
-        const curr = currentControls[index];
-        return (
-          !curr ||
-          prev.name !== curr.name ||
-          prev.type !== curr.type ||
-          prev.defaultValue !== curr.defaultValue
-        );
-      });
-
-      if (hasDefinitionChange) {
-        updatedControls[nodeId] = currentControls;
+    for (const control of currentControls) {
+      const prevControl = prevControls.find((c) => c.name === control.name);
+      if (!prevControl
+         || prevControl.defaultValue !== control.defaultValue
+         || prevControl.type !== control.type
+         || prevControl.value !== control.value
+         || prevControl.min !== control.min
+         || prevControl.max !== control.max
+         || prevControl.step !== control.step
+        ) {
+        hasChanges = true;
+        break;
       }
+    }
+    for (const control of prevControls) {
+      if (!currentControls.find((c) => c.name === control.name)) {
+        hasChanges = true;
+        break;
+      }
+    }
+    if (hasChanges) {
+      updatedControls[nodeId] = currentControls;
     }
   });
 
@@ -458,7 +463,15 @@ export const useCanvasUIData = (): CanvasUIDataApi => {
     // React Flow 集成
     const handleNodesChange = (changes: NodeChange[]) => {
       store.setState((state) => {
-        state.nodes = applyNodeChanges(changes, state.nodes) as CanvasNode[];
+        state.nodes = applyNodeChanges(
+          changes,
+          state.nodes.map((node) => {
+            if (node.measured) {
+              return { ...node, measured: { ...node.measured } }
+            }
+            return node;
+          })
+        ) as CanvasNode[];
       });
     };
 

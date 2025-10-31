@@ -376,20 +376,8 @@ const Canvas: React.FC = () => {
           <ReactFlow
             nodes={nodes}
             edges={edges}
-            onNodesChange={(changes) =>
-              uiDataApi.setNodes(
-                applyNodeChanges(
-                  changes,
-                  nodes.map((node) => {
-                    if (node.measured) {
-                      return { ...node, measured: { ...node.measured } }
-                    }
-                    return node;
-                  })
-                )
-              )
-            }
-            onEdgesChange={(changes) => uiDataApi.setEdges(applyEdgeChanges(changes, edges))}
+            onNodesChange={(changes) => uiDataApi.handleNodesChange(changes)}
+            onEdgesChange={(changes) => uiDataApi.handleEdgesChange(changes)}
             onConnect={onConnect}
             onPaneClick={handlePaneClick}
             onNodeClick={onNodeClick}
