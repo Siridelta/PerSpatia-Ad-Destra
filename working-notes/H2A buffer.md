@@ -200,6 +200,4 @@ const evalApi = useMemo(() => ({
 ---
 
 
-persist store 不直接使用persist中间件？
-
 compatibility with desmos preview node
