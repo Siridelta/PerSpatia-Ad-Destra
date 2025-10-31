@@ -45,8 +45,7 @@ const edgeTypes: EdgeTypes = {
   custom: FloatingEdge,
 };
 
-// 内部组件，使用新的 API 连接模式
-const CanvasInner: React.FC = () => {
+const Canvas: React.FC = () => {
   // 创建两大 API
   const uiDataApi = useCanvasUIData();
   const evalApi = useCanvasEval();
@@ -455,10 +454,6 @@ const CanvasInner: React.FC = () => {
       </CanvasEvalProvider>
     </CanvasUIDataProvider>
   );
-};
-
-const Canvas: React.FC = () => {
-  return <CanvasInner />;
 };
 
 export default Canvas;

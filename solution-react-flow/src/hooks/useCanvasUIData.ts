@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
-import { create, useStore } from 'zustand';
+import { createStore, useStore } from 'zustand';
 import { CanvasPersistedState, useCanvasPersistenceStore } from '@/store/canvasPersistenceStore';
 import { CanvasEvalApi } from './useCanvasEval';
 import type { CanvasNode, CanvasEdge, TextNodeType, DesmosPreviewNodeType, DesmosPreviewLink } from '@/types/canvas';
@@ -34,7 +34,7 @@ export interface UIData {
 export interface CanvasUIDataApi {
   // 订阅方法
   subscribeFromEval: (evalApi: CanvasEvalApi) => () => void;
-  subscribeData: (callback: (data: UIData, prevData?: UIData) => void) => () => void;
+  subscribeData: (callback: (data: UIData) => void) => () => void;
 
   // 数据访问方法
   getSnapshot: () => UIData;
@@ -116,7 +116,7 @@ const createUIStore = (initialState?: Partial<CanvasPersistedState>) => {
   const initialViewport = initialState?.viewport ?? defaultCanvas.viewport ?? defaultViewport;
   const initialDesmosPreviewLinks = initialState?.desmosPreviewLinks ?? {};
 
-  return create<UIStoreState>()(
+  return createStore<UIStoreState>()(
     immer(() => ({
       // 初始状态
       nodes: initialNodes,
@@ -149,9 +149,9 @@ interface EvalDataDelta {
 
 const resolveEvalDataDelta = (
   currentEvalData: Record<string, { controls: Control[] }>,
-  prevEvalData?: Record<string, { controls: Control[] }>
+  prevState?: UIStoreState
 ): EvalDataDelta => {
-  if (!prevEvalData) {
+  if (!prevState) {
     // 首次初始化，所有 controls 都是新的
     const updatedControls: Record<string, Control[]> = {};
     Object.entries(currentEvalData).forEach(([nodeId, nodeData]) => {
@@ -169,7 +169,9 @@ const resolveEvalDataDelta = (
 
   // 检查每个节点的 controls 是否有变化
   Object.entries(currentEvalData).forEach(([nodeId, nodeData]) => {
-    const prevControls = prevEvalData[nodeId]?.controls || [];
+    const prevNode = prevState.nodes.find((node) => node.id === nodeId);
+    if (!prevNode || prevNode.type !== 'textNode') return;
+    const prevControls = prevNode.data.controls || [];
     const currentControls = nodeData.controls || [];
 
     // 简单比较：如果长度不同或内容不同，则认为有变化
@@ -194,9 +196,9 @@ const resolveEvalDataDelta = (
   });
 
   // 检查是否有节点被删除
-  Object.keys(prevEvalData).forEach((nodeId) => {
-    if (!currentEvalData[nodeId]) {
-      updatedControls[nodeId] = [];
+  prevState.nodes.forEach((node) => {
+    if (node.type === 'textNode' && !currentEvalData[node.id]) {
+      updatedControls[node.id] = [];
     }
   });
 
@@ -242,7 +244,7 @@ export const useCanvasUIData = (): CanvasUIDataApi => {
       saveState(stateToSave);
     });
 
-    return unsubscribe;
+    return () => { unsubscribe(); };
   }, [store, saveState]);
 
   // 标记初始化完成（在首次渲染后）
@@ -256,7 +258,6 @@ export const useCanvasUIData = (): CanvasUIDataApi => {
   const api = useMemo<CanvasUIDataApi>(() => {
     // 订阅来自 Eval 系统的变化
     const subscribeFromEval = (evalApi: CanvasEvalApi): (() => void) => {
-      let prevEvalData: Record<string, { controls: Control[] }> | undefined = undefined;
       const unsubscribe = evalApi.subscribeData((evalData) => {
         // 提取 controls 信息
         const currentEvalData: Record<string, { controls: Control[] }> = {};
@@ -267,7 +268,7 @@ export const useCanvasUIData = (): CanvasUIDataApi => {
         });
 
         // 计算增量
-        const delta = resolveEvalDataDelta(currentEvalData, prevEvalData);
+        const delta = resolveEvalDataDelta(currentEvalData, store.getState());
 
         if (delta.hasChanges) {
           // 同步 controls 到节点数据中
@@ -282,8 +283,6 @@ export const useCanvasUIData = (): CanvasUIDataApi => {
             });
           });
         }
-
-        prevEvalData = currentEvalData;
       });
 
       return unsubscribe;
@@ -291,12 +290,11 @@ export const useCanvasUIData = (): CanvasUIDataApi => {
 
     // 订阅 UI 数据变化
     const subscribeData = (
-      callback: (data: UIData, prevData?: UIData) => void
+      callback: (data: UIData) => void
     ): (() => void) => {
-      return store.subscribe((state, prevState) => {
+      return store.subscribe((state) => {
         const currentData = toUIData(state);
-        const prevData = prevState ? toUIData(prevState) : undefined;
-        callback(currentData, prevData);
+        callback(currentData);
       });
     };
 

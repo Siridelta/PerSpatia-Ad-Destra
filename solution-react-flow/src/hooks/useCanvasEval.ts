@@ -57,7 +57,7 @@ interface CanvasEvalStoreState {
 export interface CanvasEvalApi {
   // 订阅方法
   subscribeFromUI: (uiDataApi: CanvasUIDataApi) => () => void;
-  subscribeData: (callback: (data: CanvasEvalData, prevData?: CanvasEvalData) => void) => () => void;
+  subscribeData: (callback: (data: CanvasEvalData) => void) => () => void;
 
   // 数据访问方法
   getSnapshot: () => CanvasEvalData;
@@ -679,12 +679,11 @@ export const useCanvasEval = (): CanvasEvalApi => {
 
     // 订阅 Eval 数据变化
     const subscribeData = (
-      callback: (data: CanvasEvalData, prevData?: CanvasEvalData) => void
+      callback: (data: CanvasEvalData) => void
     ): (() => void) => {
-      return store.subscribe((state, prevState) => {
+      return store.subscribe((state) => {
         const currentData = state.data;
-        const prevData = prevState?.data ?? undefined;
-        callback(currentData, prevData);
+        callback(currentData);
       });
     };
 

@@ -8,9 +8,9 @@ import { SliderControl, ToggleControl, TextControl } from './controls';
 import { ErrorDisplay, WarningDisplay, LogDisplay, OutputDisplay } from './displays';
 import CodeEditor from '../CodeEditor';
 import { useNodeEval } from '@/contexts/CanvasEvalContext';
-import { useCanvasUIData } from '@/hooks/useCanvasUIData';
 import { TextNodeType } from '@/types/canvas';
 import { TextNodeData } from '@/types/nodeData';
+import { useCanvasUIDataApi } from '@/contexts/CanvasUIDataContext';
 
 
 
@@ -45,7 +45,7 @@ function placeCaretAtPoint(x: number, y: number) {
 const TextNode: React.FC<NodeProps<TextNodeType>> = ({ id, data, selected }) => {
 
   const { code, controls, nodeName, width, height, autoResizeWidth, isCollapsed, hiddenSections } = data;
-  const { updateNodeData, updateNodeControlValues } = useCanvasUIData();
+  const { updateNodeData, updateNodeControlValues } = useCanvasUIDataApi();
 
   // 从 Eval API 获取节点的计算结果
   const nodeEval = useNodeEval(id);
