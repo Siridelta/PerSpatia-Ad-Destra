@@ -1,7 +1,7 @@
 import { useCallback } from 'react';
 import type { Node, Edge, Viewport } from '@xyflow/react';
 import { NodeChange, EdgeChange, applyNodeChanges, applyEdgeChanges } from '@xyflow/react';
-import { useCanvasStore } from '@/store/canvasStore';
+import { useUIStore } from '@/store/UIStoreProvider';
 import { CanvasEdge, CanvasNode, DesmosPreviewNodeType, TextNodeType } from '@/types/canvas';
 
 /**
@@ -30,7 +30,28 @@ export const useCanvasState = () => {
     desmosPreviewLinks,
     setNodeControlsCache,
     setControlsCache,
-  } = useCanvasStore();
+  } = useUIStore((state) => ({
+    nodes: state.nodes,
+    edges: state.edges,
+    addNode: state.addNode,
+    updateNode: state.updateNode,
+    removeNode: state.removeNode,
+    createDesmosPreviewNode: state.createDesmosPreviewNode,
+    updateDesmosPreviewState: state.updateDesmosPreviewState,
+    addEdge: state.addEdge,
+    updateEdge: state.updateEdge,
+    removeEdge: state.removeEdge,
+    setNodes: state.setNodes,
+    setEdges: state.setEdges,
+    setViewport: state.setViewport,
+    clearCanvas: state.clearCanvas,
+    resetToDefault: state.resetToDefault,
+    viewport: state.viewport,
+    controlsCache: state.controlsCache,
+    desmosPreviewLinks: state.desmosPreviewLinks,
+    setNodeControlsCache: state.setNodeControlsCache,
+    setControlsCache: state.setControlsCache,
+  }));
 
   // 便捷的节点操作
   type CreateNodeData = Omit<TextNodeType, 'id'> | Omit<DesmosPreviewNodeType, 'id'>;

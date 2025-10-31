@@ -3,7 +3,7 @@ import { createStore } from 'zustand/vanilla';
 import { useStore } from 'zustand';
 import { immer } from 'zustand/middleware/immer';
 import { jsExecutor, ControlInfo, ExecutionResult } from '@/services/jsExecutor';
-import { useCanvasStore } from '@/store/canvasStore';
+import { useGetUIStore, useUIStore } from '@/store/UIStoreProvider';
 import { produce } from 'immer';
 
 export interface ErrorInfo {
@@ -520,8 +520,9 @@ export const useCanvasEval = (input: CanvasEvalInput): CanvasEvalApi => {
     lastCompletedStateRef.current = cloneCanvasEvalStoreState(store.getState());
   }
 
-  // CanvasStore 中的 controls 缓存，用于尽量持久化 controls 状态
-  const setNodeControlsCache = useCanvasStore((state) => state.setNodeControlsCache);
+  // uiStore 中的 controls 缓存，用于尽量持久化 controls 状态
+  const uiStore = useGetUIStore();
+  const setNodeControlsCache = useUIStore((state) => state.setNodeControlsCache);
   const persistControls = useCallback(
     (nodeId: string, controls: ControlInfo[]) => {
       console.log('persistControls', nodeId, controls);
@@ -573,7 +574,7 @@ export const useCanvasEval = (input: CanvasEvalInput): CanvasEvalApi => {
     const currentVersion = evaluationVersionRef.current;
 
     const runSyncAndEvaluate = async () => {
-      const { controlsCache } = useCanvasStore.getState();
+      const { controlsCache } = uiStore.getState();
       const baseState = lastCompletedStateRef.current;
 
       // 基于 lastCompletedState 和 currentInput 计算差异
@@ -618,7 +619,7 @@ export const useCanvasEval = (input: CanvasEvalInput): CanvasEvalApi => {
     };
 
     runSyncAndEvaluate();
-  }, [store, currentInput, persistControls, runEvaluationTask]);
+  }, [store, currentInput, persistControls, runEvaluationTask, uiStore]);
 
   const api = useMemo<CanvasEvalApi>(() => {
     const getSnapshot = () => store.getState().data;
@@ -682,7 +683,7 @@ export const useCanvasEval = (input: CanvasEvalInput): CanvasEvalApi => {
 
     const syncGraph = async (nextInput: CanvasEvalInput) => {
       const current = store.getState();
-      const { controlsCache } = useCanvasStore.getState();
+      const { controlsCache } = uiStore.getState();
       const nextData: CanvasEvalData = {};
 
       nextInput.nodes.forEach(({ id, code }) => {
@@ -721,7 +722,7 @@ export const useCanvasEval = (input: CanvasEvalInput): CanvasEvalApi => {
       evaluateNode,
       evaluateAll,
     };
-  }, [store, persistControls, runEvaluationTask]);
+  }, [store, persistControls, runEvaluationTask, uiStore]);
 
   return api;
 };

@@ -1,41 +1,15 @@
 import { create } from 'zustand';
-import { persist } from 'zustand/middleware';
-import type { Node, Viewport } from '@xyflow/react';
+import { immer } from 'zustand/middleware/immer';
+import { produce } from 'immer';
+import type { Viewport } from '@xyflow/react';
 import type { ControlInfo } from '@/services/jsExecutor';
 import type { CanvasNode, CanvasEdge, DesmosPreviewNodeType, TextNodeType } from '@/types/canvas';
+import type { CanvasPersistedState } from './canvasPersistenceStore';
 
 /**
- * 画布状态管理 Store
- * 
- * 使用 Zustand persist 中间件实现自动持久化：
- * - 每次状态变化时自动保存到 localStorage
- * - 页面加载时自动从 localStorage 恢复状态
- * - 支持版本控制和数据迁移
+ * UI Store 状态接口
  */
-
-// 默认视角（React Flow 默认值）
-const defaultViewport: Viewport = { x: 0, y: 0, zoom: 1 };
-
-// 判断视角是否几乎相等，避免重复写入触发额外渲染
-const VIEWPORT_EPSILON = 0.0001;
-const isSameViewport = (a: Viewport, b: Viewport) => (
-  Math.abs(a.x - b.x) < VIEWPORT_EPSILON &&
-  Math.abs(a.y - b.y) < VIEWPORT_EPSILON &&
-  Math.abs(a.zoom - b.zoom) < VIEWPORT_EPSILON
-);
-
-interface DesmosPreviewLink {
-  previewNodeId: string;
-  outputName: string;
-}
-
-interface CreateDesmosPreviewParams {
-  sourceNodeId: string;
-  sourceOutputName: string;
-  desmosState: any;
-}
-
-interface CanvasState {
+export interface UIStoreState {
   // 状态数据
   nodes: CanvasNode[];
   edges: CanvasEdge[];
@@ -69,20 +43,56 @@ interface CanvasState {
   setControlsCache: (cache: Record<string, ControlInfo[]>) => void;
 }
 
+interface DesmosPreviewLink {
+  previewNodeId: string;
+  outputName: string;
+}
+
+interface CreateDesmosPreviewParams {
+  sourceNodeId: string;
+  sourceOutputName: string;
+  desmosState: any;
+}
+
+// 默认视角（React Flow 默认值）
+const defaultViewport: Viewport = { x: 0, y: 0, zoom: 1 };
+
+// 判断视角是否几乎相等，避免重复写入触发额外渲染
+const VIEWPORT_EPSILON = 0.0001;
+const isSameViewport = (a: Viewport, b: Viewport) => (
+  Math.abs(a.x - b.x) < VIEWPORT_EPSILON &&
+  Math.abs(a.y - b.y) < VIEWPORT_EPSILON &&
+  Math.abs(a.zoom - b.zoom) < VIEWPORT_EPSILON
+);
+
 // 默认节点和边的数据
 import defaultCanvas from '@/components/Canvas/defaultCanvas';
-import { produce } from 'immer';
-import { immer } from 'zustand/middleware/immer';
 
-export const useCanvasStore = create<CanvasState>()(
-  persist(
+/**
+ * 创建 UI Store 的工厂函数
+ * 
+ * 每个画布实例应该调用此函数创建一个独立的 store 实例。
+ * 这样可以支持多个画布实例，每个实例拥有独立的 UI 状态。
+ * 
+ * @param initialState 可选的初始状态。如果不提供，则使用默认画布数据。
+ * @returns 一个新的 Zustand Store 实例
+ */
+export const createUIStore = (initialState?: Partial<CanvasPersistedState>) => {
+  // 确定初始状态
+  const initialNodes = initialState?.nodes ?? defaultCanvas.nodes;
+  const initialEdges = initialState?.edges ?? defaultCanvas.edges;
+  const initialViewport = initialState?.viewport ?? defaultCanvas.viewport ?? defaultViewport;
+  const initialControlsCache = initialState?.controlsCache ?? {};
+  const initialDesmosPreviewLinks = initialState?.desmosPreviewLinks ?? {};
+
+  return create<UIStoreState>()(
     immer((set) => ({
-      // 初始状态 - 这些会被 persist 中间件覆盖（如果 localStorage 中有数据）
-      nodes: defaultCanvas.nodes,
-      edges: defaultCanvas.edges,
-      viewport: defaultCanvas.viewport ?? defaultViewport,
-      controlsCache: {},
-      desmosPreviewLinks: {},
+      // 初始状态
+      nodes: initialNodes,
+      edges: initialEdges,
+      viewport: initialViewport,
+      controlsCache: initialControlsCache,
+      desmosPreviewLinks: initialDesmosPreviewLinks,
 
       // 节点操作
       addNode: (node) =>
@@ -308,76 +318,7 @@ export const useCanvasStore = create<CanvasState>()(
         }),
 
       setControlsCache: (cache) => set({ controlsCache: cache }),
-    })),
-    {
-      name: 'desmos-canvas-flow-state', // localStorage key
-      version: 5, // 版本号，便于未来兼容
-      migrate: (persistedState: any, version) => {
-        if (!persistedState) {
-          return {
-            nodes: defaultCanvas.nodes,
-            edges: defaultCanvas.edges,
-            viewport: defaultCanvas.viewport ?? defaultViewport,
-            controlsCache: {},
-            desmosPreviewLinks: {},
-          };
-        }
+    }))
+  );
+};
 
-        let newState = persistedState;
-
-        if (version < 2 || !persistedState.viewport) {
-          newState = {
-            ...newState,
-            viewport: defaultViewport,
-          };
-        }
-        
-        if (version < 3) {
-          newState = {
-            ...newState,
-            nodes: newState.nodes.map((node: Node) => ({
-              ...node,
-              data: {
-                ...node.data,
-                code: typeof node.data?.label === 'string' ? node.data.label : '',
-              },
-            })),
-          };
-        }
-
-        if (version < 4 || !newState.controlsCache) {
-          newState = {
-            ...newState,
-            controlsCache: {},
-          };
-        }
-
-        if (version < 5 || !newState.desmosPreviewLinks) {
-          newState = {
-            ...newState,
-            desmosPreviewLinks: {},
-          };
-        }
-
-        return newState;
-      },
-      storage: {
-        getItem: (name) => {
-          const str = localStorage.getItem(name);
-          if (!str) return null;
-          try {
-            return JSON.parse(str);
-          } catch {
-            return null;
-          }
-        },
-        setItem: (name, value) => {
-          localStorage.setItem(name, JSON.stringify(value));
-        },
-        removeItem: (name) => {
-          localStorage.removeItem(name);
-        },
-      },
-    }
-  )
-); 

@@ -25,12 +25,13 @@ import { useCanvasState } from '@/hooks/useCanvasState';
 import { useTheme } from '@/hooks/useTheme';
 import { useSettingsStore } from '@/store/settingsStore';
 import { useToolStore } from '@/store/toolStore';
+import { UIStoreProvider } from '@/store/UIStoreProvider';
 import { CanvasEdge, CanvasNode, TextNodeType } from '@/types/canvas';
 import useInertialPan from '@/utils/useInertialPan';
 import CustomConnectionLine from './CustomConnectionLine';
 import './styles.css';
 
-// 默认节点和边现在由 canvasStore 管理
+// 默认节点和边现在由 UIStoreProvider 管理
 
 // 注册自定义节点类型
 const nodeTypes: NodeTypes = {
@@ -43,9 +44,8 @@ const edgeTypes: EdgeTypes = {
   custom: FloatingEdge,
 };
 
-
-
-const Canvas: React.FC = () => {
+// 内部组件，使用 UIStoreProvider 提供的 context
+const CanvasInner: React.FC = () => {
   // 使用统一的画布状态管理
   const {
     nodes,
@@ -436,6 +436,14 @@ const Canvas: React.FC = () => {
         />
       </div>
     </CanvasEvalProvider>
+  );
+};
+
+const Canvas: React.FC = () => {
+  return (
+    <UIStoreProvider>
+      <CanvasInner />
+    </UIStoreProvider>
   );
 };
 
