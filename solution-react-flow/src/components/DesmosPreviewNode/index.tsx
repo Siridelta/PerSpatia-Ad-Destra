@@ -2,7 +2,7 @@
 
 import React, { useEffect, useMemo, useRef, useState } from 'react';
 import { Handle, Position, NodeProps } from '@xyflow/react';
-import { useCanvasState } from '@/hooks/useCanvasState';
+import { useCanvasUIData } from '@/hooks/useCanvasUIData';
 
 import './styles.css';
 import { DesmosPreviewNodeType } from '@/types/canvas';
@@ -69,7 +69,7 @@ const DesmosPreviewNode: React.FC<NodeProps<DesmosPreviewNodeType>> = ({ id, dat
   const calculatorRef = useRef<Desmos.Calculator | null>(null);
   const lastSyncedState = useRef<string>('');
 
-  const { updateNode } = useCanvasState();
+  const { updateNode } = useCanvasUIData();
 
   const sourceLabel = useMemo(() => {
     const nodeId = data?.sourceNodeId || '未知节点';

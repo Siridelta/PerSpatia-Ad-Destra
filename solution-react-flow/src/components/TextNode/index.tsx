@@ -2,36 +2,17 @@ import React, { useState, useCallback, useEffect, useRef } from 'react';
 import { Handle, Position, NodeProps, Node as FlowNode, useReactFlow, NodeResizeControl, useKeyPress } from '@xyflow/react';
 import './styles.css';
 import '@/styles/syntax-highlighting.css';
-import { ControlInfo } from '@/services/jsExecutor';
+import { NodeControls } from '@/services/jsExecutor';
 import { useToolStore } from '@/store/toolStore';
 import { SliderControl, ToggleControl, TextControl } from './controls';
 import { ErrorDisplay, WarningDisplay, LogDisplay, OutputDisplay } from './displays';
 import CodeEditor from '../CodeEditor';
 import { useNodeEval } from '@/contexts/CanvasEvalContext';
-import { produce } from 'immer';
+import { useTextNodeData } from '@/contexts/CanvasUIDataContext';
 import { TextNodeType } from '@/types/canvas';
+import { TextNodeData } from '@/types/nodeData';
 
-// ============================================================================
-// 类型定义
-// ============================================================================
 
-export type TextNodeData = {
-  code: string;
-  result?: string;
-  showControls?: boolean;
-  consoleLogs?: string[];
-  constants?: Record<string, any>;
-  width?: number;
-  height?: number;
-  nodeName?: string;
-  isCollapsed?: boolean;
-  hiddenSections?: {
-    inputs?: boolean;
-    outputs?: boolean;
-    logs?: boolean;
-    errors?: boolean;
-  };
-};
 
 // ============================================================================
 // 工具函数
@@ -63,12 +44,46 @@ function placeCaretAtPoint(x: number, y: number) {
 
 const TextNode: React.FC<NodeProps<TextNodeType>> = ({ id, data, selected }) => {
   // ============================================================================
+  // 节点数据获取 - 使用新的 API
+  // ============================================================================
+
+  // 从 UI Data API 获取节点的 UI 数据
+  const nodeData = useTextNodeData(id) ?? {
+    node: null,
+    code: '',
+    controls: [],
+    nodeName: '',
+    width: undefined,
+    height: undefined,
+    autoResizeWidth: true,
+    isCollapsed: false,
+    hiddenSections: {
+      inputs: false,
+      outputs: false,
+      logs: false,
+      errors: false,
+    },
+    updateNode: () => { },
+    updateNodeControlValues: () => { },
+  }
+  const { code, nodeName, width, height, autoResizeWidth, isCollapsed, hiddenSections, updateNode, updateNodeControlValues, controls } = nodeData;
+
+  // 从 Eval API 获取节点的计算结果
+  const nodeEval = useNodeEval(id);
+  const outputs = nodeEval.outputs;
+  const consoleLogs = nodeEval.logs;
+  const errors = nodeEval.errors;
+  const warnings = nodeEval.warnings;
+  const isEvaluating = nodeEval.isEvaluating;
+  const evaluateNode = nodeEval.evaluate;
+
+  // ============================================================================
   // 状态定义 (按功能分组)
   // ============================================================================
 
   // UI状态
   const [isEditingName, setIsEditingName] = useState(false);
-  const [nodeName, setNodeName] = useState(data.nodeName || '未命名节点');
+  const [editingName, setEditingName] = useState<string>(nodeName);
   const [hasUnsavedChanges, setHasUnsavedChanges] = useState(false);
 
   // 动画状态
@@ -84,31 +99,21 @@ const TextNode: React.FC<NodeProps<TextNodeType>> = ({ id, data, selected }) => 
   // ============================================================================
 
   const activeTool = useToolStore((state) => state.activeTool);
-  const { setNodes } = useReactFlow();
   const nameInputRef = useRef<HTMLInputElement>(null);
 
-  // ============================================================================
-  // 节点评估相关逻辑
-  // ============================================================================
-
-  const nodeEval = useNodeEval(id);
-  const controls = nodeEval.controls;
-  const outputs = nodeEval.outputs;
-  const consoleLogs = nodeEval.logs;
-  const errors = nodeEval.errors;
-  const warnings = nodeEval.warnings;
-  const isEvaluating = nodeEval.isEvaluating;
-  const setControlValues = nodeEval.setControlValues;
-  const evaluateNode = nodeEval.evaluate;
+  // // 同步 nodeName 到 editingName
+  // useEffect(() => {
+  //   setEditingName(nodeName);
+  // }, [nodeName]);
 
   // 监听代码变化, 自动调整节点宽度
   useEffect(() => {
-    const currentText = data.code || '';
+    const currentText = code || '';
     if (currentText) {
       // 自动调整节点宽度
       setTimeout(() => {
         // 节点宽度调整逻辑
-        if (data.width && typeof data.width === 'number') return;
+        if (!autoResizeWidth) return;
 
         const nodeContainer = document.querySelector(`[data-id="${id}"] .text-node`) as HTMLElement;
         if (!nodeContainer || !currentText) return;
@@ -130,19 +135,11 @@ const TextNode: React.FC<NodeProps<TextNodeType>> = ({ id, data, selected }) => 
 
         const minNodeWidth = Math.max(contentWidth + 60, 300);
 
-        // setNodes((nodes) =>
-        //   nodes.map((node) =>
-        //     node.id === id
-        //       ? { ...node, data: { ...node.data, width: minNodeWidth } }
-        //       : node
-        //   )
-        // );
-        setNodes(nodes => produce(nodes, draft => {
-          const node = draft.find(node => node.id === id);
-          if (node) {
-            node.data.width = minNodeWidth;
-          }
-        }));
+        updateNode({
+          data: {
+            width: minNodeWidth,
+          },
+        } as Partial<TextNodeType>);
 
         console.log('自动调整节点宽度:', {
           contentWidth,
@@ -151,7 +148,7 @@ const TextNode: React.FC<NodeProps<TextNodeType>> = ({ id, data, selected }) => 
         });
       }, 100);
     }
-  }, [data.code, data.width, id, setNodes]);
+  }, [code, width, id, updateNode, autoResizeWidth]);
 
   // ============================================================================
   // UI交互逻辑 (集中管理)
@@ -159,19 +156,14 @@ const TextNode: React.FC<NodeProps<TextNodeType>> = ({ id, data, selected }) => 
 
   // 节点数据更新
   const updateNodeData = useCallback((updates: Partial<TextNodeData>) => {
-    setNodes((nodes) =>
-      nodes.map((node) =>
-        node.id === id
-          ? { ...node, data: { ...node.data, ...updates } }
-          : node
-      )
-    );
-  }, [id, setNodes]);
+    if (!nodeData.node) return;
+    updateNode({ data: { ...nodeData.node.data, ...updates } });
+  }, [updateNode, nodeData.node]);
 
   // 文本变化处理
   const handleTextChange = (newText: string) => {
     updateNodeData({ code: newText });
-    const originalText = data.code || '';
+    const originalText = code || '';
     setHasUnsavedChanges(newText !== originalText);
   };
 
@@ -195,40 +187,40 @@ const TextNode: React.FC<NodeProps<TextNodeType>> = ({ id, data, selected }) => 
 
   const handleNameSubmit = useCallback(() => {
     setIsEditingName(false);
-    updateNodeData({ nodeName });
-  }, [nodeName, updateNodeData]);
+    updateNodeData({ nodeName: editingName });
+  }, [editingName, updateNodeData]);
 
   const handleNameKeyDown = useCallback((e: React.KeyboardEvent) => {
     if (e.key === 'Enter') {
       handleNameSubmit();
     } else if (e.key === 'Escape') {
-      setNodeName(data.nodeName || '未命名节点');
+      setEditingName(nodeName);
       setIsEditingName(false);
     }
-  }, [handleNameSubmit, data.nodeName]);
+  }, [handleNameSubmit, nodeName]);
 
   // 折叠/展开逻辑
   const toggleCollapse = useCallback(() => {
-    updateNodeData({ isCollapsed: !data.isCollapsed });
-  }, [data.isCollapsed, updateNodeData]);
+    updateNodeData({ isCollapsed: !isCollapsed });
+  }, [isCollapsed, updateNodeData]);
 
   // 区域显示/隐藏逻辑
   const toggleHideSection = useCallback((section: 'inputs' | 'outputs' | 'logs' | 'errors') => {
-    const hiddenSections = data.hiddenSections || {};
-    const isCurrentlyVisible = !hiddenSections[section];
+    const currentHiddenSections = hiddenSections;
+    const isCurrentlyVisible = currentHiddenSections[section];
 
     if (isCurrentlyVisible) {
       setAnimatingOut(prev => ({ ...prev, [section]: true }));
       setTimeout(() => {
-        const newHiddenSections = { ...hiddenSections, [section]: true };
+        const newHiddenSections = { ...currentHiddenSections, [section]: true };
         updateNodeData({ hiddenSections: newHiddenSections });
         setAnimatingOut(prev => ({ ...prev, [section]: false }));
       }, 300);
     } else {
-      const newHiddenSections = { ...hiddenSections, [section]: false };
+      const newHiddenSections = { ...currentHiddenSections, [section]: false };
       updateNodeData({ hiddenSections: newHiddenSections });
     }
-  }, [data.hiddenSections, updateNodeData]);
+  }, [hiddenSections, updateNodeData]);
 
   // 重置输入到默认值
   const resetInputsToDefault = useCallback(() => {
@@ -236,21 +228,21 @@ const TextNode: React.FC<NodeProps<TextNodeType>> = ({ id, data, selected }) => 
       acc[control.name] = control.defaultValue;
       return acc;
     }, {});
-    setControlValues(defaultValues);
-  }, [controls, setControlValues]);
+    updateNodeControlValues(defaultValues);
+  }, [controls, updateNodeControlValues]);
 
   // 复制代码
   const copyCode = useCallback(async () => {
     try {
-      await navigator.clipboard.writeText(data.code || '');
+      await navigator.clipboard.writeText(code || '');
     } catch (err) {
       console.error('复制代码失败:', err);
     }
-  }, [data.code]);
+  }, [code]);
 
   const handleVariableChange = useCallback((name: string, value: any) => {
-    setControlValues({ [name]: value });
-  }, [setControlValues]);
+    updateNodeControlValues({ [name]: value });
+  }, [updateNodeControlValues]);
 
   // ============================================================================
   // 动画管理逻辑 (集中管理)
@@ -263,7 +255,7 @@ const TextNode: React.FC<NodeProps<TextNodeType>> = ({ id, data, selected }) => 
   // ============================================================================
 
   // 渲染控件
-  const renderControl = (control: ControlInfo) => {
+  const renderControl = (control: NodeControls) => {
     const currentValue = control.value ?? control.defaultValue;
 
     switch (control.type) {
@@ -296,7 +288,7 @@ const TextNode: React.FC<NodeProps<TextNodeType>> = ({ id, data, selected }) => 
     }
   };
 
-  const evalControlType = (control: ControlInfo) => {
+  const evalControlType = (control: NodeControls) => {
     switch (control.type) {
       case 'slider':
         return 'number';
@@ -327,10 +319,8 @@ const TextNode: React.FC<NodeProps<TextNodeType>> = ({ id, data, selected }) => 
   // 计算属性
   // ============================================================================
 
-  const nodeWidth = data.width || 'auto';
-  const nodeHeight = data.height || 'auto';
-  const isCollapsed = data.isCollapsed || false;
-  const hiddenSections = data.hiddenSections || {};
+  const widthStyle = (width && typeof width === 'number') ? `${width}px` : 'auto';
+  const heightStyle: string | number | undefined = height || 'auto';
 
   // ------------------
   // 按住 Ctrl 键，强制进入全部位可拖动状态
@@ -346,8 +336,8 @@ const TextNode: React.FC<NodeProps<TextNodeType>> = ({ id, data, selected }) => 
     <div
       className={`text-node${selected ? ' selected' : ''}${isCollapsed ? ' collapsed' : ''}`}
       style={{
-        ...(nodeWidth !== 'auto' && { width: `${nodeWidth}px` }),
-        height: nodeHeight,
+        ...(widthStyle !== 'auto' && { width: widthStyle }),
+        height: heightStyle,
         boxSizing: 'border-box',
         // cursor: isCollapsed ? 'default' : 'text',
         minWidth: isCollapsed ? '200px' : '300px',
@@ -361,8 +351,8 @@ const TextNode: React.FC<NodeProps<TextNodeType>> = ({ id, data, selected }) => 
             <input
               ref={nameInputRef}
               className={`text-node-name-input ${isCtrlPressed ? 'drag' : 'nodrag'}`}
-              value={nodeName}
-              onChange={(e) => setNodeName(e.target.value)}
+              value={editingName || ''}
+              onChange={(e) => setEditingName(e.target.value)}
               onBlur={handleNameSubmit}
               onKeyDown={handleNameKeyDown}
             />
@@ -380,7 +370,7 @@ const TextNode: React.FC<NodeProps<TextNodeType>> = ({ id, data, selected }) => 
               }}
               title={isCollapsed ? '点击展开节点' : '双击编辑名称'}
             >
-              {nodeName}
+              {nodeName || '未命名节点'}
               {hasUnsavedChanges && (
                 <div
                   style={{
@@ -503,7 +493,7 @@ const TextNode: React.FC<NodeProps<TextNodeType>> = ({ id, data, selected }) => 
         <div className="text-node-section text-node-code-section animate-fade-in-up">
           <CodeEditor
             className={isCtrlPressed ? 'drag' : 'nodrag'}
-            initialText={data.code || ''}
+            initialText={code || ''}
             onTextChange={handleTextChange}
             onExitEdit={handleExitEdit}
             style={{
@@ -522,7 +512,7 @@ const TextNode: React.FC<NodeProps<TextNodeType>> = ({ id, data, selected }) => 
       )}
 
       {/* 输入区域 */}
-      {!isCollapsed && (!hiddenSections.inputs || animatingOut.inputs) && controls.length > 0 && (data.showControls !== false) && (
+      {!isCollapsed && (!hiddenSections.inputs || animatingOut.inputs) && controls.length > 0 && (
         <div className={`text-node-section text-node-inputs-section ${animatingOut.inputs ? 'animate-fade-out-down' : 'animate-fade-in-up'}`}>
           <div
             className="section-label clickable"
@@ -610,7 +600,7 @@ const TextNode: React.FC<NodeProps<TextNodeType>> = ({ id, data, selected }) => 
             position="left"
             minWidth={200}
             onResize={(_event, data) => {
-              updateNodeData({ width: data.width });
+              updateNodeData({ width: data.width, autoResizeWidth: false });
             }}
           />
           <NodeResizeControl
@@ -625,7 +615,7 @@ const TextNode: React.FC<NodeProps<TextNodeType>> = ({ id, data, selected }) => 
             position="right"
             minWidth={200}
             onResize={(_event, data) => {
-              updateNodeData({ width: data.width });
+              updateNodeData({ width: data.width, autoResizeWidth: false });
             }}
           />
         </>

@@ -1,7 +1,7 @@
 import { create } from 'zustand';
 import type { CanvasNode, CanvasEdge } from '@/types/canvas';
 import type { Viewport } from '@xyflow/react';
-import type { ControlInfo } from '@/services/jsExecutor';
+import type { NodeControls } from '@/services/jsExecutor';
 
 /**
  * 画布持久化状态接口
@@ -10,7 +10,7 @@ export interface CanvasPersistedState {
   nodes: CanvasNode[];
   edges: CanvasEdge[];
   viewport: Viewport;
-  controlsCache: Record<string, ControlInfo[]>;
+  controlsCache: Record<string, NodeControls[]>;
   desmosPreviewLinks: Record<string, { previewNodeId: string; outputName: string }>;
 }
 

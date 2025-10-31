@@ -1,6 +1,6 @@
 import type { Node, Edge } from '@xyflow/react';
 
-import type { TextNodeData, DesmosPreviewNodeData } from './nodeData';
+import type { TextNodeData, DesmosPreviewNodeData, DesmosPreviewLink } from './nodeData';
 
 /**
  * 画布上可能出现的节点类型合集。
@@ -9,6 +9,7 @@ import type { TextNodeData, DesmosPreviewNodeData } from './nodeData';
  */
 export type TextNodeType = Node<TextNodeData, 'textNode'>;
 export type DesmosPreviewNodeType = Node<DesmosPreviewNodeData, 'desmosPreviewNode'>;
+export type { DesmosPreviewLink };
 
 export type CanvasNode = TextNodeType | DesmosPreviewNodeType;
 

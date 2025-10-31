@@ -201,3 +201,9 @@ const evalApi = useMemo(() => ({
 
 
 persist store 不直接使用persist中间件？
+
+do i really needa clone states?
+
+compatibility with desmos preview node
+
+handleNodesChange and handleEdgesChange uses store.getState().nodes and store.getState().edges directly, is it ok?

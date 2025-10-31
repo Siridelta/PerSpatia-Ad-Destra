@@ -1,6 +1,6 @@
 // JS代码执行引擎和IO库
 
-export interface ControlInfo {
+export interface NodeControls {
   name: string;
   type: 'slider' | 'input' | 'switch';
   defaultValue: any;
@@ -13,7 +13,7 @@ export interface ControlInfo {
 export interface ExecutionResult {
   success: boolean;
   outputs: Record<string, any>;
-  controls: ControlInfo[];
+  controls: NodeControls[];
   logs: string[];
   errors?: Array<{
     message: string;
@@ -78,7 +78,7 @@ export class JSExecutor {
     stack?: string;
   }> = [];
   private outputs: Record<string, any> = {};
-  private controls: ControlInfo[] = [];
+  private controls: NodeControls[] = [];
   private inputValues: Record<string, any> = {};
   private originalConsoleLog: any;
   private originalConsoleWarn: any;
@@ -143,7 +143,7 @@ export class JSExecutor {
     // 旧格式：node_input(控件, 变量名?) - 创建控件
     const actualName = nameOrValue || `input_${this.controls.length}`;
     
-    let controlInfo: ControlInfo;
+    let controlInfo: NodeControls;
     
     if (control instanceof Slider) {
       controlInfo = {

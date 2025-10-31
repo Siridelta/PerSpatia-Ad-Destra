@@ -8,7 +8,9 @@ import {
   NodeTypes,
   ReactFlow,
   ReactFlowInstance,
-  useReactFlow
+  useReactFlow,
+  applyNodeChanges,
+  applyEdgeChanges
 } from '@xyflow/react';
 import '@xyflow/react/dist/style.css';
 import React, { useCallback, useEffect, useMemo } from 'react';
@@ -20,18 +22,16 @@ import SettingsPanel from '@/components/SettingsPanel';
 import TextNode from '@/components/TextNode';
 import Toolbar from '@/components/Toolbar';
 import { CanvasEvalProvider } from '@/contexts/CanvasEvalContext';
+import { CanvasUIDataProvider } from '@/contexts/CanvasUIDataContext';
 import { useCanvasEval } from '@/hooks/useCanvasEval';
-import { useCanvasState } from '@/hooks/useCanvasState';
+import { useCanvasUIData } from '@/hooks/useCanvasUIData';
 import { useTheme } from '@/hooks/useTheme';
 import { useSettingsStore } from '@/store/settingsStore';
 import { useToolStore } from '@/store/toolStore';
-import { UIStoreProvider } from '@/store/UIStoreProvider';
 import { CanvasEdge, CanvasNode, TextNodeType } from '@/types/canvas';
 import useInertialPan from '@/utils/useInertialPan';
 import CustomConnectionLine from './CustomConnectionLine';
 import './styles.css';
-
-// 默认节点和边现在由 UIStoreProvider 管理
 
 // 注册自定义节点类型
 const nodeTypes: NodeTypes = {
@@ -44,24 +44,30 @@ const edgeTypes: EdgeTypes = {
   custom: FloatingEdge,
 };
 
-// 内部组件，使用 UIStoreProvider 提供的 context
+// 内部组件，使用新的 API 连接模式
 const CanvasInner: React.FC = () => {
-  // 使用统一的画布状态管理
-  const {
-    nodes,
-    edges,
-    setNodes,
-    setEdges,
-    setViewport,
-    viewport,
-    removeNode,
-    removeEdge,
-    handleNodesChange,
-    handleEdgesChange,
-    importCanvasData,
-    exportCanvasData,
-    resetToDefault,
-  } = useCanvasState();
+  // 创建两大 API
+  const uiDataApi = useCanvasUIData();
+  const evalApi = useCanvasEval();
+
+  // 连接两个 API：双向订阅
+  useEffect(() => {
+    // Eval 订阅 UI 的变化（主要是 controls）
+    const unsubscribeEvalFromUI = evalApi.subscribeFromUI(uiDataApi);
+    
+    // UI 订阅 Eval 的变化
+    const unsubscribeUIFromEval = uiDataApi.subscribeFromEval(evalApi);
+
+    return () => {
+      unsubscribeEvalFromUI();
+      unsubscribeUIFromEval();
+    };
+  }, [uiDataApi, evalApi]);
+
+  // 使用 UI Data API 获取状态
+  const nodes = uiDataApi.useUIData((data) => data.nodes);
+  const edges = uiDataApi.useUIData((data) => data.edges);
+  const viewport = uiDataApi.useUIData((data) => data.viewport);
 
   // 当前活动工具（全局）
   const activeTool = useToolStore((state) => state.activeTool);
@@ -139,9 +145,9 @@ const CanvasInner: React.FC = () => {
         const selectedEdges = edges.filter(edge => edge.selected);
 
         // 删除选中的节点
-        selectedNodes.forEach(node => removeNode(node.id));
+        selectedNodes.forEach(node => uiDataApi.removeNode(node.id));
         // 删除选中的边
-        selectedEdges.forEach(edge => removeEdge(edge.id));
+        selectedEdges.forEach(edge => uiDataApi.removeEdge(edge.id));
 
         e.preventDefault();
       }
@@ -162,7 +168,11 @@ const CanvasInner: React.FC = () => {
       window.removeEventListener('keydown', handleKeyDown, true);
       document.removeEventListener('mousedown', handleMouseDown);
     };
-  }, [setActiveTool, activeTool, setConnectionStartNode, setNodes, setEdges]);
+  }, [
+    setActiveTool, activeTool, setConnectionStartNode,
+    uiDataApi.removeNode, uiDataApi.removeEdge,
+    nodes, edges,
+  ]);
 
   // 复用的创建新节点函数
   const createTextNode = useCallback((position: { x: number; y: number }): TextNodeType => ({
@@ -172,36 +182,33 @@ const CanvasInner: React.FC = () => {
     data: {
       code: '',
       initialEditing: true,
-      width: 400  // 默认宽度
+      width: 400,  // 默认宽度
+      controls: [],
+      autoResizeWidth: true,
+      nodeName: '',
+      isCollapsed: false,
+      hiddenSections: {
+        inputs: false,
+        outputs: false,
+        logs: false,
+        errors: false,
+      },
     },
   }), []);
 
-  // use memo, cuz nodes.map and edges.map will generate new array every time
-  const canvasEvalInput = useMemo(() => ({
-    nodes: nodes.map((node) => ({
-      id: node.id,
-      code: typeof node.data?.code === 'string' ? node.data.code : '',
-    })),
-    edges: edges.map((edge) => ({
-      source: edge.source,
-      target: edge.target,
-    })),
-  }), [nodes, edges]);
-  const evalApi = useCanvasEval(canvasEvalInput);
-
   // 重置画布为默认状态
   const handleReset = useCallback(() => {
-    resetToDefault();
+    uiDataApi.resetToDefault();
     setActiveTool('select');
     setConnectionStartNode(null);
-  }, [resetToDefault, setActiveTool, setConnectionStartNode]);
+  }, [uiDataApi.resetToDefault, setActiveTool, setConnectionStartNode]);
 
   // 处理画布空白点击事件
   const handlePaneClick = useCallback((event: React.MouseEvent) => {
     if (activeTool === 'text') {
       const position = screenToFlowPosition({ x: event.clientX, y: event.clientY });
       const newNode = createTextNode(position);
-      setNodes([...nodes, newNode]);
+      uiDataApi.addNode(newNode);
       setActiveTool('select'); // 创建后切回选择模式
     }
 
@@ -209,9 +216,9 @@ const CanvasInner: React.FC = () => {
     if (activeTool === 'select' && event.detail === 2) {
       const position = screenToFlowPosition({ x: event.clientX, y: event.clientY });
       const newNode = createTextNode(position);
-      setNodes([...nodes, newNode]);
+      uiDataApi.addNode(newNode);
     }
-  }, [activeTool, screenToFlowPosition, createTextNode, setNodes, setActiveTool, nodes]);
+  }, [activeTool, screenToFlowPosition, createTextNode, uiDataApi.addNode, setActiveTool]);
 
   // 处理连接事件
   const onConnect = useCallback((connection: Connection) => {
@@ -220,7 +227,7 @@ const CanvasInner: React.FC = () => {
       id: `edge-${Date.now()}`,
       type: 'custom',
     };
-    setEdges([...edges, edge]);
+    uiDataApi.addEdge(edge);
 
     // 连接建立后，立即通知目标节点更新
     if (connection.target) {
@@ -237,7 +244,7 @@ const CanvasInner: React.FC = () => {
     if (activeTool === 'connect') {
       setActiveTool('select');
     }
-  }, [setEdges, setConnectionStartNode, activeTool, setActiveTool, edges]);
+  }, [uiDataApi.addEdge, setConnectionStartNode, activeTool, setActiveTool, evalApi.evaluateNode]);
 
   // 处理节点点击（用于连接模式）
   const onNodeClick = useCallback((event: React.MouseEvent, node: Node) => {
@@ -256,7 +263,7 @@ const CanvasInner: React.FC = () => {
           target: node.id,
           type: 'custom',
         };
-        setEdges([...edges, newEdge]);
+        uiDataApi.addEdge(newEdge);
         console.log('创建连接:', connectionStartNode, '->', node.id);
 
         // 连接建立后，立即通知目标节点更新
@@ -269,11 +276,11 @@ const CanvasInner: React.FC = () => {
         setActiveTool('select');
       }
     }
-  }, [activeTool, connectionStartNode, setConnectionStartNode, setEdges, setActiveTool]);
+  }, [activeTool, connectionStartNode, setConnectionStartNode, uiDataApi.addEdge, setActiveTool, evalApi.evaluateNode]);
 
   // 导出画布数据
   const handleExport = useCallback(() => {
-    const data = exportCanvasData();
+    const data = uiDataApi.exportCanvasData();
     // 创建下载链接
     const dataStr = JSON.stringify(data, null, 2);
     const dataBlob = new Blob([dataStr], { type: 'application/json' });
@@ -283,7 +290,7 @@ const CanvasInner: React.FC = () => {
     link.download = 'canvas-data.json';
     link.click();
     URL.revokeObjectURL(url);
-  }, [exportCanvasData]);
+  }, [uiDataApi.exportCanvasData]);
 
   // 导入并替换画布数据
   const handleImportReplace = useCallback(async () => {
@@ -298,7 +305,7 @@ const CanvasInner: React.FC = () => {
           reader.onload = (e) => {
             try {
               const data = JSON.parse(e.target?.result as string);
-              importCanvasData(data);
+              uiDataApi.importCanvasData(data);
               console.log('画布数据已替换');
             } catch (error) {
               console.error('导入画布失败:', error);
@@ -313,7 +320,7 @@ const CanvasInner: React.FC = () => {
       console.error('导入画布失败:', error);
       alert(error instanceof Error ? error.message : '导入失败');
     }
-  }, [importCanvasData]);
+  }, [uiDataApi.importCanvasData]);
 
   // 导入并添加节点到画布
   const handleImportAdd = useCallback(async () => {
@@ -331,7 +338,7 @@ const CanvasInner: React.FC = () => {
               // 合并节点和边
               const mergedNodes = [...nodes, ...data.nodes];
               const mergedEdges = [...edges, ...data.edges];
-              importCanvasData({ nodes: mergedNodes, edges: mergedEdges });
+              uiDataApi.importCanvasData({ nodes: mergedNodes, edges: mergedEdges });
               console.log('节点已添加到画布');
             } catch (error) {
               console.error('导入节点失败:', error);
@@ -346,7 +353,7 @@ const CanvasInner: React.FC = () => {
       console.error('导入节点失败:', error);
       alert(error instanceof Error ? error.message : '导入失败');
     }
-  }, [nodes, edges, importCanvasData]);
+  }, [nodes, edges, uiDataApi.importCanvasData]);
 
   // 连接线样式
   const connectionLineStyle = {
@@ -367,84 +374,82 @@ const CanvasInner: React.FC = () => {
   */
 
   return (
-    <CanvasEvalProvider api={evalApi}>
-      <div className={`canvas-container ${activeTool}-mode`}>
-        <ReactFlow
-          nodes={nodes}
-          edges={edges}
-          onNodesChange={handleNodesChange}
-          onEdgesChange={handleEdgesChange}
-          onConnect={onConnect}
-          onPaneClick={handlePaneClick}
-          onNodeClick={onNodeClick}
-          onInit={handleInit}
-          onMove={(_event, newViewport) => { if (newViewport) setViewport(newViewport); }}
-          onMoveEnd={(_event, newViewport) => { if (newViewport) setViewport(newViewport); }}
-          nodeTypes={nodeTypes}
-          edgeTypes={edgeTypes}
-          defaultEdgeOptions={defaultEdgeOptions}
-          connectionLineComponent={CustomConnectionLine}
-          connectionLineStyle={connectionLineStyle}
-          className="reactflow-canvas"
-          fitViewOptions={{ padding: 0.2 }}
-          elementsSelectable={true}
-          selectNodesOnDrag={false}
-          deleteKeyCode={['Delete', 'Backspace']}
-          maxZoom={10}
-          minZoom={0.1}
-        >
-          <Background variant={BackgroundVariant.Dots} gap={20} size={1} />
-          <Controls position="bottom-right" />
+    <CanvasUIDataProvider api={uiDataApi}>
+      <CanvasEvalProvider api={evalApi}>
+        <div className={`canvas-container ${activeTool}-mode`}>
+          <ReactFlow
+            nodes={nodes}
+            edges={edges}
+            onNodesChange={(changes) => uiDataApi.setNodes(applyNodeChanges(changes, nodes))}
+            onEdgesChange={(changes) => uiDataApi.setEdges(applyEdgeChanges(changes, edges))}
+            onConnect={onConnect}
+            onPaneClick={handlePaneClick}
+            onNodeClick={onNodeClick}
+            onInit={handleInit}
+            onMove={(_event, newViewport) => { if (newViewport) uiDataApi.setViewport(newViewport); }}
+            onMoveEnd={(_event, newViewport) => { if (newViewport) uiDataApi.setViewport(newViewport); }}
+            nodeTypes={nodeTypes}
+            edgeTypes={edgeTypes}
+            defaultEdgeOptions={defaultEdgeOptions}
+            connectionLineComponent={CustomConnectionLine}
+            connectionLineStyle={connectionLineStyle}
+            className="reactflow-canvas"
+            fitViewOptions={{ padding: 0.2 }}
+            elementsSelectable={true}
+            selectNodesOnDrag={false}
+            deleteKeyCode={['Delete', 'Backspace']}
+            maxZoom={10}
+            minZoom={0.1}
+          >
+            <Background variant={BackgroundVariant.Dots} gap={20} size={1} />
+            <Controls position="bottom-right" />
 
-          {/* 自定义箭头标记 */}
-          <svg>
-            <defs>
-              <marker
-                id="custom-edge-arrow"
-                markerWidth={8}
-                markerHeight={8}
-                refX={6}
-                refY={2}
-                orient="auto"
-                markerUnits="strokeWidth"
-              >
-                <path
-                  d="M0,0 L0,4 L6,2 z"
-                  fill="rgba(100, 200, 255, 0.8)"
-                  stroke="rgba(100, 200, 255, 0.8)"
-                />
-              </marker>
-            </defs>
-          </svg>
-        </ReactFlow>
+            {/* 自定义箭头标记 */}
+            <svg>
+              <defs>
+                <marker
+                  id="custom-edge-arrow"
+                  markerWidth={8}
+                  markerHeight={8}
+                  refX={6}
+                  refY={2}
+                  orient="auto"
+                  markerUnits="strokeWidth"
+                >
+                  <path
+                    d="M0,0 L0,4 L6,2 z"
+                    fill="rgba(100, 200, 255, 0.8)"
+                    stroke="rgba(100, 200, 255, 0.8)"
+                  />
+                </marker>
+              </defs>
+            </svg>
+          </ReactFlow>
 
-        <Toolbar />
+          <Toolbar />
 
-        {/* 底部工具栏 */}
-        <BottomToolbar
-          onSettingsClick={toggleSettingsPanel}
-          onExport={handleExport}
-          onImportReplace={handleImportReplace}
-          onImportAdd={handleImportAdd}
-          onReset={handleReset}
-        />
+          {/* 底部工具栏 */}
+          <BottomToolbar
+            onSettingsClick={toggleSettingsPanel}
+            onExport={handleExport}
+            onImportReplace={handleImportReplace}
+            onImportAdd={handleImportAdd}
+            onReset={handleReset}
+          />
 
-        {/* 设置面板 */}
-        <SettingsPanel
-          isOpen={isSettingsPanelOpen}
-          onClose={closeSettingsPanel}
-        />
-      </div>
-    </CanvasEvalProvider>
+          {/* 设置面板 */}
+          <SettingsPanel
+            isOpen={isSettingsPanelOpen}
+            onClose={closeSettingsPanel}
+          />
+        </div>
+      </CanvasEvalProvider>
+    </CanvasUIDataProvider>
   );
 };
 
 const Canvas: React.FC = () => {
-  return (
-    <UIStoreProvider>
-      <CanvasInner />
-    </UIStoreProvider>
-  );
+  return <CanvasInner />;
 };
 
 export default Canvas;

@@ -24,13 +24,6 @@ export const useNodeEval = (nodeId: string) => {
   const evalApi = useCanvasEvalApi();
   const node = evalApi.useEvalStore((state) => state[nodeId]);
 
-  const setControlValues = useCallback(
-    (values: Record<string, unknown>) => {
-      evalApi.updateNodeControls(nodeId, values);
-    },
-    [evalApi, nodeId]
-  );
-
   const evaluate = useCallback(() => evalApi.evaluateNode(nodeId), [evalApi, nodeId]);
 
   return useMemo(
@@ -42,10 +35,9 @@ export const useNodeEval = (nodeId: string) => {
       errors: node?.errors ?? [],
       warnings: node?.warnings ?? [],
       isEvaluating: node?.isEvaluating ?? false,
-      setControlValues,
       evaluate,
     }),
-    [node, setControlValues, evaluate]
+    [node, evaluate]
   );
 };
 

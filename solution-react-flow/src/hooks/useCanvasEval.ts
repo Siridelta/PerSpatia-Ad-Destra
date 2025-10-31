@@ -2,9 +2,9 @@ import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { createStore } from 'zustand/vanilla';
 import { useStore } from 'zustand';
 import { immer } from 'zustand/middleware/immer';
-import { jsExecutor, ControlInfo, ExecutionResult } from '@/services/jsExecutor';
-import { useGetUIStore, useUIStore } from '@/store/UIStoreProvider';
+import { jsExecutor, NodeControls, ExecutionResult } from '@/services/jsExecutor';
 import { produce } from 'immer';
+import type { CanvasUIDataApi } from './useCanvasUIData';
 
 export interface ErrorInfo {
   message: string;
@@ -23,6 +23,7 @@ export interface WarningInfo {
 export interface CanvasEvalInputNode {
   id: string;
   code: string;
+  controls?: NodeControls[];
 }
 
 export interface CanvasEvalInputEdge {
@@ -38,7 +39,7 @@ export interface CanvasEvalInput {
 export interface CanvasEvalNodeData {
   code: string;
   isEvaluating: boolean;
-  controls: ControlInfo[];
+  controls: NodeControls[];
   outputs: Record<string, any>;
   logs: string[];
   errors: ErrorInfo[];
@@ -54,10 +55,16 @@ interface CanvasEvalStoreState {
 }
 
 export interface CanvasEvalApi {
+  // 订阅方法
+  subscribeFromUI: (uiDataApi: CanvasUIDataApi) => () => void;
+  subscribeData: (callback: (data: CanvasEvalData, prevData?: CanvasEvalData) => void) => () => void;
+  
+  // 数据访问方法
   getSnapshot: () => CanvasEvalData;
   useEvalStore: <T>(selector: (state: CanvasEvalData) => T) => T;
+  
+  // 计算控制方法
   syncGraph: (input: CanvasEvalInput) => Promise<void>;
-  updateNodeControls: (nodeId: string, nextValues: Record<string, unknown>) => Promise<void>;
   evaluateNode: (nodeId: string) => Promise<void>;
   evaluateAll: () => Promise<void>;
 }
@@ -72,7 +79,7 @@ const createInitialNodeData = (code: string): CanvasEvalNodeData => ({
   warnings: [],
 });
 
-const mergeControls = (prevControls: ControlInfo[], nextControls: ControlInfo[]) => {
+const mergeControls = (prevControls: NodeControls[], nextControls: NodeControls[]) => {
   const prevMap = new Map(prevControls.map((c) => [c.name, c]));
   return nextControls.map((control) => {
     const prev = prevMap.get(control.name);
@@ -195,8 +202,45 @@ const resolveInputDelta = (
       addedNodeIds.push(node.id);
       return;
     }
+    // 检查 code 或 controls 是否有变化
     if (prev.code !== node.code) {
       updatedNodeIds.push(node.id);
+    } else if (node.controls) {
+      // 检查 controls 值是否有变化
+      const prevNodeData = lastCompletedState.data[node.id];
+      if (prevNodeData) {
+        const prevControls = prevNodeData.controls || [];
+        const currentControls = node.controls || [];
+        
+        // 创建 control 值的映射，便于比较
+        const prevValuesMap = new Map(prevControls.map(c => [c.name, c.value]));
+        const currentValuesMap = new Map(currentControls.map(c => [c.name, c.value]));
+        
+        // 检查是否有值的变化
+        let hasValueChange = false;
+        
+        // 检查当前 controls 是否有值变化
+        for (const [name, value] of currentValuesMap.entries()) {
+          if (prevValuesMap.get(name) !== value) {
+            hasValueChange = true;
+            break;
+          }
+        }
+        
+        // 如果 prevControls 中有 control 在当前 controls 中不存在，也算变化
+        if (!hasValueChange) {
+          for (const [name] of prevValuesMap.entries()) {
+            if (!currentValuesMap.has(name)) {
+              hasValueChange = true;
+              break;
+            }
+          }
+        }
+        
+        if (hasValueChange) {
+          updatedNodeIds.push(node.id);
+        }
+      }
     }
   });
 
@@ -266,15 +310,13 @@ const resolveInputDelta = (
 // 根据最新输入构建下一版 eval 数据 --- 全量更新版，用于首次运行
 const createInitialEvalData = (
   currentInput: CanvasEvalInput,
-  controlsCache: Record<string, ControlInfo[] | undefined>,
 ): CanvasEvalData => {
   const nextData: CanvasEvalData = {};
 
-  currentInput.nodes.forEach(({ id, code }) => {
-    const cachedControls = controlsCache[id];
+  currentInput.nodes.forEach(({ id, code, controls }) => {
     nextData[id] = {
       ...createInitialNodeData(code),
-      controls: cachedControls ? cachedControls.map((control) => ({ ...control })) : [],
+      controls: controls ? controls.map((control) => ({ ...control })) : [],
     };
   });
 
@@ -289,7 +331,11 @@ const buildNextEvalData = (
 ): CanvasEvalData =>
   produce(currentData, (draft) => {
     delta.addedNodeIds.forEach((id) => {
-      draft[id] = createInitialNodeData(currentInput.nodes.find((node) => node.id === id)!.code);
+      const node = currentInput.nodes.find((node) => node.id === id)!;
+      draft[id] = {
+        ...createInitialNodeData(node.code),
+        controls: node.controls ? node.controls.map((control) => ({ ...control })) : [],
+      };
     });
 
     delta.removedNodeIds.forEach((id) => {
@@ -297,7 +343,12 @@ const buildNextEvalData = (
     });
 
     delta.updatedNodeIds.forEach((id) => {
-      draft[id]!.code = currentInput.nodes.find((node) => node.id === id)!.code;
+      const node = currentInput.nodes.find((node) => node.id === id)!;
+      draft[id]!.code = node.code;
+      // 如果节点有新的 controls，合并它们（保留用户设置的值）
+      if (node.controls) {
+        draft[id]!.controls = mergeControls(draft[id]!.controls, node.controls);
+      }
     });
   });
 
@@ -412,7 +463,6 @@ const runEvaluationPlan = async (
   stateSnapshot: CanvasEvalStoreState,
   latestVersionRef: { current: number },
   version: number,
-  onControlsPersist?: (nodeId: string, controls: ControlInfo[]) => void,
 ) => {
   const interimResults = new Map<string, CanvasEvalNodeData>();
 
@@ -460,7 +510,6 @@ const runEvaluationPlan = async (
           errors: [],
           warnings: result.warnings || [],
         });
-        onControlsPersist?.(nodeId, result.controls);
       } else {
         interimResults.set(nodeId, {
           ...nodeState,
@@ -489,47 +538,27 @@ const runEvaluationPlan = async (
   return interimResults;
 };
 
-const createEvalStore = (input: CanvasEvalInput) => {
-  const initialData: CanvasEvalData = {};
-  input.nodes.forEach(({ id, code }) => {
-    initialData[id] = createInitialNodeData(code);
-  });
-
-  const maps = buildGraphIOReprs(input.edges);
-
+const createEvalStore = () => {
   return createStore<CanvasEvalStoreState>()(
     immer(() => ({
-      data: initialData,
-      incomingByTarget: maps.incoming,
-      outgoingBySource: maps.outgoing,
+      data: {},
+      incomingByTarget: {},
+      outgoingBySource: {},
     })),
   );
 };
 type EvalStore = ReturnType<typeof createEvalStore>;
 
-export const useCanvasEval = (input: CanvasEvalInput): CanvasEvalApi => {
-  const currentInput = input;
-
+export const useCanvasEval = (): CanvasEvalApi => {
   // 内部 evaluation store（每个 Canvas 单独实例）
-  const [store] = useState(() => createEvalStore(currentInput));
+  const [store] = useState(() => createEvalStore());
 
-  const evaluationVersionRef = useRef(0);
+  const evalTaskVerRef = useRef(0);
   const lastCompletedStateRef = useRef<CanvasEvalStoreState | null>(null);
 
   if (!lastCompletedStateRef.current) {
     lastCompletedStateRef.current = cloneCanvasEvalStoreState(store.getState());
   }
-
-  // uiStore 中的 controls 缓存，用于尽量持久化 controls 状态
-  const uiStore = useGetUIStore();
-  const setNodeControlsCache = useUIStore((state) => state.setNodeControlsCache);
-  const persistControls = useCallback(
-    (nodeId: string, controls: ControlInfo[]) => {
-      console.log('persistControls', nodeId, controls);
-      setNodeControlsCache(nodeId, controls.length ? controls : undefined);
-    },
-    [setNodeControlsCache]
-  );
 
   const runEvaluationTask = useCallback(
     async (
@@ -549,12 +578,11 @@ export const useCanvasEval = (input: CanvasEvalInput): CanvasEvalApi => {
       const interimResults = await runEvaluationPlan(
         plan,
         baseState,
-        evaluationVersionRef,
-        version,
-        persistControls,
+        evalTaskVerRef,
+        version
       );
 
-      if (!interimResults || evaluationVersionRef.current !== version) {
+      if (!interimResults || evalTaskVerRef.current !== version) {
         return null;
       }
 
@@ -565,16 +593,14 @@ export const useCanvasEval = (input: CanvasEvalInput): CanvasEvalApi => {
       });
 
       return nextState;
-    },
-    [persistControls],
-  );
+    }, []);
 
-  useEffect(() => {
-    evaluationVersionRef.current += 1;
-    const currentVersion = evaluationVersionRef.current;
+  // 同步 UI 数据并触发计算的内部函数
+  const syncFromUIInput = useCallback(
+    async (currentInput: CanvasEvalInput) => {
+      evalTaskVerRef.current += 1;
+      const currentVersion = evalTaskVerRef.current;
 
-    const runSyncAndEvaluate = async () => {
-      const { controlsCache } = uiStore.getState();
       const baseState = lastCompletedStateRef.current;
 
       // 基于 lastCompletedState 和 currentInput 计算差异
@@ -592,7 +618,7 @@ export const useCanvasEval = (input: CanvasEvalInput): CanvasEvalApi => {
       // 如果有 baseState，则进行增量更新；否则进行全量初始化
       const nextData = baseState
         ? buildNextEvalData(baseState.data, currentInput, delta)
-        : createInitialEvalData(currentInput, controlsCache);
+        : createInitialEvalData(currentInput);
 
       const graphIOReprs = buildGraphIOReprs(currentInput.edges);
 
@@ -616,10 +642,9 @@ export const useCanvasEval = (input: CanvasEvalInput): CanvasEvalApi => {
         store.setState(completedState);
         lastCompletedStateRef.current = cloneCanvasEvalStoreState(completedState);
       }
-    };
-
-    runSyncAndEvaluate();
-  }, [store, currentInput, persistControls, runEvaluationTask, uiStore]);
+    },
+    [store, runEvaluationTask]
+  );
 
   const api = useMemo<CanvasEvalApi>(() => {
     const getSnapshot = () => store.getState().data;
@@ -627,48 +652,56 @@ export const useCanvasEval = (input: CanvasEvalInput): CanvasEvalApi => {
     const useEvalStore = <T>(selector: (state: CanvasEvalData) => T) =>
       useStore(store, (state) => selector(state.data));
 
+    // 订阅来自 UI 的数据变化
+    const subscribeFromUI = (uiDataApi: CanvasUIDataApi): (() => void) => {
+
+      // 订阅 UI 数据变化
+      const unsubscribe = uiDataApi.subscribeData((uiData, prevUIData) => {
+        // 转换 UI 数据为 EvalInput，将 controlsCache 中的 controls 合并到 nodes 中
+        const currentInput: CanvasEvalInput = {
+          nodes: uiData.nodes.map((node) => {
+            const controls = uiData.controlsCache[node.id];
+            return {
+              id: node.id,
+              code: typeof node.data?.code === 'string' ? node.data.code : '',
+              controls: controls ? controls.map((control) => ({ ...control })) : undefined,
+            };
+          }),
+          edges: uiData.edges.map((edge) => ({
+            source: edge.source,
+            target: edge.target,
+          })),
+        };
+
+        // 同步并触发计算
+        syncFromUIInput(currentInput);
+      });
+
+      return unsubscribe;
+    };
+
+    // 订阅 Eval 数据变化
+    const subscribeData = (
+      callback: (data: CanvasEvalData, prevData?: CanvasEvalData) => void
+    ): (() => void) => {
+      return store.subscribe((state, prevState) => {
+        const currentData = state.data;
+        const prevData = prevState?.data ?? undefined;
+        callback(currentData, prevData);
+      });
+    };
+
     const requestEvaluation = async (entryNodeIds: string[]) => {
       if (!entryNodeIds.length) return;
 
-      evaluationVersionRef.current += 1;
-      const currentVersion = evaluationVersionRef.current;
+      evalTaskVerRef.current += 1;
+      const currentVersion = evalTaskVerRef.current;
 
       const baseState = store.getState();
       const completedState = await runEvaluationTask(entryNodeIds, baseState, currentVersion);
       if (completedState) {
         store.setState(completedState);
         lastCompletedStateRef.current = cloneCanvasEvalStoreState(completedState);
-      }
-    };
-
-    const updateNodeControls = async (nodeId: string, nextValues: Record<string, unknown>) => {
-      let changed = false;
-
-      store.setState((draft) => {
-        const node = draft.data[nodeId];
-        if (!node) return;
-
-        const updatedControls = node.controls.map((control) => {
-          if (Object.prototype.hasOwnProperty.call(nextValues, control.name)) {
-            const nextValue = nextValues[control.name];
-            if (control.value !== nextValue) {
-              changed = true;
-              return { ...control, value: nextValue };
-            }
-          }
-          return control;
-        });
-
-        if (changed) {
-          node.controls = updatedControls;
-        }
-      });
-
-      if (changed) {
-        await requestEvaluation([nodeId]);
-      } else {
-        const current = store.getState().data[nodeId];
-        if (current) persistControls(nodeId, current.controls);
       }
     };
 
@@ -683,22 +716,20 @@ export const useCanvasEval = (input: CanvasEvalInput): CanvasEvalApi => {
 
     const syncGraph = async (nextInput: CanvasEvalInput) => {
       const current = store.getState();
-      const { controlsCache } = uiStore.getState();
       const nextData: CanvasEvalData = {};
 
-      nextInput.nodes.forEach(({ id, code }) => {
+      nextInput.nodes.forEach(({ id, code, controls }) => {
         const prev = current.data[id];
-        const cachedControls = controlsCache[id];
         if (prev) {
           nextData[id] = {
             ...prev,
             code,
-            controls: cachedControls ? cachedControls.map((control) => ({ ...control })) : prev.controls,
+            controls: controls ? mergeControls(prev.controls, controls) : prev.controls,
           };
         } else {
           nextData[id] = {
             ...createInitialNodeData(code),
-            controls: cachedControls ? cachedControls.map((control) => ({ ...control })) : [],
+            controls: controls ? controls.map((control) => ({ ...control })) : [],
           };
         }
       });
@@ -715,14 +746,15 @@ export const useCanvasEval = (input: CanvasEvalInput): CanvasEvalApi => {
     };
 
     return {
+      subscribeFromUI,
+      subscribeData,
       getSnapshot,
       useEvalStore,
       syncGraph,
-      updateNodeControls,
       evaluateNode,
       evaluateAll,
     };
-  }, [store, persistControls, runEvaluationTask, uiStore]);
+  }, [store, runEvaluationTask, syncFromUIInput]);
 
   return api;
 };
