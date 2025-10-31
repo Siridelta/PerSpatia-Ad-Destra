@@ -2,7 +2,7 @@ import { useCallback, useMemo, useRef, useState } from 'react';
 import { createStore } from 'zustand/vanilla';
 import { useStore } from 'zustand';
 import { immer } from 'zustand/middleware/immer';
-import { jsExecutor, NodeControls, ExecutionResult } from '@/services/jsExecutor';
+import { jsExecutor, Control, ExecutionResult } from '@/services/jsExecutor';
 import { produce } from 'immer';
 import type { CanvasUIDataApi } from './useCanvasUIData';
 
@@ -23,7 +23,7 @@ export interface WarningInfo {
 export interface CanvasEvalInputNode {
   id: string;
   code: string;
-  controls?: NodeControls[];
+  controls?: Control[];
 }
 
 export interface CanvasEvalInputEdge {
@@ -39,7 +39,7 @@ export interface CanvasEvalInput {
 export interface CanvasEvalNodeData {
   code: string;
   isEvaluating: boolean;
-  controls: NodeControls[];
+  controls: Control[];
   outputs: Record<string, any>;
   logs: string[];
   errors: ErrorInfo[];
@@ -78,7 +78,7 @@ const createInitialNodeData = (code: string): CanvasEvalNodeData => ({
   warnings: [],
 });
 
-const mergeControls = (prevControls: NodeControls[], nextControls: NodeControls[]) => {
+const mergeControls = (prevControls: Control[], nextControls: Control[]) => {
   const prevMap = new Map(prevControls.map((c) => [c.name, c]));
   return nextControls.map((control) => {
     const prev = prevMap.get(control.name);
@@ -654,7 +654,7 @@ export const useCanvasEval = (): CanvasEvalApi => {
         // 转换 UI 数据为 EvalInput，从节点数据中读取 controls
         const currentInput: CanvasEvalInput = {
           nodes: uiData.nodes.map((node) => {
-            let controls: NodeControls[] | undefined = undefined;
+            let controls: Control[] | undefined = undefined;
             if (node.type === 'textNode' && node.data.controls) {
               controls = node.data.controls.map((control) => ({ ...control }));
             }

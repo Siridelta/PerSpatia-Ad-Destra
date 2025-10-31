@@ -1,6 +1,6 @@
 /// <reference types="desmos" />
 
-import { NodeControls } from "@/services/jsExecutor";
+import { Control } from "@/services/jsExecutor";
 
 /**
  * 文本节点的数据结构，负责描述 TextNode 自身需要的业务状态。
@@ -13,7 +13,7 @@ import { NodeControls } from "@/services/jsExecutor";
  */
 export interface TextNodeData extends Record<string, unknown> {
   code: string;
-  controls: NodeControls[];
+  controls: Control[];
   width?: number;
   height?: number;
   autoResizeWidth: boolean;

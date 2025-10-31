@@ -4,7 +4,7 @@ import { CanvasPersistedState, useCanvasPersistenceStore } from '@/store/canvasP
 import { CanvasEvalApi } from './useCanvasEval';
 import type { CanvasNode, CanvasEdge, TextNodeType, DesmosPreviewNodeType, DesmosPreviewLink } from '@/types/canvas';
 import { applyEdgeChanges, applyNodeChanges, type EdgeChange, type NodeChange, type Viewport } from '@xyflow/react';
-import type { NodeControls } from '@/services/jsExecutor';
+import type { Control } from '@/services/jsExecutor';
 import { DesmosPreviewNodeData, TextNodeData } from '@/types/nodeData';
 
 
@@ -143,17 +143,17 @@ const toUIData = (state: UIStoreState): UIData => ({
  * 计算 EvalData 变化的增量
  */
 interface EvalDataDelta {
-  updatedControls: Record<string, NodeControls[]>;
+  updatedControls: Record<string, Control[]>;
   hasChanges: boolean;
 }
 
 const resolveEvalDataDelta = (
-  currentEvalData: Record<string, { controls: NodeControls[] }>,
-  prevEvalData?: Record<string, { controls: NodeControls[] }>
+  currentEvalData: Record<string, { controls: Control[] }>,
+  prevEvalData?: Record<string, { controls: Control[] }>
 ): EvalDataDelta => {
   if (!prevEvalData) {
     // 首次初始化，所有 controls 都是新的
-    const updatedControls: Record<string, NodeControls[]> = {};
+    const updatedControls: Record<string, Control[]> = {};
     Object.entries(currentEvalData).forEach(([nodeId, nodeData]) => {
       if (nodeData.controls.length > 0) {
         updatedControls[nodeId] = nodeData.controls;
@@ -165,7 +165,7 @@ const resolveEvalDataDelta = (
     };
   }
 
-  const updatedControls: Record<string, NodeControls[]> = {};
+  const updatedControls: Record<string, Control[]> = {};
 
   // 检查每个节点的 controls 是否有变化
   Object.entries(currentEvalData).forEach(([nodeId, nodeData]) => {
@@ -256,10 +256,10 @@ export const useCanvasUIData = (): CanvasUIDataApi => {
   const api = useMemo<CanvasUIDataApi>(() => {
     // 订阅来自 Eval 系统的变化
     const subscribeFromEval = (evalApi: CanvasEvalApi): (() => void) => {
-      let prevEvalData: Record<string, { controls: NodeControls[] }> | undefined = undefined;
+      let prevEvalData: Record<string, { controls: Control[] }> | undefined = undefined;
       const unsubscribe = evalApi.subscribeData((evalData) => {
         // 提取 controls 信息
-        const currentEvalData: Record<string, { controls: NodeControls[] }> = {};
+        const currentEvalData: Record<string, { controls: Control[] }> = {};
         Object.entries(evalData).forEach(([nodeId, nodeData]) => {
           currentEvalData[nodeId] = {
             controls: nodeData.controls || [],

@@ -2,7 +2,7 @@ import React, { useState, useCallback, useEffect, useRef } from 'react';
 import { Handle, Position, NodeProps, NodeResizeControl, useKeyPress } from '@xyflow/react';
 import './styles.css';
 import '@/styles/syntax-highlighting.css';
-import { NodeControls } from '@/services/jsExecutor';
+import { Control } from '@/services/jsExecutor';
 import { useToolStore } from '@/store/toolStore';
 import { SliderControl, ToggleControl, TextControl } from './controls';
 import { ErrorDisplay, WarningDisplay, LogDisplay, OutputDisplay } from './displays';
@@ -227,7 +227,7 @@ const TextNode: React.FC<NodeProps<TextNodeType>> = ({ id, data, selected }) => 
   // ============================================================================
 
   // 渲染控件
-  const renderControl = (control: NodeControls) => {
+  const renderControl = (control: Control) => {
     const currentValue = control.value ?? control.defaultValue;
 
     switch (control.type) {
@@ -260,7 +260,7 @@ const TextNode: React.FC<NodeProps<TextNodeType>> = ({ id, data, selected }) => 
     }
   };
 
-  const evalControlType = (control: NodeControls) => {
+  const evalControlType = (control: Control) => {
     switch (control.type) {
       case 'slider':
         return 'number';
