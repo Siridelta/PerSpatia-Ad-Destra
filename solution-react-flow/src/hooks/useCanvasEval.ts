@@ -657,14 +657,17 @@ export const useCanvasEval = (): CanvasEvalApi => {
 
       // 订阅 UI 数据变化
       const unsubscribe = uiDataApi.subscribeData((uiData, prevUIData) => {
-        // 转换 UI 数据为 EvalInput，将 controlsCache 中的 controls 合并到 nodes 中
+        // 转换 UI 数据为 EvalInput，从节点数据中读取 controls
         const currentInput: CanvasEvalInput = {
           nodes: uiData.nodes.map((node) => {
-            const controls = uiData.controlsCache[node.id];
+            let controls: NodeControls[] | undefined = undefined;
+            if (node.type === 'textNode' && node.data.controls) {
+              controls = node.data.controls.map((control) => ({ ...control }));
+            }
             return {
               id: node.id,
               code: typeof node.data?.code === 'string' ? node.data.code : '',
-              controls: controls ? controls.map((control) => ({ ...control })) : undefined,
+              controls,
             };
           }),
           edges: uiData.edges.map((edge) => ({

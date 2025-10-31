@@ -13,7 +13,6 @@ export interface UIStoreState {
   nodes: CanvasNode[];
   edges: CanvasEdge[];
   viewport: Viewport;
-  controlsCache: Record<string, NodeControls[]>;
   desmosPreviewLinks: Record<string, DesmosPreviewLink>;
 }
 
@@ -25,7 +24,6 @@ export interface UIData {
   nodes: CanvasNode[];
   edges: CanvasEdge[];
   viewport: Viewport;
-  controlsCache: Record<string, NodeControls[]>;
 }
 
 /**
@@ -78,8 +76,8 @@ export interface CanvasUIDataApi {
   updateDesmosPreviewState: (sourceNodeId: string, desmosState: any) => void;
 
   // Controls 操作
-  setNodeControlsCache: (nodeId: string, controls?: NodeControls[]) => void;
   updateNodeControlValues: (nodeId: string, values: Record<string, unknown>) => void;
+  updateNodeControlValue: (nodeId: string, controlName: string, value: unknown) => void;
 }
 
 
@@ -108,12 +106,11 @@ const isSameViewport = (a: Viewport, b: Viewport) => (
  * @param initialState 可选的初始状态。如果不提供，则使用默认画布数据。
  * @returns 一个新的 Zustand Store 实例
  */
-export const createUIStore = (initialState?: Partial<CanvasPersistedState>) => {
+const createUIStore = (initialState?: Partial<CanvasPersistedState>) => {
   // 确定初始状态
   const initialNodes = initialState?.nodes ?? defaultCanvas.nodes;
   const initialEdges = initialState?.edges ?? defaultCanvas.edges;
   const initialViewport = initialState?.viewport ?? defaultCanvas.viewport ?? defaultViewport;
-  const initialControlsCache = initialState?.controlsCache ?? {};
   const initialDesmosPreviewLinks = initialState?.desmosPreviewLinks ?? {};
 
   return create<UIStoreState>()(
@@ -122,7 +119,6 @@ export const createUIStore = (initialState?: Partial<CanvasPersistedState>) => {
       nodes: initialNodes,
       edges: initialEdges,
       viewport: initialViewport,
-      controlsCache: initialControlsCache,
       desmosPreviewLinks: initialDesmosPreviewLinks,
     }))
   );
@@ -137,7 +133,6 @@ const toUIData = (state: UIStoreState): UIData => ({
   nodes: state.nodes,
   edges: state.edges,
   viewport: state.viewport,
-  controlsCache: state.controlsCache,
 });
 
 /**
@@ -236,7 +231,6 @@ export const useCanvasUIData = (): CanvasUIDataApi => {
         nodes: state.nodes,
         edges: state.edges,
         viewport: state.viewport,
-        controlsCache: state.controlsCache,
         desmosPreviewLinks: state.desmosPreviewLinks,
       };
 
@@ -272,15 +266,14 @@ export const useCanvasUIData = (): CanvasUIDataApi => {
         const delta = resolveEvalDataDelta(currentEvalData, prevEvalData);
 
         if (delta.hasChanges) {
-          // 同步 controls 到 UI Store
+          // 同步 controls 到节点数据中
           store.setState((draft) => {
             Object.entries(delta.updatedControls).forEach(([nodeId, controls]) => {
-              if (controls.length === 0) {
-                // 删除缓存
-                delete draft.controlsCache[nodeId];
-              } else {
-                // 更新缓存
-                draft.controlsCache[nodeId] = controls;
+              const node = draft.nodes.find((n) => n.id === nodeId);
+              if (!node) return;
+              if (node.type === 'textNode') {
+                // 更新节点数据中的 controls
+                node.data.controls = controls;
               }
             });
           });
@@ -367,13 +360,6 @@ export const useCanvasUIData = (): CanvasUIDataApi => {
       store.setState(state => {
         const validIds = new Set(nodes.map((node) => node.id));
 
-        const nextCache: Record<string, NodeControls[]> = {};
-        Object.entries(state.controlsCache).forEach(([id, controls]) => {
-          if (validIds.has(id)) {
-            nextCache[id] = controls;
-          }
-        });
-
         const nextPreviewLinks: Record<string, DesmosPreviewLink> = {};
         Object.entries(state.desmosPreviewLinks).forEach(([sourceId, link]) => {
           if (validIds.has(sourceId) && validIds.has(link.previewNodeId)) {
@@ -383,7 +369,6 @@ export const useCanvasUIData = (): CanvasUIDataApi => {
 
         return {
           nodes,
-          controlsCache: nextCache,
           desmosPreviewLinks: nextPreviewLinks,
         };
       });
@@ -420,7 +405,6 @@ export const useCanvasUIData = (): CanvasUIDataApi => {
         nodes: [],
         edges: [],
         viewport: defaultViewport,
-        controlsCache: {},
         desmosPreviewLinks: {},
       });
 
@@ -429,7 +413,6 @@ export const useCanvasUIData = (): CanvasUIDataApi => {
         nodes: defaultCanvas.nodes,
         edges: defaultCanvas.edges,
         viewport: defaultCanvas.viewport ?? defaultViewport,
-        controlsCache: {},
         desmosPreviewLinks: {},
       });
 
@@ -612,34 +595,30 @@ export const useCanvasUIData = (): CanvasUIDataApi => {
         };
       });
 
-    // 控件缓存操作
-    const setNodeControlsCache = (nodeId: string, controls?: NodeControls[]) => 
-      store.setState(state => {
-        const nextCache = { ...state.controlsCache };
-        if (!controls || controls.length === 0) {
-          delete nextCache[nodeId];
-        } else {
-          nextCache[nodeId] = controls;
-        }
-        return { controlsCache: nextCache };
-      });
-
     // 更新节点的 control 值（用于用户交互）
-    const updateNodeControlValues = (nodeId: string, values: Record<string, unknown>) => {
-      const currentControls = store.getState().controlsCache[nodeId];
-      if (!currentControls) return;
-
-      // 更新 controls 的值
-      const updatedControls = currentControls.map((control) => {
-        if (Object.prototype.hasOwnProperty.call(values, control.name)) {
-          return { ...control, value: values[control.name] };
+    const updateNodeControlValues = (nodeId: string, values: Record<string, unknown>) =>
+      store.setState(state => {
+        const node = state.nodes.find((n) => n.id === nodeId);
+        if (!node) return;
+        if (node.type === 'textNode' && node.data.controls) {
+          node.data.controls.forEach((control) => {
+            if (values.hasOwnProperty(control.name)) {
+              control.value = values[control.name];
+            }
+          });
         }
-        return control;
       });
 
-      // 更新到 controlsCache
-      setNodeControlsCache(nodeId, updatedControls);
-    };
+    const updateNodeControlValue = (nodeId: string, controlName: string, value: unknown) =>
+      store.setState(state => {
+        const node = state.nodes.find((n) => n.id === nodeId);
+        if (!node) return;
+        if (node.type === 'textNode' && node.data.controls) {
+          const control = node.data.controls.find((control) => control.name === controlName);
+          if (!control) return;
+          control.value = value;
+        }
+      });
 
     return {
       subscribeFromEval,
@@ -666,8 +645,8 @@ export const useCanvasUIData = (): CanvasUIDataApi => {
       createTextNode,
       createDesmosPreviewNode,
       updateDesmosPreviewState,
-      setNodeControlsCache,
       updateNodeControlValues,
+      updateNodeControlValue,
     };
   }, [store]);
 

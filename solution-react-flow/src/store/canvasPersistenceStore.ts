@@ -10,7 +10,7 @@ export interface CanvasPersistedState {
   nodes: CanvasNode[];
   edges: CanvasEdge[];
   viewport: Viewport;
-  controlsCache: Record<string, NodeControls[]>;
+  controlsCache?: Record<string, NodeControls[]>; // 可选，用于向后兼容
   desmosPreviewLinks: Record<string, { previewNodeId: string; outputName: string }>;
 }
 
@@ -31,7 +31,7 @@ interface CanvasPersistenceState {
 }
 
 const STORAGE_KEY = 'desmos-canvas-flow-state';
-const STORAGE_VERSION = 5;
+const STORAGE_VERSION = 6; // 版本 6: controls 整合到节点数据中
 
 // 默认视角（React Flow 默认值）
 const defaultViewport: Viewport = { x: 0, y: 0, zoom: 1 };
@@ -43,7 +43,6 @@ const migrateState = (persistedState: any, version: number): CanvasPersistedStat
       nodes: [],
       edges: [],
       viewport: defaultViewport,
-      controlsCache: {},
       desmosPreviewLinks: {},
     };
   }
@@ -85,6 +84,27 @@ const migrateState = (persistedState: any, version: number): CanvasPersistedStat
     newState = {
       ...newState,
       desmosPreviewLinks: {},
+    };
+  }
+
+  // 版本 6: 将 controlsCache 迁移到节点数据中
+  if (version < 6 && newState.controlsCache) {
+    newState = {
+      ...newState,
+      nodes: newState.nodes.map((node: any) => {
+        if (node.type === 'textNode' && newState.controlsCache![node.id]) {
+          return {
+            ...node,
+            data: {
+              ...node.data,
+              controls: newState.controlsCache![node.id],
+            },
+          };
+        }
+        return node;
+      }),
+      // 移除 controlsCache，因为已经整合到节点数据中
+      controlsCache: undefined,
     };
   }
 
