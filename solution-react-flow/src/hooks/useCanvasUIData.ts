@@ -147,7 +147,7 @@ interface EvalDataDelta {
   hasChanges: boolean;
 }
 
-const resolveEvalDataDelta = (
+const resolveDeltaByEvalData = (
   currentEvalData: Record<string, { controls: Control[] }>,
   prevState?: UIStoreState
 ): EvalDataDelta => {
@@ -265,15 +265,15 @@ export const useCanvasUIData = (): CanvasUIDataApi => {
     const subscribeFromEval = (evalApi: CanvasEvalApi): (() => void) => {
       const unsubscribe = evalApi.subscribeData((evalData) => {
         // 提取 controls 信息
-        const currentEvalData: Record<string, { controls: Control[] }> = {};
+        const currNodesControls: Record<string, { controls: Control[] }> = {};
         Object.entries(evalData).forEach(([nodeId, nodeData]) => {
-          currentEvalData[nodeId] = {
+          currNodesControls[nodeId] = {
             controls: nodeData.controls || [],
           };
         });
 
         // 计算增量
-        const delta = resolveEvalDataDelta(currentEvalData, store.getState());
+        const delta = resolveDeltaByEvalData(currNodesControls, store.getState());
 
         if (delta.hasChanges) {
           // 同步 controls 到节点数据中
