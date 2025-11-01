@@ -17,10 +17,10 @@
           "logs": false,
           "errors": false
         },
-        "width": 575,
+        "width": 556,
         "controls": [
           {
-            "name": "input_0",
+            "name": "speed",
             "type": "slider",
             "defaultValue": 50,
             "min": 0,
@@ -29,13 +29,13 @@
             "value": 50
           },
           {
-            "name": "input_1",
+            "name": "name",
             "type": "input",
             "defaultValue": "测试",
             "value": "测试"
           },
           {
-            "name": "input_2",
+            "name": "enabled",
             "type": "switch",
             "defaultValue": true,
             "value": true
@@ -44,8 +44,8 @@
       },
       "type": "textNode",
       "measured": {
-        "width": 575,
-        "height": 535
+        "width": 556,
+        "height": 493
       },
       "selected": false,
       "dragging": false,
@@ -60,7 +60,7 @@
       "data": {
         "code": "let result = node_input(\"result\");\n\nlet doubled = result * 2;\nconsole.log(`结果的两倍是: ${doubled}`);\n\nnode_output(doubled, \"doubled\");",
         "autoResizeWidth": true,
-        "nodeName": "节点2",
+        "nodeName": "",
         "isCollapsed": false,
         "hiddenSections": {
           "inputs": false,
@@ -68,12 +68,12 @@
           "logs": false,
           "errors": false
         },
-        "width": 400,
+        "width": 379,
         "controls": []
       },
       "type": "textNode",
       "measured": {
-        "width": 400,
+        "width": 379,
         "height": 327
       },
       "selected": false,
@@ -88,7 +88,7 @@
       "data": {
         "code": "let message = node_input(new InputBox(\"cptbtptp棍母bcptdtptp\"), \"message\");\nlet capPos = node_input(new Slider(0, 0, message.length, 1), \"capPos\");\n\nconst newMessage = ''.concat(\n    message.slice(0, capPos),\n    message.slice(capPos, capPos + 1).toUpperCase(),\n    message.slice(capPos + 1)\n)\n    .replace(/棍母/g, '')\n\nnode_output(newMessage, \"newMessage\");",
         "autoResizeWidth": true,
-        "nodeName": "节点3",
+        "nodeName": "",
         "isCollapsed": false,
         "hiddenSections": {
           "inputs": false,
@@ -96,20 +96,29 @@
           "logs": false,
           "errors": false
         },
-        "width": 595,
+        "width": 684,
         "controls": [
           {
-            "name": "input_0",
+            "name": "message",
             "type": "input",
-            "defaultValue": "Hello World",
-            "value": "Hello World"
+            "defaultValue": "cptbtptp棍母bcptdtptp",
+            "value": "cptbtptp棍母bcptdtptp"
+          },
+          {
+            "name": "capPos",
+            "type": "slider",
+            "defaultValue": 0,
+            "min": 0,
+            "max": 19,
+            "step": 1,
+            "value": 0
           }
         ]
       },
       "type": "textNode",
       "measured": {
-        "width": 595,
-        "height": 401
+        "width": 684,
+        "height": 461
       },
       "selected": false,
       "dragging": false,
@@ -126,8 +135,8 @@
     }
   ],
   "viewport": {
-    "x": -166.34606657627762,
-    "y": 282.1937008326808,
+    "x": 53.65393342372215,
+    "y": 358.19370083268086,
     "zoom": 0.7578582832551953
   }
 }

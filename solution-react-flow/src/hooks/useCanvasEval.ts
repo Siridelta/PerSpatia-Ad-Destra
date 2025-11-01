@@ -422,6 +422,27 @@ const createEvaluationPlan = (
   return { scope, order };
 };
 
+/**
+ * 深拷贝辅助函数
+ * 确保数据传递时使用传值而非传引用，避免副作用
+ */
+const deepCloneValue = <T>(value: T): T => {
+  try {
+    // 优先使用 structuredClone，如果不支持则回退到 JSON 序列化
+    if (typeof structuredClone === 'function') {
+      return structuredClone(value);
+    } else {
+      // 回退方案：使用 JSON 序列化（可能丢失函数、undefined 等）
+      return JSON.parse(JSON.stringify(value));
+    }
+  } catch (error) {
+    // 如果深拷贝失败（例如包含不可序列化的值），记录警告并返回原值
+    console.warn(`[useCanvasEval] 无法深拷贝值，使用原值:`, error);
+    return value;
+  }
+};
+
+
 const collectLatestInputValues = (
   nodeId: string,
   state: CanvasEvalStoreState,
@@ -483,11 +504,12 @@ const runEvaluationPlan = async (
       });
 
       if (result.success) {
+        // 深拷贝执行结果，确保存储的数据是独立副本
         interimResults.set(nodeId, {
           ...nodeState,
           isEvaluating: false,
           controls: result.controls,
-          outputs: result.outputs,
+          outputs: deepCloneValue(result.outputs),
           logs: result.logs,
           errors: [],
           warnings: result.warnings || [],
