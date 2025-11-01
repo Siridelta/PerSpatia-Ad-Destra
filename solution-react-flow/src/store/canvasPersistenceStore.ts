@@ -92,12 +92,13 @@ const migrateState = (persistedState: any, version: number): CanvasPersistedStat
     newState = {
       ...newState,
       nodes: newState.nodes.map((node: any) => {
-        if (node.type === 'textNode' && newState.controlsCache![node.id]) {
+        if (node.type === 'textNode') {
+          const controls = newState.controlsCache?.[node.id] ?? [];
           return {
             ...node,
             data: {
               ...node.data,
-              controls: newState.controlsCache![node.id],
+              controls: controls,
               autoResizeWidth: node.data.autoResizeWidth ?? true,
               nodeName: node.data.nodeName ?? '',
               isCollapsed: node.data.isCollapsed ?? false,
