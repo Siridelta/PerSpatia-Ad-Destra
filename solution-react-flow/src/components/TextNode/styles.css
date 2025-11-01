@@ -807,6 +807,9 @@
   background: rgba(125, 225, 234, 0.15);
   border: 1px solid rgba(125, 225, 234, 0.4);
   color: #7de1ea;
+  padding: 0;
+  margin-left: auto;
+  margin-right: 6px;
   width: 24px;
   height: 24px;
   display: flex;
