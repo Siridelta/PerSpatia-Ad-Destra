@@ -1,5 +1,5 @@
 import { createContext, ReactNode, useContext, useMemo, useCallback } from 'react';
-import { CanvasEvalApi } from '@/hooks/useCanvasEval';
+import { CanvasEvalApi, CanvasEvalNode } from '@/hooks/useCanvasEval';
 
 interface CanvasEvalProviderProps {
   api: CanvasEvalApi;
@@ -22,21 +22,22 @@ export const useCanvasEvalApi = () => {
 
 export const useNodeEval = (nodeId: string) => {
   const evalApi = useCanvasEvalApi();
-  const node = evalApi.useEvalStore((state) => state[nodeId]);
+  const node = evalApi.useEvalStore((state) => state[nodeId]) as CanvasEvalNode | undefined;
 
   const evaluate = useCallback(() => evalApi.evaluateNode(nodeId), [evalApi, nodeId]);
 
   return useMemo(
-    () => ({
-      node,
-      controls: node?.controls ?? [],
-      outputs: node?.outputs ?? {},
-      logs: node?.logs ?? [],
-      errors: node?.errors ?? [],
-      warnings: node?.warnings ?? [],
-      isEvaluating: node?.isEvaluating ?? false,
-      evaluate,
-    }),
+    () => (
+      node ? {
+        node,
+        controls: node?.controls ?? [],
+        outputs: node?.outputs ?? {},
+        logs: node?.logs ?? [],
+        errors: node?.errors ?? [],
+        warnings: node?.warnings ?? [],
+        isEvaluating: node?.isEvaluating ?? false,
+        evaluate,
+      } : null),
     [node, evaluate]
   );
 };

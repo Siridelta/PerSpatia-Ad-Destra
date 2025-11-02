@@ -33,14 +33,7 @@ export interface TextNodeData extends Record<string, unknown> {
  * - 记录最新的 Desmos 图形状态，用于持久化与回显
  */
 export interface DesmosPreviewNodeData extends Record<string, unknown> {
-  sourceNodeId: string;
-  sourceOutputName: string;
-  desmosState?: Desmos.GraphState;
-}
-
-export interface DesmosPreviewLink {
-  previewNodeId: string;
-  outputName: string;
+  // Phase 1: 预览节点保持只读，不在节点数据中维护业务状态
 }
 
 

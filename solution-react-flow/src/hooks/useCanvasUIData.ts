@@ -2,7 +2,7 @@ import { useEffect, useMemo, useRef, useState } from 'react';
 import { createStore, useStore } from 'zustand';
 import { CanvasPersistedState, useCanvasPersistenceStore } from '@/store/canvasPersistenceStore';
 import { CanvasEvalApi } from './useCanvasEval';
-import type { CanvasNode, CanvasEdge, TextNodeType, DesmosPreviewNodeType, DesmosPreviewLink } from '@/types/canvas';
+import type { CanvasNode, CanvasEdge, TextNodeType, DesmosPreviewNodeType, DesmosPreviewEdge, CustomCanvasEdge } from '@/types/canvas';
 import { applyEdgeChanges, applyNodeChanges, type EdgeChange, type NodeChange, type Viewport } from '@xyflow/react';
 import type { Control } from '@/services/jsExecutor';
 import { DesmosPreviewNodeData, TextNodeData } from '@/types/nodeData';
@@ -13,7 +13,6 @@ export interface UIStoreState {
   nodes: CanvasNode[];
   edges: CanvasEdge[];
   viewport: Viewport;
-  desmosPreviewLinks: Record<string, DesmosPreviewLink>;
 }
 
 /**
@@ -24,7 +23,6 @@ export interface UIData {
   nodes: CanvasNode[];
   edges: CanvasEdge[];
   viewport: Viewport;
-  desmosPreviewLinks: Record<string, DesmosPreviewLink>;
 }
 
 /**
@@ -42,15 +40,15 @@ export interface CanvasUIDataApi {
   useNodeData: (id: string) => TextNodeData | DesmosPreviewNodeData | undefined;
 
   // 节点操作
-  addNode: (node: CanvasNode) => void;
-  updateNode: (id: string, updates: Partial<CanvasNode>) => void;
+  addNode: <NodeType extends CanvasNode>(node: NodeType) => void;
+  updateNode: <NodeType extends CanvasNode>(id: string, updates: Partial<NodeType>) => void;
   updateNodeData: (id: string, updates: Record<string, unknown>) => void;
   removeNode: (id: string) => void;
   setNodes: (nodes: CanvasNode[]) => void;
 
   // 边操作
-  addEdge: (edge: CanvasEdge) => void;
-  updateEdge: (id: string, updates: Partial<CanvasEdge>) => void;
+  addEdge: <EdgeType extends CanvasEdge>(edge: EdgeType) => void;
+  updateEdge: <EdgeType extends CanvasEdge>(id: string, updates: Partial<EdgeType>) => void;
   removeEdge: (id: string) => void;
   setEdges: (edges: CanvasEdge[]) => void;
 
@@ -68,15 +66,14 @@ export interface CanvasUIDataApi {
   handleEdgesChange: (changes: EdgeChange[]) => void;
 
   // 便捷创建操作
-  createEdge: (source: string, target: string, edgeData?: Partial<CanvasEdge>) => CanvasEdge;
+  createDepEdge: (source: string, target: string, edgeData?: Partial<CustomCanvasEdge>) => CustomCanvasEdge;
 
   // TextNode 操作
   defaultTextNodeData: TextNodeData;
   createTextNode: (node: Partial<TextNodeType>) => void;
 
   // Desmos 预览节点操作
-  createDesmosPreviewNode: (params: { sourceNodeId: string; sourceOutputName: string; desmosState: any }) => void;
-  updateDesmosPreviewState: (sourceNodeId: string, desmosState: any) => void;
+  createDesmosPreviewNode: (params: { sourceNodeId: string; sourceOutputName: string }) => void;
 
   // Controls 操作
   updateNodeControlValues: (nodeId: string, values: Record<string, unknown>) => void;
@@ -91,6 +88,8 @@ import { immer } from 'zustand/middleware/immer';
 
 // 默认视角（React Flow 默认值）
 const defaultViewport: Viewport = { x: 0, y: 0, zoom: 1 };
+
+const isDesmosPreviewEdge = (edge: CanvasEdge): edge is DesmosPreviewEdge => edge.type === 'desmosPreviewEdge';
 
 // 判断视角是否几乎相等，避免重复写入触发额外渲染
 const VIEWPORT_EPSILON = 0.0001;
@@ -114,7 +113,6 @@ const createUIStore = (initialState?: Partial<CanvasPersistedState>) => {
   const initialNodes = initialState?.nodes ?? defaultCanvas.nodes;
   const initialEdges = initialState?.edges ?? defaultCanvas.edges;
   const initialViewport = initialState?.viewport ?? defaultCanvas.viewport ?? defaultViewport;
-  const initialDesmosPreviewLinks = initialState?.desmosPreviewLinks ?? {};
 
   return createStore<UIStoreState>()(
     immer(() => ({
@@ -122,7 +120,6 @@ const createUIStore = (initialState?: Partial<CanvasPersistedState>) => {
       nodes: initialNodes,
       edges: initialEdges,
       viewport: initialViewport,
-      desmosPreviewLinks: initialDesmosPreviewLinks,
     }))
   );
 };
@@ -136,7 +133,6 @@ const toUIData = (state: UIStoreState): UIData => ({
   nodes: state.nodes,
   edges: state.edges,
   viewport: state.viewport,
-  desmosPreviewLinks: state.desmosPreviewLinks,
 });
 
 /**
@@ -242,7 +238,6 @@ export const useCanvasUIData = (): CanvasUIDataApi => {
         nodes: state.nodes,
         edges: state.edges,
         viewport: state.viewport,
-        desmosPreviewLinks: state.desmosPreviewLinks,
       };
 
       // 保存到持久化存储
@@ -263,7 +258,7 @@ export const useCanvasUIData = (): CanvasUIDataApi => {
   const api = useMemo<CanvasUIDataApi>(() => {
     // 订阅来自 Eval 系统的变化
     const subscribeFromEval = (evalApi: CanvasEvalApi): (() => void) => {
-      const unsubscribe = evalApi.subscribeData((evalData) => {
+      const unsubscribe = evalApi.subscribeData(async (evalData) => {
         // 提取 controls 信息
         const currNodesControls: Record<string, { controls: Control[] }> = {};
         Object.entries(evalData).forEach(([nodeId, nodeData]) => {
@@ -318,12 +313,12 @@ export const useCanvasUIData = (): CanvasUIDataApi => {
     };
 
     // 节点操作
-    const addNode = (node: CanvasNode) =>
+    const addNode = <NodeType extends CanvasNode>(node: NodeType) =>
       store.setState(state => ({
         nodes: [...state.nodes, node]
       }));
 
-    const updateNode = <T extends TextNodeType | DesmosPreviewNodeType>(id: string, updates: Partial<T>) =>
+    const updateNode = <NodeType extends CanvasNode>(id: string, updates: Partial<NodeType>) =>
       store.setState(state => {
         const nodeIndex = state.nodes.findIndex((node) => node.id === id);
         if (nodeIndex === -1) return;
@@ -343,65 +338,39 @@ export const useCanvasUIData = (): CanvasUIDataApi => {
 
     const removeNode = (id: string) =>
       store.setState(state => {
-        const { nodes, edges, desmosPreviewLinks } = state;
-        const nextLinks: Record<string, DesmosPreviewLink> = { ...desmosPreviewLinks };
-
-        const cleanedNodes = nodes.filter((node) => node.id !== id);
-        const cleanedEdges = edges.filter((edge) => edge.source !== id && edge.target !== id);
-
-        // 如果这是源节点，删除其预览节点及映射
-        if (nextLinks[id]) {
-          const previewId = nextLinks[id].previewNodeId;
-          delete nextLinks[id];
-          return {
-            nodes: cleanedNodes.filter((node) => node.id !== previewId),
-            edges: cleanedEdges.filter((edge) => edge.source !== previewId && edge.target !== previewId),
-            desmosPreviewLinks: nextLinks,
-          };
+        const targetNode = state.nodes.find((node) => node.id === id);
+        if (!targetNode) {
+          return;
         }
 
-        // 如果这是预览节点，找到对应源节点，移除映射
-        const sourceEntry = Object.entries(nextLinks).find(([, link]) => link.previewNodeId === id);
-        if (sourceEntry) {
-          const [sourceId] = sourceEntry;
-          delete nextLinks[sourceId];
+        const nodesToRemove = new Set<string>([id]);
+
+        if (targetNode.type === 'textNode') {
+          state.edges.forEach((edge) => {
+            if (isDesmosPreviewEdge(edge) && edge.source === id) {
+              nodesToRemove.add(edge.target);
+            }
+          });
         }
 
-        return {
-          nodes: cleanedNodes,
-          edges: cleanedEdges,
-          desmosPreviewLinks: nextLinks,
-        };
+        state.nodes = state.nodes.filter((node) => !nodesToRemove.has(node.id));
+        state.edges = state.edges.filter((edge) => !nodesToRemove.has(edge.source) && !nodesToRemove.has(edge.target));
       });
 
     const setNodes = (nodes: CanvasNode[]) =>
-      store.setState(state => {
-        const validIds = new Set(nodes.map((node) => node.id));
-
-        const nextPreviewLinks: Record<string, DesmosPreviewLink> = {};
-        Object.entries(state.desmosPreviewLinks).forEach(([sourceId, link]) => {
-          if (validIds.has(sourceId) && validIds.has(link.previewNodeId)) {
-            nextPreviewLinks[sourceId] = link;
-          }
-        });
-
-        return {
-          nodes,
-          desmosPreviewLinks: nextPreviewLinks,
-        };
-      });
+      store.setState({ nodes });
 
     // 边操作
-    const addEdge = (edge: CanvasEdge) =>
+    const addEdge = <EdgeType extends CanvasEdge>(edge: EdgeType) =>
       store.setState(state => ({
         edges: [...state.edges, edge]
       }));
 
-    const updateEdge = (id: string, updates: Partial<CanvasEdge>) =>
+    const updateEdge = <EdgeType extends CanvasEdge>(id: string, updates: Partial<EdgeType>) =>
       store.setState(state => {
         const edgeIndex = state.edges.findIndex((edge) => edge.id === id);
         if (edgeIndex === -1) return;
-        state.edges[edgeIndex] = { ...state.edges[edgeIndex], ...updates };
+        Object.assign(state.edges[edgeIndex], updates);
       });
 
     const removeEdge = (id: string) =>
@@ -423,7 +392,6 @@ export const useCanvasUIData = (): CanvasUIDataApi => {
         nodes: [],
         edges: [],
         viewport: defaultViewport,
-        desmosPreviewLinks: {},
       });
 
     const resetToDefault = () =>
@@ -431,7 +399,6 @@ export const useCanvasUIData = (): CanvasUIDataApi => {
         nodes: defaultCanvas.nodes,
         edges: defaultCanvas.edges,
         viewport: defaultCanvas.viewport ?? defaultViewport,
-        desmosPreviewLinks: {},
       });
 
     // 导入/导出操作
@@ -482,12 +449,13 @@ export const useCanvasUIData = (): CanvasUIDataApi => {
     };
 
     // 便捷创建操作
-    const createEdge = (source: string, target: string, edgeData?: Partial<CanvasEdge>) => {
-      const newEdge: CanvasEdge = {
+    const createDepEdge = (source: string, target: string, edgeData?: Partial<CustomCanvasEdge>) => {
+      const newEdge: CustomCanvasEdge = {
         id: `edge-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`,
         source,
         target,
         type: 'custom',
+        data: edgeData?.data ?? {},
         ...edgeData,
       };
       addEdge(newEdge);
@@ -521,104 +489,56 @@ export const useCanvasUIData = (): CanvasUIDataApi => {
     };
 
     // Desmos 预览节点操作
-    const createDesmosPreviewNode = ({ sourceNodeId, sourceOutputName, desmosState }: {
+    const createDesmosPreviewNode = ({ sourceNodeId, sourceOutputName }: {
       sourceNodeId: string;
       sourceOutputName: string;
-      desmosState: any;
     }) =>
       store.setState(state => {
-        if (state.desmosPreviewLinks[sourceNodeId]) {
-          return state;
+        const duplicatedEdge = state.edges.some(
+          (edge) =>
+            isDesmosPreviewEdge(edge) &&
+            edge.source === sourceNodeId &&
+            edge.data?.sourceOutputName === sourceOutputName,
+        );
+        if (duplicatedEdge) {
+          return;
         }
 
         const sourceNode = state.nodes.find((node) => node.id === sourceNodeId);
         if (!sourceNode) {
-          return state;
+          return;
         }
-
-        const clonedState = (() => {
-          try {
-            return desmosState && typeof structuredClone === 'function'
-              ? structuredClone(desmosState)
-              : JSON.parse(JSON.stringify(desmosState ?? {}));
-          } catch {
-            return desmosState ?? {};
-          }
-        })();
 
         const previewNodeId = `desmos-preview-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
         const offsetX = 420;
         const offsetY = 60;
-        const previewIndex = Object.keys(state.desmosPreviewLinks).length;
+        const existingPreviewCount = state.edges.filter(
+          (edge) => isDesmosPreviewEdge(edge) && edge.source === sourceNodeId,
+        ).length;
+        const position = {
+          x: sourceNode.position.x + offsetX,
+          y: sourceNode.position.y + existingPreviewCount * offsetY,
+        };
+
         const previewNode: DesmosPreviewNodeType = {
           id: previewNodeId,
           type: 'desmosPreviewNode',
-          position: {
-            x: sourceNode.position.x + offsetX,
-            y: sourceNode.position.y + previewIndex * offsetY,
-          },
-          data: {
-            sourceNodeId,
-            sourceOutputName,
-            desmosState: clonedState,
-          },
+          position,
+          data: {},
         };
 
-        const previewEdge: CanvasEdge = {
+        const previewEdge: DesmosPreviewEdge = {
           id: `edge-${sourceNodeId}-desmos-${Date.now()}`,
           source: sourceNodeId,
           target: previewNodeId,
-          type: 'custom',
-        };
-
-        return {
-          nodes: [...state.nodes, previewNode],
-          edges: [...state.edges, previewEdge],
-          desmosPreviewLinks: {
-            ...state.desmosPreviewLinks,
-            [sourceNodeId]: {
-              previewNodeId,
-              outputName: sourceOutputName,
-            },
+          type: 'desmosPreviewEdge',
+          data: {
+            sourceOutputName,
           },
         };
-      });
 
-    const updateDesmosPreviewState = (sourceNodeId: string, desmosState: any) =>
-      store.setState(state => {
-        const link = state.desmosPreviewLinks[sourceNodeId];
-        if (!link) {
-          return state;
-        }
-
-        const previewNodeId = link.previewNodeId;
-        const cloneState = (() => {
-          try {
-            return desmosState && typeof structuredClone === 'function'
-              ? structuredClone(desmosState)
-              : JSON.parse(JSON.stringify(desmosState ?? {}));
-          } catch {
-            return desmosState ?? {};
-          }
-        })();
-
-        const updatedNodes = state.nodes.map((node) => {
-          if (node.id !== previewNodeId) {
-            return node;
-          }
-          return {
-            ...node,
-            data: {
-              ...node.data,
-              desmosState: cloneState,
-            },
-          };
-        });
-
-        return {
-          ...state,
-          nodes: updatedNodes,
-        };
+        state.nodes.push(previewNode);
+        state.edges.push(previewEdge);
       });
 
     // 更新节点的 control 值（用于用户交互）
@@ -668,11 +588,10 @@ export const useCanvasUIData = (): CanvasUIDataApi => {
       exportCanvasData,
       handleNodesChange,
       handleEdgesChange,
-      createEdge,
+      createDepEdge,
       defaultTextNodeData,
       createTextNode,
       createDesmosPreviewNode,
-      updateDesmosPreviewState,
       updateNodeControlValues,
       updateNodeControlValue,
     };

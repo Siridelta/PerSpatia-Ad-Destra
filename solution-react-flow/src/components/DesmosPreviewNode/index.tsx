@@ -3,9 +3,10 @@
 import React, { useEffect, useMemo, useRef, useState } from 'react';
 import { Handle, Position, NodeProps } from '@xyflow/react';
 import { useCanvasUIData } from '@/hooks/useCanvasUIData';
+import { useNodeEval } from '@/contexts/CanvasEvalContext';
 
 import './styles.css';
-import { DesmosPreviewNodeType } from '@/types/canvas';
+import { DesmosPreviewNodeType, DesmosPreviewEdge, TextNodeType } from '@/types/canvas';
 
 // ============================================================================
 // 类型定义
@@ -62,20 +63,35 @@ const ensureDesmosLoaded = (): Promise<void> => {
 // 主组件实现
 // ============================================================================
 
-const DesmosPreviewNode: React.FC<NodeProps<DesmosPreviewNodeType>> = ({ id, data, selected }) => {
+const DesmosPreviewNode: React.FC<NodeProps<DesmosPreviewNodeType>> = ({ id, selected }) => {
   const [isReady, setIsReady] = useState<boolean>(typeof window !== 'undefined' && !!window.Desmos);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
   const containerRef = useRef<HTMLDivElement | null>(null);
   const calculatorRef = useRef<Desmos.Calculator | null>(null);
   const lastSyncedState = useRef<string>('');
 
-  const { updateNode } = useCanvasUIData();
+  const { useUIData } = useCanvasUIData();
+  const previewEdge = useUIData((ui) =>
+    ui.edges.find((edge) => edge.type === 'desmosPreviewEdge' && edge.target === id) as DesmosPreviewEdge | undefined,
+  );
+  const sourceNode = useUIData((ui) => {
+    if (!previewEdge) return undefined;
+    const candidate = ui.nodes.find((node) => node.id === previewEdge.source);
+    if (candidate?.type === 'textNode') {
+      return candidate;
+    }
+    return undefined;
+  });
 
   const sourceLabel = useMemo(() => {
-    const nodeId = data?.sourceNodeId || '未知节点';
-    const outputName = data?.sourceOutputName || '未知输出';
-    return `${nodeId} · ${outputName}`;
-  }, [data?.sourceNodeId, data?.sourceOutputName]);
+    const nodeName = sourceNode?.data.nodeName?.trim();
+    const nodeDisplay = nodeName || sourceNode?.id || '未知节点';
+    const outputName = previewEdge?.data?.sourceOutputName || '未知输出';
+    return `${nodeDisplay} · ${outputName}`;
+  }, [previewEdge?.data?.sourceOutputName, sourceNode?.data.nodeName, sourceNode?.id]);
+
+  const nodeEval = useNodeEval(id);
+  const desmosState = nodeEval?.outputs?.desmosState as Desmos.GraphState | undefined;
 
   // 监听 Desmos 脚本加载并初始化计算器
   useEffect(() => {
@@ -96,15 +112,7 @@ const DesmosPreviewNode: React.FC<NodeProps<DesmosPreviewNodeType>> = ({ id, dat
         });
 
         calculatorRef.current = calculator;
-
-        if (data?.desmosState) {
-          try {
-            calculator.setState(data.desmosState);
-            lastSyncedState.current = JSON.stringify(data.desmosState);
-          } catch (error) {
-            console.error('初始化 Desmos 状态失败:', error);
-          }
-        }
+        lastSyncedState.current = '';
       })
       .catch((error) => {
         if (isCancelled) return;
@@ -119,59 +127,32 @@ const DesmosPreviewNode: React.FC<NodeProps<DesmosPreviewNodeType>> = ({ id, dat
         calculatorRef.current = null;
       }
     };
-  }, [data?.desmosState]);
+  }, []);
 
   // 当父节点传来新的状态时，刷新 Desmos 视图
   useEffect(() => {
     if (!isReady || !calculatorRef.current) return;
 
     const calculator = calculatorRef.current;
-    const state = data?.desmosState ?? {};
-    const serialized = JSON.stringify(state);
+    const serialized = desmosState ? JSON.stringify(desmosState) : '';
 
     if (serialized === lastSyncedState.current) {
       return;
     }
 
     try {
-      calculator.setState(state);
+      if (desmosState) {
+        calculator.setState(desmosState);
+      } else if (typeof (calculator as any).setBlank === 'function') {
+        (calculator as any).setBlank();
+      } else {
+        calculator.setState({ expressions: { list: [] } } as Desmos.GraphState);
+      }
       lastSyncedState.current = serialized;
     } catch (error) {
       console.error('Desmos 状态同步失败:', error);
     }
-  }, [data?.desmosState, isReady]);
-
-  // 当用户在预览节点内操作 Desmos 时，将最新状态写回节点数据，确保持久化
-  useEffect(() => {
-    if (!calculatorRef.current) return;
-
-    const calculator = calculatorRef.current;
-
-    const handleChange = () => {
-      try {
-        const nextState = calculator.getState();
-        const serialized = JSON.stringify(nextState);
-        if (serialized === lastSyncedState.current) {
-          return;
-        }
-        lastSyncedState.current = serialized;
-        updateNode(id, {
-          data: {
-            ...data,
-            desmosState: nextState,
-          },
-        });
-      } catch (error) {
-        console.error('读取 Desmos 状态失败:', error);
-      }
-    };
-
-    calculator.observeEvent('change', handleChange);
-
-    return () => {
-        calculator?.unobserveEvent('change');
-    };
-  }, [data, id, updateNode]);
+  }, [desmosState, isReady]);
 
   return (
     <div className={`desmos-preview-node${selected ? ' selected' : ''}`}>

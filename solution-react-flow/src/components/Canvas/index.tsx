@@ -28,7 +28,7 @@ import { useCanvasUIData } from '@/hooks/useCanvasUIData';
 import { useTheme } from '@/hooks/useTheme';
 import { useSettingsStore } from '@/store/settingsStore';
 import { useToolStore } from '@/store/toolStore';
-import { CanvasEdge, CanvasNode, TextNodeType } from '@/types/canvas';
+import { CanvasEdge, CanvasNode, CustomCanvasEdge, TextNodeType } from '@/types/canvas';
 import useInertialPan from '@/utils/useInertialPan';
 import CustomConnectionLine from './CustomConnectionLine';
 import './styles.css';
@@ -43,6 +43,7 @@ const nodeTypes: NodeTypes = {
 // 注册自定义边类型
 const edgeTypes: EdgeTypes = {
   custom: FloatingEdge,
+  desmosPreviewEdge: FloatingEdge,
 };
 
 const Canvas: React.FC = () => {
@@ -218,21 +219,16 @@ const Canvas: React.FC = () => {
 
   // 处理连接事件
   const onConnect = useCallback((connection: Connection) => {
-    const edge: CanvasEdge = {
-      ...connection,
-      id: `edge-${Date.now()}`,
-      type: 'custom',
-    };
-    uiDataApi.addEdge(edge);
+    uiDataApi.createDepEdge(connection.source, connection.target);
 
     // 连接建立后，立即通知目标节点更新
     if (connection.target) {
       console.log('新连接建立，通知目标节点更新:', connection.source, '->', connection.target);
 
       // 延迟一点时间确保连接已经添加到edges中
-      setTimeout(() => {
-        evalApi.evaluateNode(connection.target);
-      }, 50);
+      // setTimeout(() => {
+      //   evalApi.evaluateNode(connection.target);
+      // }, 50);
     }
 
     // 连接完成后，清除连接状态并退出连接模式
@@ -253,19 +249,13 @@ const Canvas: React.FC = () => {
         console.log('设置连接起始节点:', node.id);
       } else if (connectionStartNode !== node.id) {
         // 创建连接
-        const newEdge: CanvasEdge = {
-          id: `edge-${Date.now()}`,
-          source: connectionStartNode,
-          target: node.id,
-          type: 'custom',
-        };
-        uiDataApi.addEdge(newEdge);
+        uiDataApi.createDepEdge(connectionStartNode, node.id);
         console.log('创建连接:', connectionStartNode, '->', node.id);
 
         // 连接建立后，立即通知目标节点更新
-        setTimeout(() => {
-          evalApi.evaluateNode(node.id);
-        }, 50);
+        // setTimeout(() => {
+        //   evalApi.evaluateNode(node.id);
+        // }, 50);
 
         // 重置连接状态并退出连接模式
         setConnectionStartNode(null);

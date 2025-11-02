@@ -11,7 +11,6 @@ export interface CanvasPersistedState {
   edges: CanvasEdge[];
   viewport: Viewport;
   controlsCache?: Record<string, Control[]>; // 可选，用于向后兼容
-  desmosPreviewLinks: Record<string, { previewNodeId: string; outputName: string }>;
 }
 
 /**
@@ -31,7 +30,7 @@ interface CanvasPersistenceState {
 }
 
 const STORAGE_KEY = 'desmos-canvas-flow-state';
-const STORAGE_VERSION = 6; // 版本 6: controls 整合到节点数据中
+const STORAGE_VERSION = 7; // 版本 7: 使用 desmosPreviewEdge 替代 desmosPreviewLinks
 
 // 默认视角（React Flow 默认值）
 const defaultViewport: Viewport = { x: 0, y: 0, zoom: 1 };
@@ -43,7 +42,6 @@ const migrateState = (persistedState: any, version: number): CanvasPersistedStat
       nodes: [],
       edges: [],
       viewport: defaultViewport,
-      desmosPreviewLinks: {},
     };
   }
 
@@ -116,6 +114,49 @@ const migrateState = (persistedState: any, version: number): CanvasPersistedStat
       // 移除 controlsCache，因为已经整合到节点数据中
       controlsCache: undefined,
     };
+  }
+
+  // 版本 7: 使用专用边存储预览节点关系，并移除旧字段
+  if (version < 7) {
+    const legacyLinks = newState.desmosPreviewLinks ?? {};
+    if (Array.isArray(newState.edges) && legacyLinks && Object.keys(legacyLinks).length > 0) {
+      newState = {
+        ...newState,
+        edges: newState.edges.map((edge: any) => {
+          const link = legacyLinks[edge.source];
+          if (link && edge.target === link.previewNodeId) {
+            return {
+              ...edge,
+              type: 'desmosPreviewEdge',
+              data: {
+                ...(edge.data ?? {}),
+                sourceOutputName: link.outputName,
+              },
+            };
+          }
+          return edge;
+        }),
+      };
+    }
+
+    if (Array.isArray(newState.nodes)) {
+      newState = {
+        ...newState,
+        nodes: newState.nodes.map((node: any) => {
+          if (node.type === 'desmosPreviewNode') {
+            const { desmosState: _legacyState, sourceNodeId: _legacySource, sourceOutputName: _legacyOutput, ...restData } = node.data ?? {};
+            return {
+              ...node,
+              data: restData,
+            };
+          }
+          return node;
+        })
+      };
+    }
+
+    const { desmosPreviewLinks: _legacyLinks, ...rest } = newState;
+    newState = rest;
   }
 
   return newState;

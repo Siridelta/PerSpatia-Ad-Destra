@@ -5,7 +5,7 @@ import { immer } from 'zustand/middleware/immer';
 import { jsExecutor, Control, ExecutionResult } from '@/services/jsExecutor';
 import { produce } from 'immer';
 import type { CanvasUIDataApi, UIData } from './useCanvasUIData';
-import { TextNodeType } from '@/types/canvas';
+import { CanvasEdge, CanvasNode, DesmosPreviewEdgeData, TextNodeType } from '@/types/canvas';
 
 export interface ErrorInfo {
   message: string;
@@ -21,18 +21,33 @@ export interface WarningInfo {
   stack?: string;
 }
 
+// Delta Types
+
 export interface CanvasEvalDeltaNode {
   id: string;
   code: string;
   controls?: Control[];
 }
 
-export interface CanvasEvalDeltaEdge {
+// Dep: Dependency
+export interface CanvasEvalDeltaDepEdge {
   source: string;
   target: string;
 }
 
+// DP: Desmos Preview
+export interface CanvasEvalDeltaDPEdge {
+  source: string;
+  target: string;
+  data: {
+    sourceOutputName: string;
+  };
+}
+
+// Eval Store/State Types
+
 export interface CanvasEvalNode {
+  type: CanvasNode['type'];
   code: string;
   isEvaluating: boolean;
   controls: Control[];
@@ -44,10 +59,20 @@ export interface CanvasEvalNode {
 
 export type CanvasEvalNodes = Record<string, CanvasEvalNode>;
 
-interface CanvasEvalStoreState {
-  nodes: CanvasEvalNodes;
+export interface CanvasEvalDepIOs {
   incomingByTarget: Record<string, string[]>;
   outgoingBySource: Record<string, string[]>;
+}
+
+export interface CanvasEvalDPIOs {
+  incomingByTarget: Record<string, { source: string, sourceOutputName: string }>;
+  outgoingBySource: Record<string, Record<string, string>>;
+}
+
+interface CanvasEvalStoreState {
+  nodes: CanvasEvalNodes;
+  depIOs: CanvasEvalDepIOs;
+  DPIOs: CanvasEvalDPIOs;
 }
 
 export interface CanvasEvalApi {
@@ -84,7 +109,8 @@ export interface CanvasEvalApi {
  */
 
 // create initial node data
-const createInitialNodeData = (code: string, controls: Control[]): CanvasEvalNode => ({
+const createInitialNodeData = (type: CanvasNode['type'], code: string, controls: Control[]): CanvasEvalNode => ({
+  type,
   code,
   isEvaluating: false,
   controls: controls.map((control) => ({ ...control })),
@@ -103,11 +129,12 @@ const mergeControls = (prevControls: Control[], nextControls: Control[]) => {
   });
 };
 
-const buildGraphIOReprs = (edges: CanvasEvalDeltaEdge[]) => {
+const buildDepIOs = (edges: CanvasEdge[]): CanvasEvalDepIOs => {
   const incoming: Record<string, string[]> = {};
   const outgoing: Record<string, string[]> = {};
 
-  edges.forEach(({ source, target }) => {
+  edges.forEach((edge) => {
+    const { source, target } = edge;
     if (!incoming[target]) incoming[target] = [];
     if (!incoming[target].includes(source)) incoming[target].push(source);
 
@@ -115,9 +142,30 @@ const buildGraphIOReprs = (edges: CanvasEvalDeltaEdge[]) => {
     if (!outgoing[source].includes(target)) outgoing[source].push(target);
   });
 
-  return { incoming, outgoing };
+  return { incomingByTarget: incoming, outgoingBySource: outgoing };
 };
 
+const buildDPIOs = (edges: CanvasEdge[]): CanvasEvalDPIOs => {
+  const incoming: Record<string, { source: string, sourceOutputName: string }> = {};
+  const outgoing: Record<string, Record<string, string>> = {};
+
+  edges.forEach((edge) => {
+    if (edge.type !== 'desmosPreviewEdge') return;
+    const { source, target, data } = edge;
+    const { sourceOutputName } = data;
+    if (incoming[target]) {
+      throw new Error('A target can only have one Desmos Preview Edge');
+    }
+    incoming[target] = { source, sourceOutputName };
+    if (!outgoing[source]) outgoing[source] = {};
+    if (outgoing[source][sourceOutputName]) {
+      throw new Error('A source can only have one Desmos Preview Edge per output');
+    }
+    outgoing[source][sourceOutputName] = target;
+  });
+
+  return { incomingByTarget: incoming, outgoingBySource: outgoing };
+};
 
 
 
@@ -125,29 +173,37 @@ const buildGraphIOReprs = (edges: CanvasEvalDeltaEdge[]) => {
 
 
 // 为边生成唯一键，便于在 diff 过程中进行集合对比
-const createEdgeKey = ({ source, target }: CanvasEvalDeltaEdge) => `${source}->${target}`;
+const createEdgeKey = ({ source, target }: Pick<CanvasEdge, 'source' | 'target'>) => `${source}->${target}`;
 
 // 描述一次 CanvasEvalInput 变化中我们关心的增量信息
-interface InputDelta {
+interface CanvasEvalDelta {
   addedNodeIds: string[];
   removedNodeIds: string[];
   updatedNodeIds: string[];
-  addedEdges: CanvasEvalDeltaEdge[];
-  removedEdges: CanvasEvalDeltaEdge[];
+  addedDepEdges: CanvasEvalDeltaDepEdge[];
+  removedDepEdges: CanvasEvalDeltaDepEdge[];
+  addedDPEdges: CanvasEvalDeltaDPEdge[];
+  removedDPEdges: CanvasEvalDeltaDPEdge[];
   impactedNodeIds: string[];
   hasChanges: boolean;
 }
 
 
 // 从 lastCompletedState 中提取边信息，用于比较
-const extractEdgesFromState = (state: CanvasEvalStoreState): CanvasEvalDeltaEdge[] => {
-  const edges: CanvasEvalDeltaEdge[] = [];
-  Object.entries(state.outgoingBySource).forEach(([source, targets]) => {
+const extractEdgesFromState = (state: CanvasEvalStoreState): { dep: CanvasEvalDeltaDepEdge[], DP: CanvasEvalDeltaDPEdge[] } => {
+  const depEdges: CanvasEvalDeltaDepEdge[] = [];
+  const DPEdges: CanvasEvalDeltaDPEdge[] = [];
+  Object.entries(state.depIOs.outgoingBySource).forEach(([source, targets]) => {
     targets.forEach((target) => {
-      edges.push({ source, target });
+      depEdges.push({ source, target });
     });
   });
-  return edges;
+  Object.entries(state.DPIOs.outgoingBySource).forEach(([source, targets]) => {
+    Object.entries(targets).forEach(([sourceOutputName, target]) => {
+      DPEdges.push({ source, target, data: { sourceOutputName } });
+    });
+  });
+  return { dep: depEdges, DP: DPEdges };
 };
 
 // 计算 currentInput 与 lastCompletedState 之间的差异，并推断需要重新计算的节点集合
@@ -155,7 +211,7 @@ const extractEdgesFromState = (state: CanvasEvalStoreState): CanvasEvalDeltaEdge
 const resolveDeltaByUIData = (
   lastCompletedState: CanvasEvalStoreState | null,
   uiData: UIData,
-): InputDelta => {
+): CanvasEvalDelta => {
 
   // 如果没有上次完成的状态，则认为所有节点都是新增的
   if (!lastCompletedState) {
@@ -165,8 +221,10 @@ const resolveDeltaByUIData = (
       addedNodeIds,
       removedNodeIds: [],
       updatedNodeIds: [],
-      addedEdges: uiData.edges,
-      removedEdges: [],
+      addedDepEdges: uiData.edges.filter((edge) => edge.type === 'custom'),
+      removedDepEdges: [],
+      addedDPEdges: uiData.edges.filter((edge) => edge.type === 'desmosPreviewEdge'),
+      removedDPEdges: [],
       impactedNodeIds,
       hasChanges: true,
     };
@@ -236,23 +294,48 @@ const resolveDeltaByUIData = (
     }
   });
 
-  const prevEdges = extractEdgesFromState(lastCompletedState);
-  const currEdges = uiData.edges;
-  const prevEdgeSet = new Set(prevEdges.map(createEdgeKey));
-  const currEdgeSet = new Set(uiData.edges.map(createEdgeKey));
+  const extractedPrevEdges = extractEdgesFromState(lastCompletedState);
+  const prevDepEdges = extractedPrevEdges.dep;
+  const currDepEdges = uiData.edges.filter((edge) => edge.type === 'custom');
+  const prevDepEdgeSet = new Set(prevDepEdges.map(createEdgeKey));
+  const currDepEdgeSet = new Set(currDepEdges.map(createEdgeKey));
 
-  const addedEdges: CanvasEvalDeltaEdge[] = [];
-  const removedEdges: CanvasEvalDeltaEdge[] = [];
+  const addedDepEdges: CanvasEvalDeltaDepEdge[] = [];
+  const removedDepEdges: CanvasEvalDeltaDepEdge[] = [];
 
-  uiData.edges.forEach((edge) => {
-    if (!prevEdgeSet.has(createEdgeKey(edge))) {
-      addedEdges.push(edge);
+  currDepEdges.forEach((edge) => {
+    if (!prevDepEdgeSet.has(createEdgeKey(edge))) {
+      addedDepEdges.push(edge);
     }
   });
 
-  prevEdges.forEach((edge) => {
-    if (!currEdgeSet.has(createEdgeKey(edge))) {
-      removedEdges.push(edge);
+  prevDepEdges.forEach((edge) => {
+    if (!currDepEdgeSet.has(createEdgeKey(edge))) {
+      removedDepEdges.push(edge);
+    }
+  });
+
+  const prevDPEdges = extractedPrevEdges.DP;
+  const currDPEdges = uiData.edges.filter((edge) => edge.type === 'desmosPreviewEdge');
+  const prevDPEdgeSet = new Set(prevDPEdges.map(createEdgeKey));
+  const currDPEdgeSet = new Set(currDPEdges.map(createEdgeKey));
+
+  const addedDPEdges: CanvasEvalDeltaDPEdge[] = [];
+  const removedDPEdges: CanvasEvalDeltaDPEdge[] = [];
+  const updatedDPEdges: CanvasEvalDeltaDPEdge[] = [];    // It's ridiculous... but just in case
+
+  currDPEdges.forEach((edge) => {
+    if (!prevDPEdgeSet.has(createEdgeKey(edge))) {
+      addedDPEdges.push(edge);
+      return;
+    }
+    const prevEdge = prevDPEdges.find((e) => e.source === edge.source && e.target === edge.target);
+
+  });
+
+  prevDPEdges.forEach((edge) => {
+    if (!currDPEdgeSet.has(createEdgeKey(edge))) {
+      removedDPEdges.push(edge);
     }
   });
 
@@ -261,13 +344,15 @@ const resolveDeltaByUIData = (
 
   addedNodeIds.forEach((id) => impacted.add(id));
   updatedNodeIds.forEach((id) => impacted.add(id));
-  addedEdges.forEach((edge) => impacted.add(edge.target));
-  removedEdges.forEach((edge) => impacted.add(edge.target));
+  addedDepEdges.forEach((edge) => impacted.add(edge.target));
+  removedDepEdges.forEach((edge) => impacted.add(edge.target));
+  addedDPEdges.forEach((edge) => impacted.add(edge.target));    // Again this is not necessary if incoming data is consistent
+  // no need to add removedDPEdges, because as a desmos preview edge is removed the target preview node will be removed anyway
 
   // 节点被移除时，其下游节点同样需要重新计算
   // （兜底，以防输入数据不良，删除节点时没删除边而遗漏下游节点）
   removedNodeIds.forEach((nodeId) => {
-    const downstream = currEdges.filter((edge) => edge.source === nodeId).map((edge) => edge.target);
+    const downstream = currDepEdges.filter((edge) => edge.source === nodeId).map((edge) => edge.target);
     downstream.forEach((targetId) => impacted.add(targetId));
   });
 
@@ -280,15 +365,19 @@ const resolveDeltaByUIData = (
     addedNodeIds.length > 0 ||
     removedNodeIds.length > 0 ||
     updatedNodeIds.length > 0 ||
-    addedEdges.length > 0 ||
-    removedEdges.length > 0;
+    addedDepEdges.length > 0 ||
+    removedDepEdges.length > 0 ||
+    addedDPEdges.length > 0 ||
+    removedDPEdges.length > 0;
 
   return {
     addedNodeIds,
     removedNodeIds,
     updatedNodeIds,
-    addedEdges,
-    removedEdges,
+    addedDepEdges,
+    removedDepEdges,
+    addedDPEdges,
+    removedDPEdges,
     impactedNodeIds,
     hasChanges,
   };
@@ -302,9 +391,9 @@ const createInitialEvalNodes = (
 
   uiData.nodes.forEach((node) => {
     if (node.type === 'textNode') {
-      nextNodes[node.id] = createInitialNodeData(node.data.code, node.data.controls);
+      nextNodes[node.id] = createInitialNodeData('textNode', node.data.code, node.data.controls);
     } else {
-      nextNodes[node.id] = createInitialNodeData('', []);
+      nextNodes[node.id] = createInitialNodeData(node.type, '', []);
     }
   });
 
@@ -315,12 +404,17 @@ const createInitialEvalNodes = (
 const buildNextEvalNodes = (
   currNodes: CanvasEvalNodes,
   currUIData: UIData,
-  delta: InputDelta,
+  delta: CanvasEvalDelta,
 ): CanvasEvalNodes =>
   produce(currNodes, (draft) => {
     delta.addedNodeIds.forEach((id) => {
-      const node = currUIData.nodes.find((node) => node.id === id)! as TextNodeType;
-      draft[id] = createInitialNodeData(node.data.code, node.data.controls);
+      const node = currUIData.nodes.find((candidate) => candidate.id === id);
+      if (!node) return;
+      if (node.type === 'textNode') {
+        draft[id] = createInitialNodeData('textNode', node.data.code, node.data.controls);
+      } else {
+        draft[id] = createInitialNodeData(node.type, '', []);
+      }
     });
 
     delta.removedNodeIds.forEach((id) => {
@@ -329,6 +423,7 @@ const buildNextEvalNodes = (
 
     delta.updatedNodeIds.forEach((id) => {
       const node = currUIData.nodes.find((node) => node.id === id)! as TextNodeType;
+      draft[id]!.type = 'textNode';
       draft[id]!.code = node.data.code;
       draft[id]!.controls = node.data.controls.map((control) => ({ ...control }));
     });
@@ -338,42 +433,42 @@ const collectEvaluationScope = (
   entryNodeIds: string[],
   state: CanvasEvalStoreState,
 ) => {
-  const existingNodeIds = new Set(Object.keys(state.nodes));
-  const scope = new Set<string>();
-  const discoveryOrder: string[] = [];   // image of queue, sync operates with it, but without shifts
-  const queue: string[] = [];
+  const existingTextNodeIds = new Set(Object.keys(state.nodes).filter((id) => state.nodes[id].type === 'textNode'));
+  const existingDPNodeIds = new Set(Object.keys(state.nodes).filter((id) => state.nodes[id].type === 'desmosPreviewNode'));
 
-  entryNodeIds.forEach((nodeId) => {
-    if (!existingNodeIds.has(nodeId)) return;
-    if (scope.has(nodeId)) return;
-    scope.add(nodeId);
-    queue.push(nodeId);
-    discoveryOrder.push(nodeId);
-  });
+  const textNodesScope = new Set<string>(entryNodeIds.filter((id) => existingTextNodeIds.has(id)));  // = entryTextNodeIds deduplicated
+  const DPNodesScope = new Set<string>(entryNodeIds.filter((id) => existingDPNodeIds.has(id)));  // = entryDPNodeIds deduplicated
+
+  // 下面先处理 text nodes，后面再在结果后面直接后缀加上 DP nodes
+
+  const discoveryOrder: string[] = [...textNodesScope];   // image of queue, sync operates with it, but without shifts
+  const queue: string[] = [...textNodesScope];
 
   while (queue.length) {
     const current = queue.shift()!;
-    const downstream = state.outgoingBySource[current] || [];
+    const downstream = state.depIOs.outgoingBySource[current] || [];
     downstream.forEach((targetId) => {
-      if (!existingNodeIds.has(targetId)) return;
-      if (scope.has(targetId)) return;
-      scope.add(targetId);
+      if (!existingTextNodeIds.has(targetId)) return;
+      if (textNodesScope.has(targetId)) return;
+      textNodesScope.add(targetId);
       queue.push(targetId);
       discoveryOrder.push(targetId);
     });
   }
 
-  return { scope, discoveryOrder };
+  discoveryOrder.push(...DPNodesScope);
+
+  return { textNodesScope, DPNodesScope, discoveryOrder };
 };
 
-// 目前暂时使用简单串行执行的计划方式
+// 目前暂时使用简单串行执行的计划方式；Desmos Preview 永远放最后执行
 const createEvaluationPlan = (
   entryNodeIds: string[],
   state: CanvasEvalStoreState,
 ) => {
-  const { scope, discoveryOrder } = collectEvaluationScope(entryNodeIds, state);
-  if (!scope.size) {
-    return { scope, order: [] as string[] };
+  const { textNodesScope, DPNodesScope, discoveryOrder } = collectEvaluationScope(entryNodeIds, state);
+  if (!textNodesScope.size) {
+    return { textNodesScope, DPNodesScope, order:discoveryOrder };
   }
 
   // discoveryOrder 里保证：一个节点要么是 entry，要么前方出现至少一个它的 scope 内上游依赖节点
@@ -381,11 +476,11 @@ const createEvaluationPlan = (
 
   // 1. 寻找 scope 里入度为 0 的节点，加入队列；这不等于被选定为 entry 的节点范围，因为 entry 节点也可能有(scope 内的)入度
   const inDegree = new Map<string, number>();
-  scope.forEach((nodeId) => {
-    const incoming = state.incomingByTarget[nodeId] || [];
+  textNodesScope.forEach((nodeId) => {
+    const incoming = state.depIOs.incomingByTarget[nodeId] || [];
     let count = 0;
     incoming.forEach((sourceId) => {
-      if (scope.has(sourceId)) count += 1;
+      if (textNodesScope.has(sourceId)) count += 1;
     });
     inDegree.set(nodeId, count);
   });
@@ -402,24 +497,26 @@ const createEvaluationPlan = (
     const current = queue.shift()!;
     order.push(current);
 
-    const downstream = state.outgoingBySource[current] || [];
+    const downstream = state.depIOs.outgoingBySource[current] || [];
     downstream.forEach((targetId) => {
-      if (!scope.has(targetId)) return;
+      if (!textNodesScope.has(targetId)) return;
       const next = (localInDegree.get(targetId) ?? 0) - 1;
       localInDegree.set(targetId, next);
       if (next === 0) queue.push(targetId);
     });
   }
 
-  if (order.length !== scope.size) {
+  if (order.length !== textNodesScope.size) {
     console.warn('[useCanvasEval] evaluation scope contains cycle, fallback to discovery order.', {
       entryNodeIds,
-      scopeSize: scope.size,
+      scopeSize: textNodesScope.size,
     });
-    return { scope, order: discoveryOrder };
+    return { textNodesScope, DPNodesScope, order: discoveryOrder };
   }
 
-  return { scope, order };
+  order.push(...DPNodesScope);
+
+  return { textNodesScope, DPNodesScope, order };
 };
 
 /**
@@ -449,7 +546,7 @@ const collectLatestInputValues = (
   interimResults: Map<string, CanvasEvalNode>,
 ) => {
   const inputs: Record<string, any> = {};
-  const sources = state.incomingByTarget[nodeId] || [];
+  const sources = state.depIOs.incomingByTarget[nodeId] || [];
 
   sources.forEach((sourceId) => {
     const sourceState = interimResults.get(sourceId) ?? state.nodes[sourceId];
@@ -462,20 +559,37 @@ const collectLatestInputValues = (
 };
 
 const runEvaluationPlan = async (
-  plan: { scope: Set<string>; order: string[] },
+  order: string[],
   stateSnapshot: CanvasEvalStoreState,
   latestVersionRef: { current: number },
   version: number,
 ) => {
   const interimResults = new Map<string, CanvasEvalNode>();
 
-  for (const nodeId of plan.order) {
+  for (const nodeId of order) {
     if (latestVersionRef.current !== version) {
       return;
     }
 
     const nodeState = stateSnapshot.nodes[nodeId];
     if (!nodeState) continue;
+
+    if (nodeState.type === 'desmosPreviewNode') {
+      const {source, sourceOutputName} = stateSnapshot.DPIOs.incomingByTarget[nodeId] || [];
+      const desmosState = 
+        interimResults.get(source)?.outputs[sourceOutputName]
+        ?? stateSnapshot.nodes[source]?.outputs[sourceOutputName];
+
+      interimResults.set(nodeId, {
+        ...nodeState,
+        isEvaluating: false,
+        outputs: { desmosState },
+        logs: [],
+        errors: [],
+        warnings: [],
+      });
+      continue;
+    }
 
     const trimmedCode = nodeState.code.trim();
     if (!trimmedCode) {
@@ -546,8 +660,14 @@ const createEvalStore = () => {
   return createStore<CanvasEvalStoreState>()(
     immer(() => ({
       nodes: {},
-      incomingByTarget: {},
-      outgoingBySource: {},
+      depIOs: {
+        incomingByTarget: {},
+        outgoingBySource: {},
+      },
+      DPIOs: {
+        incomingByTarget: {},
+        outgoingBySource: {},
+      },
     })),
   );
 };
@@ -569,13 +689,13 @@ export const useCanvasEval = (): CanvasEvalApi => {
         return null;
       }
 
-      const plan = createEvaluationPlan(entryNodeIds, baseState);
-      if (!plan.order.length) {
+      const { order } = createEvaluationPlan(entryNodeIds, baseState);
+      if (!order.length) {
         return baseState;
       }
 
       const interimResults = await runEvaluationPlan(
-        plan,
+        order,
         baseState,
         evalTaskVerRef,
         version
@@ -619,12 +739,13 @@ export const useCanvasEval = (): CanvasEvalApi => {
         ? buildNextEvalNodes(baseState.nodes, uiData, delta)
         : createInitialEvalNodes(uiData);
 
-      const graphIOReprs = buildGraphIOReprs(uiData.edges);   // CanvasEdge extends CanvasEvalDeltaEdge, so it's compatible
+      const depIOs = buildDepIOs(uiData.edges);
+      const DPIOs = buildDPIOs(uiData.edges);
 
       const nextState: CanvasEvalStoreState = {
         nodes: nextNodes,
-        incomingByTarget: graphIOReprs.incoming,
-        outgoingBySource: graphIOReprs.outgoing,
+        depIOs,
+        DPIOs,
       };
 
       // 如果没有需要重新计算的节点，直接更新 lastCompletedState
@@ -654,7 +775,7 @@ export const useCanvasEval = (): CanvasEvalApi => {
 
     // 订阅来自 UI 的数据变化
     const subscribeFromUI = (uiDataApi: CanvasUIDataApi): (() => void) => {
-      const unsubscribe = uiDataApi.subscribeData((uiData) => handleUIDataUpdate(uiData));
+      const unsubscribe = uiDataApi.subscribeData(async (uiData) => handleUIDataUpdate(uiData));
       return unsubscribe;
     };
 

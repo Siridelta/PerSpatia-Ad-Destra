@@ -16,8 +16,8 @@ export interface OutputDisplayProps {
 
 const OutputDisplay: React.FC<OutputDisplayProps> = ({ outputs, isAnimatingOut = false, nodeId }) => {
 
-  const { createDesmosPreviewNode, updateDesmosPreviewState, useUIData } = useCanvasUIData();
-  const desmosPreviewLinks = useUIData((data) => data.desmosPreviewLinks);
+  const { createDesmosPreviewNode, useUIData } = useCanvasUIData();
+  const edges = useUIData((data) => data.edges);
 
   const exportableOutputs = useMemo<ExportableOutputInfo[]>(() => {
     return Object.entries(outputs).map(([name, value]) => {
@@ -36,18 +36,20 @@ const OutputDisplay: React.FC<OutputDisplayProps> = ({ outputs, isAnimatingOut =
   const handleExport = (info: ExportableOutputInfo) => {
     if (!info.isExportable) return;
 
-    const resolvedSourceNodeId = (info.value as { _sourceNodeId?: string })?._sourceNodeId ?? nodeId;
+    const existingPreviewEdge = edges.find(
+      (edge) =>
+        edge.type === 'desmosPreviewEdge' &&
+        edge.source === nodeId &&
+        edge.data?.sourceOutputName === info.name,
+    );
 
-    const existingLink = desmosPreviewLinks?.[resolvedSourceNodeId];
-    if (existingLink) {
-      updateDesmosPreviewState(resolvedSourceNodeId, info.value);
+    if (existingPreviewEdge) {
       return;
     }
 
     createDesmosPreviewNode({
-      sourceNodeId: resolvedSourceNodeId,
+      sourceNodeId: nodeId,
       sourceOutputName: info.name,
-      desmosState: info.value,
     });
   };
 

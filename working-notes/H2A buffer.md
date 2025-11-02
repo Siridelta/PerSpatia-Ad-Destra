@@ -47,3 +47,4 @@ export/import canvas:
 
 - bug: when import there's problems in node inital dimensions -> hence the 2-layer not visually synced, and unexpected scrollbars
 
+- customEdge -> depEdge / dependencyEdge; merged in state v7, not to upgrade
