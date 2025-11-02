@@ -213,6 +213,10 @@ const resolveDeltaByEvalData = (
  * Canvas UI Data Hook
  * 
  * 创建并管理 UI Store 实例，提供统一的 API 接口
+ * 
+ * DO NOT USE THIS HOOK BELOW CanvasUIDataContext!!!
+ * FOR BELOW-CONTEXT USAGE, USE useCanvasUIDataApi TO GET THE API OBJECT!!!
+ * This hook is intended for canvas overall state management, one instance per canvas.
  */
 export const useCanvasUIData = (): CanvasUIDataApi => {
   const { loadState, saveState } = useCanvasPersistenceStore();

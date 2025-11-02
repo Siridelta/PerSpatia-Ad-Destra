@@ -1,5 +1,5 @@
 import React, { useCallback, useMemo } from 'react';
-import { useCanvasUIData } from '@/hooks/useCanvasUIData';
+import { useCanvasUIDataApi } from '@/contexts/CanvasUIDataContext';
 
 interface ExportableOutputInfo {
   name: string;
@@ -16,7 +16,7 @@ export interface OutputDisplayProps {
 
 const OutputDisplay: React.FC<OutputDisplayProps> = ({ outputs, isAnimatingOut = false, nodeId }) => {
 
-  const { createDesmosPreviewNode, useUIData } = useCanvasUIData();
+  const { createDesmosPreviewNode, useUIData } = useCanvasUIDataApi();
   const edges = useUIData((data) => data.edges);
 
   const exportableOutputs = useMemo<ExportableOutputInfo[]>(() => {

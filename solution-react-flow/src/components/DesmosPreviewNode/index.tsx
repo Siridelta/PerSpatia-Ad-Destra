@@ -2,11 +2,11 @@
 
 import React, { useEffect, useMemo, useRef, useState } from 'react';
 import { Handle, Position, NodeProps } from '@xyflow/react';
-import { useCanvasUIData } from '@/hooks/useCanvasUIData';
 import { useNodeEval } from '@/contexts/CanvasEvalContext';
 
 import './styles.css';
 import { DesmosPreviewNodeType, DesmosPreviewEdge, TextNodeType } from '@/types/canvas';
+import { useCanvasUIDataApi } from '@/contexts/CanvasUIDataContext';
 
 // ============================================================================
 // 类型定义
@@ -70,7 +70,7 @@ const DesmosPreviewNode: React.FC<NodeProps<DesmosPreviewNodeType>> = ({ id, sel
   const calculatorRef = useRef<Desmos.Calculator | null>(null);
   const lastSyncedState = useRef<string>('');
 
-  const { useUIData } = useCanvasUIData();
+  const { useUIData } = useCanvasUIDataApi();
   const previewEdge = useUIData((ui) =>
     ui.edges.find((edge) => edge.type === 'desmosPreviewEdge' && edge.target === id) as DesmosPreviewEdge | undefined,
   );
