@@ -1,4 +1,4 @@
-import React, { useMemo } from 'react';
+import React, { useCallback, useMemo } from 'react';
 import { useCanvasUIData } from '@/hooks/useCanvasUIData';
 
 interface ExportableOutputInfo {
@@ -33,7 +33,7 @@ const OutputDisplay: React.FC<OutputDisplayProps> = ({ outputs, isAnimatingOut =
     });
   }, [outputs]);
 
-  const handleExport = (info: ExportableOutputInfo) => {
+  const handleExport = useCallback((info: ExportableOutputInfo) => {
     if (!info.isExportable) return;
 
     const existingPreviewEdge = edges.find(
@@ -51,9 +51,9 @@ const OutputDisplay: React.FC<OutputDisplayProps> = ({ outputs, isAnimatingOut =
       sourceNodeId: nodeId,
       sourceOutputName: info.name,
     });
-  };
+  }, [edges, nodeId]);
 
-  const renderExportButton = (info: ExportableOutputInfo) => {
+  const renderExportButton = useCallback((info: ExportableOutputInfo) => {
     return (
       <button
         className="output-export-button"
@@ -68,9 +68,9 @@ const OutputDisplay: React.FC<OutputDisplayProps> = ({ outputs, isAnimatingOut =
         </svg>
       </button>
     );
-  };
+  }, [nodeId]);
 
-  const renderOutput = (info: ExportableOutputInfo, index: number) => {
+  const renderOutput = useCallback((info: ExportableOutputInfo, index: number) => {
     const { name, value } = info;
     const valueStr = (() => {
       if (typeof value === 'object') {
@@ -97,12 +97,12 @@ const OutputDisplay: React.FC<OutputDisplayProps> = ({ outputs, isAnimatingOut =
         {info.isExportable && renderExportButton(info)}
       </div>
     );
-  };
+  }, [isAnimatingOut, renderExportButton]);
 
   return (
     <div className={`text-node-section text-node-outputs-section ${isAnimatingOut ? 'animate-fade-out-down' : 'animate-fade-in-up'}`}>
       <div className="section-label">Outputs</div>
-      {exportableOutputs.map(renderOutput)}
+      {exportableOutputs.map((info, index) => renderOutput(info, index))}
     </div>
   );
 };

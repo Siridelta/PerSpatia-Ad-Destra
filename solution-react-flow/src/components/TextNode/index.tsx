@@ -49,12 +49,12 @@ const TextNode: React.FC<NodeProps<TextNodeType>> = ({ id, data, selected }) => 
 
   // 从 Eval API 获取节点的计算结果
   const nodeEval = useNodeEval(id);
-  const outputs = nodeEval.outputs;
-  const consoleLogs = nodeEval.logs;
-  const errors = nodeEval.errors;
-  const warnings = nodeEval.warnings;
-  const isEvaluating = nodeEval.isEvaluating;
-  const evaluateNode = nodeEval.evaluate;
+  const outputs = nodeEval?.outputs ?? {};
+  const consoleLogs = nodeEval?.logs ?? [];
+  const errors = nodeEval?.errors ?? [];
+  const warnings = nodeEval?.warnings ?? [];
+  const isEvaluating = nodeEval?.isEvaluating ?? false;
+  const evaluateNode = nodeEval?.evaluate ?? (() => {});
 
   // ============================================================================
   // 状态定义 (按功能分组)
