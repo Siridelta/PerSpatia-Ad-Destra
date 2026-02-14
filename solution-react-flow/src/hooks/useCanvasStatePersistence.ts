@@ -62,6 +62,7 @@ export const useCanvasStatePersistence = (uiDataApi: CanvasUIDataApi, flowDataAp
   }, [loadState, uiDataApi, flowDataApi]);
 
   useEffect(() => {
+    // 避免在未加载完成时保存状态
     if (!isHydrated) return;
     saveState({
       uiData,

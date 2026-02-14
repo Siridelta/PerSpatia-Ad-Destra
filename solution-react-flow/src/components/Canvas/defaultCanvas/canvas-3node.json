@@ -16,7 +16,7 @@
                 "min": 0,
                 "max": 100,
                 "step": 1,
-                "value": 50
+                "value": 40
               },
               {
                 "name": "name",
@@ -120,11 +120,7 @@
             "width": 631,
             "height": 493
           },
-          "selected": false,
-          "dragging": false,
-          "width": 631,
-          "height": 493,
-          "resizing": false
+          "selected": true
         },
         {
           "id": "2",
@@ -137,12 +133,7 @@
           "measured": {
             "width": 544,
             "height": 327
-          },
-          "selected": false,
-          "dragging": false,
-          "width": 544,
-          "height": 327,
-          "resizing": false
+          }
         },
         {
           "id": "3",
@@ -152,12 +143,10 @@
             "y": 641.2808446356297
           },
           "data": {},
-          "dragging": false,
           "measured": {
             "width": 724,
             "height": 461
-          },
-          "selected": true
+          }
         }
       ],
       "edges": [
@@ -166,14 +155,13 @@
           "source": "1",
           "target": "2",
           "type": "custom",
-          "data": {},
-          "selected": false
+          "data": {}
         }
       ],
       "viewport": {
-        "x": 378.91578776015706,
-        "y": 155.39748323489272,
-        "zoom": 0.7578582832551952
+        "x": 461.8554877575373,
+        "y": 101.54803032477412,
+        "zoom": 0.9999999999999948
       }
     }
   }

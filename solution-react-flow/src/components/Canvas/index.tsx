@@ -100,8 +100,10 @@ const Canvas: React.FC = () => {
 
   // 将业务层 UIData 拓扑同步到 FlowData（先采用低效双遍历，后续 Map 化再优化）
   useEffect(() => {
+    // 避免在未加载完成时同步状态
+    if (!isHydrated) return;
     flowDataApi.syncWithUI(uiNodes, uiEdges);
-  }, [uiNodes, uiEdges, flowDataApi]);
+  }, [uiNodes, uiEdges, flowDataApi, isHydrated]);
 
   // onInit 时主动推送一次视角，避免首次渲染时闪烁
   const handleInit = useCallback((reactFlowInstance: ReactFlowInstance<CanvasNodeFlowData, CanvasEdgeFlowData>) => {

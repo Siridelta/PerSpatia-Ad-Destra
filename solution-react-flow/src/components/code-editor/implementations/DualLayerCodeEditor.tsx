@@ -39,10 +39,11 @@ export const DualLayerCodeEditor: CodeEditorComponent = ({
     }
   }, []);
 
-  // 同步镜像层内容
+  // initialText 向下同步内容
   useEffect(() => {
-    if (!mirrorRef.current) return;
+    if (!mirrorRef.current || !textareaRef.current) return;
     mirrorRef.current.innerHTML = highlightCode(initialText);
+    textareaRef.current.value = initialText;
   }, [initialText, highlightCode]);
 
 
