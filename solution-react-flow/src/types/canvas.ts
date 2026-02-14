@@ -1,37 +1,54 @@
 import type { Node, Edge } from '@xyflow/react';
 
-import type { TextNodeData, DesmosPreviewNodeData } from './nodeData';
+import type { TextNodeUIData, DesmosPreviewNodeUIData } from './nodeData';
+
+// --- Node Data Types ---
+
+export enum CanvasNodeKind {
+  TextNode = 'textNode',
+  DesmosPreviewNode = 'desmosPreviewNode',
+}
 
 /**
  * UIData 节点类型（业务层，不包含 React Flow 布局信息）
+ * 暂时保留 id+data 结构，但 UIData 迁移至 Map 存储后不再需要，需直接退化为 xxxUIData 类型
  */
-export interface TextNodeType {
+export interface TextNodeUIDataEntry {
   id: string;
-  type: 'textNode';
-  data: TextNodeData;
+  type: CanvasNodeKind.TextNode;
+  data: TextNodeUIData;
 }
 
-export interface DesmosPreviewNodeType {
+export interface DesmosPreviewNodeUIDataEntry {
   id: string;
-  type: 'desmosPreviewNode';
-  data: DesmosPreviewNodeData;
+  type: CanvasNodeKind.DesmosPreviewNode;
+  data: DesmosPreviewNodeUIData;
 }
 
-export type CanvasNode = TextNodeType | DesmosPreviewNodeType;
+export type CanvasNodeUIDataEntry = TextNodeUIDataEntry | DesmosPreviewNodeUIDataEntry;
 
 /**
  * FlowData 节点类型（仅用于 React Flow 渲染与交互）
  */
-export type FlowTextNode = Node<Record<string, never>, 'textNode'>;
-export type FlowDesmosPreviewNode = Node<Record<string, never>, 'desmosPreviewNode'>;
-export type FlowNode = FlowTextNode | FlowDesmosPreviewNode;
+export type TextNodeFlowData = Node<{}, CanvasNodeKind.TextNode>;
+export type DesmosPreviewNodeFlowData = Node<{}, CanvasNodeKind.DesmosPreviewNode>;
+export type CanvasNodeFlowData = TextNodeFlowData | DesmosPreviewNodeFlowData;
 
-export interface CustomEdgeData extends Record<string, unknown> {
+
+
+// --- Edge Data Types ---
+
+export enum CanvasEdgeKind {
+  CustomEdge = 'custom',
+  DesmosPreviewEdge = 'desmosPreviewEdge',
+}
+
+export interface CustomEdgeUIData extends Record<string, unknown> {
   label?: string;
   [key: string]: unknown;
 }
 
-export interface DesmosPreviewEdgeData extends Record<string, unknown> {
+export interface DesmosPreviewEdgeUIData extends Record<string, unknown> {
   sourceOutputName: string;
 }
 
@@ -41,23 +58,17 @@ export type TypedEdge<EdgeData extends Record<string, unknown>, EdgeType extends
   data: EdgeData;
 };
 
-export type CustomCanvasEdge = TypedEdge<CustomEdgeData, 'custom'>;
-export type DesmosPreviewEdge = TypedEdge<DesmosPreviewEdgeData, 'desmosPreviewEdge'>;
+export type CustomEdgeUIDataEntry = TypedEdge<CustomEdgeUIData, CanvasEdgeKind.CustomEdge>;
+export type DesmosPreviewEdgeUIDataEntry = TypedEdge<DesmosPreviewEdgeUIData, CanvasEdgeKind.DesmosPreviewEdge>;
 
-export type CanvasEdge = CustomCanvasEdge | DesmosPreviewEdge;
+export type CanvasEdgeUIDataEntry = CustomEdgeUIDataEntry | DesmosPreviewEdgeUIDataEntry;
 
 /**
  * FlowData 边类型（仅用于 React Flow 渲染与交互）
  * data 在 flow 层并非必需，所以保持可选。
  */
-export type FlowCustomEdge = Edge<Record<string, unknown>, 'custom'> & {
-  type: 'custom';
-  data?: Record<string, unknown>;
-};
-export type FlowDesmosPreviewEdge = Edge<Record<string, unknown>, 'desmosPreviewEdge'> & {
-  type: 'desmosPreviewEdge';
-  data?: Record<string, unknown>;
-};
-export type FlowEdge = FlowCustomEdge | FlowDesmosPreviewEdge;
+export type CustomEdgeFlowData = Edge<{}, CanvasEdgeKind.CustomEdge>;
+export type DesmosPreviewEdgeFlowData = Edge<{}, CanvasEdgeKind.DesmosPreviewEdge>;
+export type CanvasEdgeFlowData = CustomEdgeFlowData | DesmosPreviewEdgeFlowData;
 
 

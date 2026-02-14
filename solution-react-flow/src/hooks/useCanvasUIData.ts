@@ -2,26 +2,26 @@ import { useMemo, useRef, useState } from 'react';
 import { createStore, useStore } from 'zustand';
 import { CanvasEvalApi } from './useCanvasEval';
 import type {
-  CanvasNode,
-  CanvasEdge,
-  TextNodeType,
-  DesmosPreviewNodeType,
-  DesmosPreviewEdge,
-  CustomCanvasEdge,
+  CanvasNodeUIDataEntry,
+  CanvasEdgeUIDataEntry,
+  TextNodeUIDataEntry,
+  DesmosPreviewNodeUIDataEntry,
+  DesmosPreviewEdgeUIDataEntry,
+  CustomEdgeUIDataEntry,
 } from '@/types/canvas';
 import type { Control } from '@/services/jsExecutor';
-import { DesmosPreviewNodeData, TextNodeData } from '@/types/nodeData';
+import { DesmosPreviewNodeUIData, TextNodeUIData } from '@/types/nodeData';
 import defaultCanvas from '@/components/Canvas/defaultCanvas';
 import { immer } from 'zustand/middleware/immer';
 
 export interface UIStoreState {
-  nodes: CanvasNode[];
-  edges: CanvasEdge[];
+  nodes: CanvasNodeUIDataEntry[];
+  edges: CanvasEdgeUIDataEntry[];
 }
 
 export interface UIData {
-  nodes: CanvasNode[];
-  edges: CanvasEdge[];
+  nodes: CanvasNodeUIDataEntry[];
+  edges: CanvasEdgeUIDataEntry[];
 }
 
 export interface CanvasUIDataApi {
@@ -29,34 +29,34 @@ export interface CanvasUIDataApi {
   subscribeData: (callback: (data: UIData) => void) => () => void;
   getSnapshot: () => UIData;
   useUIData: <T>(selector: (data: UIData) => T) => T;
-  useNodeData: (id: string) => TextNodeData | DesmosPreviewNodeData | undefined;
-  addNode: <NodeType extends CanvasNode>(node: NodeType) => void;
-  updateNode: <NodeType extends CanvasNode>(id: string, updates: Partial<NodeType>) => void;
+  useNodeData: (id: string) => TextNodeUIData | DesmosPreviewNodeUIData | undefined;
+  addNode: <NodeType extends CanvasNodeUIDataEntry>(node: NodeType) => void;
+  updateNode: <NodeType extends CanvasNodeUIDataEntry>(id: string, updates: Partial<NodeType>) => void;
   updateNodeData: (id: string, updates: Record<string, unknown>) => void;
   removeNode: (id: string) => void;
-  setNodes: (nodes: CanvasNode[]) => void;
+  setNodes: (nodes: CanvasNodeUIDataEntry[]) => void;
 
-  addEdge: <EdgeType extends CanvasEdge>(edge: EdgeType) => void;
-  updateEdge: <EdgeType extends CanvasEdge>(id: string, updates: Partial<EdgeType>) => void;
+  addEdge: <EdgeType extends CanvasEdgeUIDataEntry>(edge: EdgeType) => void;
+  updateEdge: <EdgeType extends CanvasEdgeUIDataEntry>(id: string, updates: Partial<EdgeType>) => void;
   removeEdge: (id: string) => void;
-  setEdges: (edges: CanvasEdge[]) => void;
+  setEdges: (edges: CanvasEdgeUIDataEntry[]) => void;
   clearCanvas: () => void;
   resetToDefault: () => void;
   importUIData: (data: { nodes: any[]; edges: any[] }) => void;
   exportUIData: () => UIData;
 
-  createDepEdge: (source: string, target: string, edgeData?: Partial<CustomCanvasEdge>) => CustomCanvasEdge;
-  defaultTextNodeData: TextNodeData;
-  createTextNode: (params?: { id?: string; position?: { x: number; y: number }; data?: Partial<TextNodeData> }) => TextNodeType;
+  createDepEdge: (source: string, target: string, edgeData?: Partial<CustomEdgeUIDataEntry>) => CustomEdgeUIDataEntry;
+  defaultTextNodeData: TextNodeUIData;
+  createTextNode: (params?: { id?: string; position?: { x: number; y: number }; data?: Partial<TextNodeUIData> }) => TextNodeUIDataEntry;
   createDesmosPreviewNode: (params: { sourceNodeId: string; sourceOutputName: string }) => void;
 
   updateNodeControlValues: (nodeId: string, values: Record<string, unknown>) => void;
   updateNodeControlValue: (nodeId: string, controlName: string, value: unknown) => void;
 }
 
-const isDesmosPreviewEdge = (edge: CanvasEdge): edge is DesmosPreviewEdge => edge.type === 'desmosPreviewEdge';
+const isDesmosPreviewEdge = (edge: CanvasEdgeUIDataEntry): edge is DesmosPreviewEdgeUIDataEntry => edge.type === 'desmosPreviewEdge';
 
-const defaultTextNodeData: TextNodeData = {
+const defaultTextNodeData: TextNodeUIData = {
   code: '',
   controls: [],
   autoResizeWidth: true,
@@ -70,13 +70,13 @@ const defaultTextNodeData: TextNodeData = {
   },
 };
 
-const normalizeUINodes = (nodes: any[]): CanvasNode[] =>
+const normalizeUINodes = (nodes: any[]): CanvasNodeUIDataEntry[] =>
   nodes.map((node) => {
     if (node?.type === 'desmosPreviewNode') {
       return {
         id: String(node.id),
         type: 'desmosPreviewNode',
-        data: (node?.data ?? {}) as DesmosPreviewNodeData,
+        data: (node?.data ?? {}) as DesmosPreviewNodeUIData,
       };
     }
 
@@ -87,7 +87,7 @@ const normalizeUINodes = (nodes: any[]): CanvasNode[] =>
     };
   });
 
-const normalizeUIEdges = (edges: any[]): CanvasEdge[] =>
+const normalizeUIEdges = (edges: any[]): CanvasEdgeUIDataEntry[] =>
   edges
     .filter((edge) => edge?.id && edge?.source && edge?.target)
     .map((edge) => {
@@ -120,7 +120,7 @@ const getDefaultUIData = (): UIData => ({
   edges: normalizeUIEdges(legacyDefaultEdges),
 });
 
-const createUIStore = (initial?: { nodes: CanvasNode[]; edges: CanvasEdge[] }) =>
+const createUIStore = (initial?: { nodes: CanvasNodeUIDataEntry[]; edges: CanvasEdgeUIDataEntry[] }) =>
   createStore<UIStoreState>()(
     immer(() => ({
       nodes: initial?.nodes ?? getDefaultUIData().nodes,
@@ -234,18 +234,18 @@ export const useCanvasUIData = (): CanvasUIDataApi => {
       });
     }
 
-    const useNodeData = (id: string): TextNodeData | DesmosPreviewNodeData | undefined =>
+    const useNodeData = (id: string): TextNodeUIData | DesmosPreviewNodeUIData | undefined =>
       useUIData((data) => data.nodes.find((node) => node.id === id)?.data);
 
-    const addNode = <NodeType extends CanvasNode>(node: NodeType) => {
+    const addNode = <NodeType extends CanvasNodeUIDataEntry>(node: NodeType) => {
       store.setState((state) => ({ nodes: [...state.nodes, node] }));
     };
 
-    const updateNode = <NodeType extends CanvasNode>(id: string, updates: Partial<NodeType>) =>
+    const updateNode = <NodeType extends CanvasNodeUIDataEntry>(id: string, updates: Partial<NodeType>) =>
       store.setState((state) => {
         const index = state.nodes.findIndex((node) => node.id === id);
         if (index === -1) return;
-        state.nodes[index] = { ...state.nodes[index], ...updates } as CanvasNode;
+        state.nodes[index] = { ...state.nodes[index], ...updates } as CanvasNodeUIDataEntry;
       });
 
     const updateNodeData = (id: string, updates: Record<string, unknown>) =>
@@ -274,15 +274,15 @@ export const useCanvasUIData = (): CanvasUIDataApi => {
       });
     };
 
-    const setNodes = (nodes: CanvasNode[]) => {
+    const setNodes = (nodes: CanvasNodeUIDataEntry[]) => {
       store.setState({ nodes });
     };
 
-    const addEdge = <EdgeType extends CanvasEdge>(edge: EdgeType) => {
+    const addEdge = <EdgeType extends CanvasEdgeUIDataEntry>(edge: EdgeType) => {
       store.setState((state) => ({ edges: [...state.edges, edge] }));
     };
 
-    const updateEdge = <EdgeType extends CanvasEdge>(id: string, updates: Partial<EdgeType>) =>
+    const updateEdge = <EdgeType extends CanvasEdgeUIDataEntry>(id: string, updates: Partial<EdgeType>) =>
       store.setState((state) => {
         const index = state.edges.findIndex((edge) => edge.id === id);
         if (index === -1) return;
@@ -293,7 +293,7 @@ export const useCanvasUIData = (): CanvasUIDataApi => {
       store.setState((state) => ({ edges: state.edges.filter((edge) => edge.id !== id) }));
     };
 
-    const setEdges = (edges: CanvasEdge[]) => {
+    const setEdges = (edges: CanvasEdgeUIDataEntry[]) => {
       store.setState({ edges });
     };
 
@@ -315,8 +315,8 @@ export const useCanvasUIData = (): CanvasUIDataApi => {
 
     const exportUIData = (): UIData => toUIData(store.getState());
 
-    const createDepEdge = (source: string, target: string, edgeData?: Partial<CustomCanvasEdge>) => {
-      const newEdge: CustomCanvasEdge = {
+    const createDepEdge = (source: string, target: string, edgeData?: Partial<CustomEdgeUIDataEntry>) => {
+      const newEdge: CustomEdgeUIDataEntry = {
         id: `edge-${Date.now()}-${Math.random().toString(36).slice(2, 11)}`,
         source,
         target,
@@ -328,9 +328,9 @@ export const useCanvasUIData = (): CanvasUIDataApi => {
       return newEdge;
     };
 
-    const createTextNode = (params?: { id?: string; position?: { x: number; y: number }; data?: Partial<TextNodeData> }) => {
+    const createTextNode = (params?: { id?: string; position?: { x: number; y: number }; data?: Partial<TextNodeUIData> }) => {
       const nodeId = params?.id ?? `node-${Date.now()}-${Math.random().toString(36).slice(2, 11)}`;
-      const uiNode: TextNodeType = {
+      const uiNode: TextNodeUIDataEntry = {
         id: nodeId,
         type: 'textNode',
         data: { ...defaultTextNodeData, ...(params?.data ?? {}) },
@@ -354,12 +354,12 @@ export const useCanvasUIData = (): CanvasUIDataApi => {
 
       const previewNodeId = `desmos-preview-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
 
-      const previewNode: DesmosPreviewNodeType = {
+      const previewNode: DesmosPreviewNodeUIDataEntry = {
         id: previewNodeId,
         type: 'desmosPreviewNode',
         data: {},
       };
-      const previewEdge: DesmosPreviewEdge = {
+      const previewEdge: DesmosPreviewEdgeUIDataEntry = {
         id: `edge-${sourceNodeId}-desmos-${Date.now()}`,
         source: sourceNodeId,
         target: previewNodeId,

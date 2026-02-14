@@ -5,7 +5,7 @@ import { immer } from 'zustand/middleware/immer';
 import { jsExecutor, Control, ExecutionResult } from '@/services/jsExecutor';
 import { produce } from 'immer';
 import type { CanvasUIDataApi, UIData } from './useCanvasUIData';
-import { CanvasEdge, CanvasNode, DesmosPreviewEdgeData, TextNodeType } from '@/types/canvas';
+import { CanvasEdgeUIDataEntry, CanvasNodeUIDataEntry, DesmosPreviewEdgeUIData, TextNodeUIDataEntry } from '@/types/canvas';
 
 export interface ErrorInfo {
   message: string;
@@ -47,7 +47,7 @@ export interface CanvasEvalDeltaDPEdge {
 // Eval Store/State Types
 
 export interface CanvasEvalNode {
-  type: CanvasNode['type'];
+  type: CanvasNodeUIDataEntry['type'];
   code: string;
   isEvaluating: boolean;
   controls: Control[];
@@ -109,7 +109,7 @@ export interface CanvasEvalApi {
  */
 
 // create initial node data
-const createInitialNodeData = (type: CanvasNode['type'], code: string, controls: Control[]): CanvasEvalNode => ({
+const createInitialNodeData = (type: CanvasNodeUIDataEntry['type'], code: string, controls: Control[]): CanvasEvalNode => ({
   type,
   code,
   isEvaluating: false,
@@ -129,7 +129,7 @@ const mergeControls = (prevControls: Control[], nextControls: Control[]) => {
   });
 };
 
-const buildDepIOs = (edges: CanvasEdge[]): CanvasEvalDepIOs => {
+const buildDepIOs = (edges: CanvasEdgeUIDataEntry[]): CanvasEvalDepIOs => {
   const incoming: Record<string, string[]> = {};
   const outgoing: Record<string, string[]> = {};
 
@@ -145,7 +145,7 @@ const buildDepIOs = (edges: CanvasEdge[]): CanvasEvalDepIOs => {
   return { incomingByTarget: incoming, outgoingBySource: outgoing };
 };
 
-const buildDPIOs = (edges: CanvasEdge[]): CanvasEvalDPIOs => {
+const buildDPIOs = (edges: CanvasEdgeUIDataEntry[]): CanvasEvalDPIOs => {
   const incoming: Record<string, { source: string, sourceOutputName: string }> = {};
   const outgoing: Record<string, Record<string, string>> = {};
 
@@ -173,7 +173,7 @@ const buildDPIOs = (edges: CanvasEdge[]): CanvasEvalDPIOs => {
 
 
 // 为边生成唯一键，便于在 diff 过程中进行集合对比
-const createEdgeKey = ({ source, target }: Pick<CanvasEdge, 'source' | 'target'>) => `${source}->${target}`;
+const createEdgeKey = ({ source, target }: Pick<CanvasEdgeUIDataEntry, 'source' | 'target'>) => `${source}->${target}`;
 
 // 描述一次 CanvasEvalInput 变化中我们关心的增量信息
 interface CanvasEvalDelta {
@@ -422,7 +422,7 @@ const buildNextEvalNodes = (
     });
 
     delta.updatedNodeIds.forEach((id) => {
-      const node = currUIData.nodes.find((node) => node.id === id)! as TextNodeType;
+      const node = currUIData.nodes.find((node) => node.id === id)! as TextNodeUIDataEntry;
       draft[id]!.type = 'textNode';
       draft[id]!.code = node.data.code;
       draft[id]!.controls = node.data.controls.map((control) => ({ ...control }));

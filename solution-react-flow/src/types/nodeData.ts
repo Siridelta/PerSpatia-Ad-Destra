@@ -11,7 +11,7 @@ import { Control } from "@/services/jsExecutor";
  * - `isCollapsed`：节点是否折叠
  * - `hiddenSections`：节点内的隐藏部分（哪些部分是隐藏的）
  */
-export interface TextNodeData extends Record<string, unknown> {
+export interface TextNodeUIData extends Record<string, unknown> {
   code: string;
   controls: Control[];
   width?: number;
@@ -32,7 +32,7 @@ export interface TextNodeData extends Record<string, unknown> {
  * - 指向源节点及其输出名称，便于建立映射
  * - 记录最新的 Desmos 图形状态，用于持久化与回显
  */
-export interface DesmosPreviewNodeData extends Record<string, unknown> {
+export interface DesmosPreviewNodeUIData extends Record<string, unknown> {
   // Phase 1: 预览节点保持只读，不在节点数据中维护业务状态
 }
 

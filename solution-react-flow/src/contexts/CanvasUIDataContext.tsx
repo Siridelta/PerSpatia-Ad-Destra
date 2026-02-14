@@ -1,6 +1,6 @@
 import { createContext, ReactNode, useContext, useMemo, useCallback } from 'react';
 import { CanvasUIDataApi } from '@/hooks/useCanvasUIData';
-import type { CanvasNode, TextNodeType } from '@/types/canvas';
+import type { CanvasNodeUIDataEntry, TextNodeUIDataEntry } from '@/types/canvas';
 
 interface CanvasUIDataProviderProps {
   api: CanvasUIDataApi;
@@ -37,7 +37,7 @@ export const useTextNodeData = (nodeId: string) => {
 
   // 更新节点数据的方法
   const updateNode = useCallback(
-    (updates: Partial<TextNodeType>) => {
+    (updates: Partial<TextNodeUIDataEntry>) => {
       uiDataApi.updateNode(nodeId, updates);
     },
     [uiDataApi, nodeId]
@@ -93,7 +93,7 @@ export const useDesmosPreviewNodeData = (nodeId: string) => {
 
   // 更新节点数据的方法
   const updateNode = useCallback(
-    (updates: Partial<CanvasNode>) => {
+    (updates: Partial<CanvasNodeUIDataEntry>) => {
       uiDataApi.updateNode(nodeId, updates);
     },
     [uiDataApi, nodeId]

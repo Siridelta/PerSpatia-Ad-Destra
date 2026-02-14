@@ -5,7 +5,7 @@ import { Handle, Position, NodeProps } from '@xyflow/react';
 import { useNodeEval } from '@/contexts/CanvasEvalContext';
 
 import './styles.css';
-import { FlowDesmosPreviewNode, DesmosPreviewEdge } from '@/types/canvas';
+import { DesmosPreviewNodeFlowData, DesmosPreviewEdgeUIDataEntry } from '@/types/canvas';
 import { useCanvasUIDataApi } from '@/contexts/CanvasUIDataContext';
 
 // ============================================================================
@@ -63,7 +63,7 @@ const ensureDesmosLoaded = (): Promise<void> => {
 // 主组件实现
 // ============================================================================
 
-const DesmosPreviewNode: React.FC<NodeProps<FlowDesmosPreviewNode>> = ({ id, selected }) => {
+const DesmosPreviewNode: React.FC<NodeProps<DesmosPreviewNodeFlowData>> = ({ id, selected }) => {
   const [isReady, setIsReady] = useState<boolean>(typeof window !== 'undefined' && !!window.Desmos);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
   const containerRef = useRef<HTMLDivElement | null>(null);
@@ -72,7 +72,7 @@ const DesmosPreviewNode: React.FC<NodeProps<FlowDesmosPreviewNode>> = ({ id, sel
 
   const { useUIData } = useCanvasUIDataApi();
   const previewEdge = useUIData((ui) =>
-    ui.edges.find((edge) => edge.type === 'desmosPreviewEdge' && edge.target === id) as DesmosPreviewEdge | undefined,
+    ui.edges.find((edge) => edge.type === 'desmosPreviewEdge' && edge.target === id) as DesmosPreviewEdgeUIDataEntry | undefined,
   );
   const sourceNode = useUIData((ui) => {
     if (!previewEdge) return undefined;

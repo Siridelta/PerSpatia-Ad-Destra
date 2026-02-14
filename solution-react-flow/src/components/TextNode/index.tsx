@@ -8,8 +8,8 @@ import { SliderControl, ToggleControl, TextControl } from './controls';
 import { ErrorDisplay, WarningDisplay, LogDisplay, OutputDisplay } from './displays';
 import CodeEditor from '../CodeEditor';
 import { useNodeEval } from '@/contexts/CanvasEvalContext';
-import { FlowTextNode } from '@/types/canvas';
-import { TextNodeData } from '@/types/nodeData';
+import { TextNodeFlowData } from '@/types/canvas';
+import { TextNodeUIData } from '@/types/nodeData';
 import { useCanvasUIDataApi } from '@/contexts/CanvasUIDataContext';
 
 
@@ -42,7 +42,7 @@ function placeCaretAtPoint(x: number, y: number) {
 // 主组件
 // ============================================================================
 
-const TextNode: React.FC<NodeProps<FlowTextNode>> = ({ id, selected }) => {
+const TextNode: React.FC<NodeProps<TextNodeFlowData>> = ({ id, selected }) => {
 
   const { updateNodeData, updateNodeControlValues, useUIData } = useCanvasUIDataApi();
   const nodeData = useUIData((uiData) => {
@@ -120,7 +120,7 @@ const TextNode: React.FC<NodeProps<FlowTextNode>> = ({ id, selected }) => {
   // ============================================================================
 
   // 节点数据更新
-  const updateData = useCallback((updates: Partial<TextNodeData>) => {
+  const updateData = useCallback((updates: Partial<TextNodeUIData>) => {
     updateNodeData(id, updates);
   }, [updateNodeData, id]);
 

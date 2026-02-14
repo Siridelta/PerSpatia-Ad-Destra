@@ -28,7 +28,7 @@ import { useCanvasUIData } from '@/hooks/useCanvasUIData';
 import { useTheme } from '@/hooks/useTheme';
 import { useSettingsStore } from '@/store/settingsStore';
 import { useToolStore } from '@/store/toolStore';
-import { FlowEdge, FlowNode } from '@/types/canvas';
+import { CanvasEdgeFlowData, CanvasNodeFlowData, CanvasNodeKind } from '@/types/canvas';
 import useInertialPan from '@/utils/useInertialPan';
 import { useTestRefChange } from '@/utils/useTestRefChange';
 import CustomConnectionLine from './CustomConnectionLine';
@@ -97,7 +97,7 @@ const Canvas: React.FC = () => {
   }, [uiNodes, uiEdges, flowDataApi]);
 
   // onInit 时主动推送一次视角，避免首次渲染时闪烁
-  const handleInit = useCallback((reactFlowInstance: ReactFlowInstance<FlowNode, FlowEdge>) => {
+  const handleInit = useCallback((reactFlowInstance: ReactFlowInstance<CanvasNodeFlowData, CanvasEdgeFlowData>) => {
     if (!viewport) return;
     reactFlowInstance.setViewport(viewport);
   }, [viewport]);
@@ -194,7 +194,7 @@ const Canvas: React.FC = () => {
       });
       flowDataApi.addNode({
         id: node.id,
-        type: 'textNode',
+        type: CanvasNodeKind.TextNode,
         position,
         data: {},
       });
@@ -212,7 +212,7 @@ const Canvas: React.FC = () => {
       });
       flowDataApi.addNode({
         id: node.id,
-        type: 'textNode',
+        type: CanvasNodeKind.TextNode,
         position,
         data: {},
       });

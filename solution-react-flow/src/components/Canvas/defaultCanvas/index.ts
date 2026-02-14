@@ -1,14 +1,14 @@
 /*eslint no-unused-vars: "off" */
 
-import { CanvasEdge, CanvasNode } from '@/types/canvas';
+import { CanvasEdgeUIDataEntry, CanvasNodeUIDataEntry } from '@/types/canvas';
 import { Viewport } from '@xyflow/react';
 
 import canvas3node from './canvas-3node.json';
 import canvasChainDoubler from './canvas-chain-doubler.json';
 
 type DefaultCanvas = {
-    nodes: CanvasNode[];
-    edges: CanvasEdge[];
+    nodes: CanvasNodeUIDataEntry[];
+    edges: CanvasEdgeUIDataEntry[];
     viewport: Viewport;
 }
 

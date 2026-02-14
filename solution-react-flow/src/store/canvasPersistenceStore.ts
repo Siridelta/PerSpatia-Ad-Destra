@@ -1,5 +1,5 @@
 import { create } from 'zustand';
-import type { CanvasNode, CanvasEdge, FlowNode, FlowEdge } from '@/types/canvas';
+import { type CanvasNodeUIDataEntry, type CanvasEdgeUIDataEntry, type CanvasNodeFlowData, type CanvasEdgeFlowData, CanvasNodeKind, CanvasEdgeKind } from '@/types/canvas';
 import type { Viewport } from '@xyflow/react';
 import type { Control } from '@/services/jsExecutor';
 
@@ -8,12 +8,12 @@ import type { Control } from '@/services/jsExecutor';
  */
 export interface CanvasPersistedState {
   uiData: {
-    nodes: CanvasNode[];
-    edges: CanvasEdge[];
+    nodes: CanvasNodeUIDataEntry[];
+    edges: CanvasEdgeUIDataEntry[];
   };
   flowData: {
-    nodes: FlowNode[];
-    edges: FlowEdge[];
+    nodes: CanvasNodeFlowData[];
+    edges: CanvasEdgeFlowData[];
     viewport: Viewport;
   };
 }
@@ -174,12 +174,12 @@ const defaultHiddenSections = {
   errors: false,
 };
 
-const normalizeUINodes = (nodes: any[]): CanvasNode[] =>
+const normalizeUINodes = (nodes: any[]): CanvasNodeUIDataEntry[] =>
   nodes.map((node) => {
     if (node?.type === 'textNode') {
       return {
         id: String(node.id),
-        type: 'textNode',
+        type: CanvasNodeKind.TextNode,
         data: {
           code: typeof node?.data?.code === 'string' ? node.data.code : '',
           controls: Array.isArray(node?.data?.controls) ? node.data.controls : [],
@@ -195,21 +195,21 @@ const normalizeUINodes = (nodes: any[]): CanvasNode[] =>
 
     return {
       id: String(node.id),
-      type: 'desmosPreviewNode',
+      type: CanvasNodeKind.DesmosPreviewNode,
       data: (node?.data ?? {}) as Record<string, unknown>,
     };
   });
 
-const normalizeUIEdges = (edges: any[]): CanvasEdge[] =>
+const normalizeUIEdges = (edges: any[]): CanvasEdgeUIDataEntry[] =>
   edges
     .filter((edge) => edge?.id && edge?.source && edge?.target && edge?.type)
     .map((edge) => {
-      if (edge.type === 'desmosPreviewEdge') {
+      if (edge.type === CanvasEdgeKind.DesmosPreviewEdge) {
         return {
           id: String(edge.id),
           source: String(edge.source),
           target: String(edge.target),
-          type: 'desmosPreviewEdge',
+          type: CanvasEdgeKind.DesmosPreviewEdge,
           data: {
             sourceOutputName: String(edge?.data?.sourceOutputName ?? ''),
           },
@@ -220,27 +220,27 @@ const normalizeUIEdges = (edges: any[]): CanvasEdge[] =>
         id: String(edge.id),
         source: String(edge.source),
         target: String(edge.target),
-        type: 'custom',
+        type: CanvasEdgeKind.CustomEdge,
         data: (edge?.data ?? {}) as Record<string, unknown>,
       };
     });
 
-const normalizeFlowNodes = (nodes: any[]): FlowNode[] =>
+const normalizeFlowNodes = (nodes: any[]): CanvasNodeFlowData[] =>
   nodes.map((node) => ({
     id: String(node.id),
-    type: node?.type === 'desmosPreviewNode' ? 'desmosPreviewNode' : 'textNode',
+    type: node?.type === CanvasNodeKind.DesmosPreviewNode ? CanvasNodeKind.DesmosPreviewNode : CanvasNodeKind.TextNode,
     position: node?.position ?? { x: 0, y: 0 },
     data: {},
   }));
 
-const normalizeFlowEdges = (edges: any[]): FlowEdge[] =>
+const normalizeFlowEdges = (edges: any[]): CanvasEdgeFlowData[] =>
   edges
     .filter((edge) => edge?.id && edge?.source && edge?.target && edge?.type)
     .map((edge) => ({
       id: String(edge.id),
       source: String(edge.source),
       target: String(edge.target),
-      type: edge.type === 'desmosPreviewEdge' ? 'desmosPreviewEdge' : 'custom',
+      type: edge.type === CanvasEdgeKind.DesmosPreviewEdge ? CanvasEdgeKind.DesmosPreviewEdge : CanvasEdgeKind.CustomEdge,
       data: {},
     }));
 

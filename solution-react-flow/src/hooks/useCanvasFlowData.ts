@@ -1,12 +1,12 @@
 import { useMemo, useRef, useState } from 'react';
 import { createStore, useStore } from 'zustand';
 import { applyEdgeChanges, applyNodeChanges, type EdgeChange, type NodeChange, type Viewport } from '@xyflow/react';
-import type { CanvasEdge, CanvasNode, FlowEdge, FlowNode } from '@/types/canvas';
+import { type CanvasEdgeUIDataEntry, type CanvasNodeUIDataEntry, type CanvasEdgeFlowData, type CanvasNodeFlowData, CanvasNodeKind, CanvasEdgeKind } from '@/types/canvas';
 import defaultCanvas from '@/components/Canvas/defaultCanvas';
 
 export interface FlowData {
-  nodes: FlowNode[];
-  edges: FlowEdge[];
+  nodes: CanvasNodeFlowData[];
+  edges: CanvasEdgeFlowData[];
   viewport: Viewport;
 }
 
@@ -14,13 +14,13 @@ export interface CanvasFlowDataApi {
   getSnapshot: () => FlowData;
   useFlowData: <T>(selector: (data: FlowData) => T) => T;
 
-  setNodes: (nodes: FlowNode[]) => void;
-  setEdges: (edges: FlowEdge[]) => void;
+  setNodes: (nodes: CanvasNodeFlowData[]) => void;
+  setEdges: (edges: CanvasEdgeFlowData[]) => void;
   setViewport: (viewport: Viewport) => void;
 
-  addNode: (node: FlowNode) => void;
+  addNode: (node: CanvasNodeFlowData) => void;
   removeNode: (id: string) => void;
-  addEdge: (edge: FlowEdge) => void;
+  addEdge: (edge: CanvasEdgeFlowData) => void;
   removeEdge: (id: string) => void;
 
   handleNodesChange: (changes: NodeChange[]) => void;
@@ -31,7 +31,7 @@ export interface CanvasFlowDataApi {
   resetToDefault: () => void;
   clearCanvas: () => void;
 
-  syncWithUI: (uiNodes: CanvasNode[], uiEdges: CanvasEdge[]) => void;
+  syncWithUI: (uiNodes: CanvasNodeUIDataEntry[], uiEdges: CanvasEdgeUIDataEntry[]) => void;
 }
 
 const defaultViewport: Viewport = { x: 0, y: 0, zoom: 1 };
@@ -43,22 +43,22 @@ const isSameViewport = (a: Viewport, b: Viewport) => (
   Math.abs(a.zoom - b.zoom) < VIEWPORT_EPSILON
 );
 
-const normalizeFlowNodes = (nodes: any[]): FlowNode[] =>
+const normalizeFlowNodes = (nodes: any[]): CanvasNodeFlowData[] =>
   nodes.map((node) => ({
     id: String(node.id),
-    type: node?.type === 'desmosPreviewNode' ? 'desmosPreviewNode' : 'textNode',
+    type: node?.type === CanvasNodeKind.DesmosPreviewNode ? CanvasNodeKind.DesmosPreviewNode : CanvasNodeKind.TextNode,
     position: node?.position ?? { x: 0, y: 0 },
     data: {},
   }));
 
-const normalizeFlowEdges = (edges: any[]): FlowEdge[] =>
+const normalizeFlowEdges = (edges: any[]): CanvasEdgeFlowData[] =>
   edges
     .filter((edge) => edge?.id && edge?.source && edge?.target)
     .map((edge) => ({
       id: String(edge.id),
       source: String(edge.source),
       target: String(edge.target),
-      type: edge?.type === 'desmosPreviewEdge' ? 'desmosPreviewEdge' : 'custom',
+      type: edge?.type === CanvasEdgeKind.DesmosPreviewEdge ? CanvasEdgeKind.DesmosPreviewEdge : CanvasEdgeKind.CustomEdge,
       data: {},
     }));
 
@@ -74,8 +74,8 @@ const getDefaultFlowData = (): FlowData => {
 };
 
 interface FlowStoreState {
-  nodes: FlowNode[];
-  edges: FlowEdge[];
+  nodes: CanvasNodeFlowData[];
+  edges: CanvasEdgeFlowData[];
   viewport: Viewport;
 }
 
@@ -111,12 +111,12 @@ export const useCanvasFlowData = (): CanvasFlowDataApi => {
       });
     }
 
-    const setNodes = (nodes: FlowNode[]) => store.setState({ nodes });
-    const setEdges = (edges: FlowEdge[]) => store.setState({ edges });
+    const setNodes = (nodes: CanvasNodeFlowData[]) => store.setState({ nodes });
+    const setEdges = (edges: CanvasEdgeFlowData[]) => store.setState({ edges });
     const setViewport = (viewport: Viewport) =>
       store.setState((state) => (isSameViewport(state.viewport, viewport) ? state : { viewport }));
 
-    const addNode = (node: FlowNode) =>
+    const addNode = (node: CanvasNodeFlowData) =>
       store.setState((state) => ({ nodes: [...state.nodes, node] }));
 
     const removeNode = (id: string) =>
@@ -125,7 +125,7 @@ export const useCanvasFlowData = (): CanvasFlowDataApi => {
         edges: state.edges.filter((edge) => edge.source !== id && edge.target !== id),
       }));
 
-    const addEdge = (edge: FlowEdge) =>
+    const addEdge = (edge: CanvasEdgeFlowData) =>
       store.setState((state) => ({ edges: [...state.edges, edge] }));
 
     const removeEdge = (id: string) =>
@@ -133,12 +133,12 @@ export const useCanvasFlowData = (): CanvasFlowDataApi => {
 
     const handleNodesChange = (changes: NodeChange[]) =>
       store.setState((state) => ({
-        nodes: applyNodeChanges(changes, state.nodes) as FlowNode[],
+        nodes: applyNodeChanges(changes, state.nodes) as CanvasNodeFlowData[],
       }));
 
     const handleEdgesChange = (changes: EdgeChange[]) =>
       store.setState((state) => ({
-        edges: applyEdgeChanges(changes, state.edges) as FlowEdge[],
+        edges: applyEdgeChanges(changes, state.edges) as CanvasEdgeFlowData[],
       }));
 
     const importFlowData = (incoming: Partial<FlowData>) => {
@@ -155,12 +155,12 @@ export const useCanvasFlowData = (): CanvasFlowDataApi => {
     const resetToDefault = () => store.setState(getDefaultFlowData());
     const clearCanvas = () => store.setState({ nodes: [], edges: [], viewport: defaultViewport });
 
-    const syncWithUI = (uiNodes: CanvasNode[], uiEdges: CanvasEdge[]) => {
+    const syncWithUI = (uiNodes: CanvasNodeUIDataEntry[], uiEdges: CanvasEdgeUIDataEntry[]) => {
       store.setState((state) => {
         const existingNodeMap = new Map(state.nodes.map((node) => [node.id, node]));
         const existingEdgeMap = new Map(state.edges.map((edge) => [edge.id, edge]));
 
-        const nextNodes: FlowNode[] = uiNodes.map((uiNode) => {
+        const nextNodes: CanvasNodeFlowData[] = uiNodes.map((uiNode) => {
           const existing = existingNodeMap.get(uiNode.id);
           if (existing) {
             return { ...existing, type: uiNode.type, data: {} };
@@ -174,7 +174,7 @@ export const useCanvasFlowData = (): CanvasFlowDataApi => {
         });
 
         const nodeIdSet = new Set(nextNodes.map((node) => node.id));
-        const nextEdges: FlowEdge[] = uiEdges
+        const nextEdges: CanvasEdgeFlowData[] = uiEdges
           .filter((edge) => nodeIdSet.has(edge.source) && nodeIdSet.has(edge.target))
           .map((uiEdge) => {
             const existing = existingEdgeMap.get(uiEdge.id);
