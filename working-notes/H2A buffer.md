@@ -45,6 +45,19 @@ export/import canvas:
 
 - use complete state --- with version number
 
-- bug: when import there's problems in node inital dimensions -> hence the 2-layer not visually synced, and unexpected scrollbars
+- bug: 导入时节点的尺寸初始化有问题 -> 导致2层不 visually synced, 和 unexpected scrollbars
 
 - customEdge -> depEdge / dependencyEdge; merged in state v7, not to upgrade
+
+
+
+
+---
+
+260212 refactor:
+
+- default canvas incompatibility
+- flowData syncWithUI object-builds reducing (performance)
+- handleImportReplace, handleImportAdd: use logic of persistence and migration
+
+- node/edge types 简化

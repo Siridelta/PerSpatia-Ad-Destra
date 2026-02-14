@@ -43,6 +43,7 @@ function placeCaretAtPoint(x: number, y: number) {
 // ============================================================================
 
 const TextNode: React.FC<NodeProps<FlowTextNode>> = ({ id, selected }) => {
+
   const { updateNodeData, updateNodeControlValues, useUIData } = useCanvasUIDataApi();
   const nodeData = useUIData((uiData) => {
     const node = uiData.nodes.find((item) => item.id === id);

@@ -1,9 +1,16 @@
-import React, { useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import { ReactFlowProvider } from '@xyflow/react';
 import TextNode from '../../components/TextNode';
 import './TestPage.css';
+import { CanvasUIDataProvider } from '@/contexts/CanvasUIDataContext';
+import { CanvasEvalProvider } from '@/contexts/CanvasEvalContext';
+import { useCanvasUIData } from '@/hooks/useCanvasUIData';
+import { useCanvasEval } from '@/hooks/useCanvasEval';
 
 const SizingBehaviorTest: React.FC = () => {
+  const uiDataApi = useCanvasUIData();
+  const evalApi = useCanvasEval();
+
   const [testCode, setTestCode] = useState(`// 测试代码
 const longVariableName = "这是一个很长的变量名";
 const shortVar = "短变量";
@@ -12,6 +19,42 @@ node_output("result", longVariableName + shortVar);`);
 
   const [hasError, setHasError] = useState(false);
   const [errorMessage, setErrorMessage] = useState('');
+  const nodeId = 'sizing-test-node';
+
+  useEffect(() => {
+    const unsubscribeEvalFromUI = evalApi.subscribeFromUI(uiDataApi);
+    const unsubscribeUIFromEval = uiDataApi.subscribeFromEval(evalApi);
+    return () => {
+      unsubscribeEvalFromUI();
+      unsubscribeUIFromEval();
+    };
+  }, [evalApi, uiDataApi]);
+
+  useEffect(() => {
+    const existingNode = uiDataApi.getSnapshot().nodes.find((node) => node.id === nodeId);
+    if (!existingNode) {
+      uiDataApi.createTextNode({
+        id: nodeId,
+        position: { x: 0, y: 0 },
+        data: {
+          code: testCode,
+          nodeName: '尺寸测试节点',
+          width: 600,
+          height: 500,
+          autoResizeWidth: false,
+        },
+      });
+      return;
+    }
+
+    uiDataApi.updateNodeData(nodeId, {
+      code: testCode,
+      nodeName: '尺寸测试节点',
+      width: 600,
+      height: 500,
+      autoResizeWidth: false,
+    });
+  }, [testCode, uiDataApi]);
 
   const handleTestScenario = (scenario: string) => {
     setHasError(false);
@@ -145,27 +188,26 @@ node_output("result", x + y);`);
               <p>观察节点的尺寸调整行为</p>
             </div>
             <div className="node-display-area">
-              <ReactFlowProvider>
-                <TextNode 
-                  id="sizing-test-node"
-                  data={{
-                    code: testCode,
-                    nodeName: '尺寸测试节点',
-                    width: 600,
-                    height: 500,
-                  }}
-                  selected={false}
-                  type="text"
-                  dragging={false}
-                  zIndex={0}
-                  selectable={true}
-                  deletable={true}
-                  draggable={true}
-                  isConnectable={true}
-                  positionAbsoluteX={0}
-                  positionAbsoluteY={0}
-                />
-              </ReactFlowProvider>
+              <CanvasUIDataProvider api={uiDataApi}>
+                <CanvasEvalProvider api={evalApi}>
+                  <ReactFlowProvider>
+                    <TextNode
+                      id={nodeId}
+                      data={{}}
+                      selected={false}
+                      type="textNode"
+                      dragging={false}
+                      zIndex={0}
+                      selectable={true}
+                      deletable={true}
+                      draggable={true}
+                      isConnectable={true}
+                      positionAbsoluteX={0}
+                      positionAbsoluteY={0}
+                    />
+                  </ReactFlowProvider>
+                </CanvasEvalProvider>
+              </CanvasUIDataProvider>
             </div>
           </div>
         </div>

@@ -9,8 +9,6 @@ import {
   ReactFlow,
   ReactFlowInstance,
   useReactFlow,
-  applyNodeChanges,
-  applyEdgeChanges
 } from '@xyflow/react';
 import '@xyflow/react/dist/style.css';
 import React, { useCallback, useEffect } from 'react';
@@ -24,15 +22,17 @@ import Toolbar from '@/components/Toolbar';
 import { CanvasEvalProvider } from '@/contexts/CanvasEvalContext';
 import { CanvasUIDataProvider } from '@/contexts/CanvasUIDataContext';
 import { useCanvasEval } from '@/hooks/useCanvasEval';
+import { useCanvasFlowData } from '@/hooks/useCanvasFlowData';
+import { useCanvasStatePersistence } from '@/hooks/useCanvasStatePersistence';
 import { useCanvasUIData } from '@/hooks/useCanvasUIData';
 import { useTheme } from '@/hooks/useTheme';
 import { useSettingsStore } from '@/store/settingsStore';
 import { useToolStore } from '@/store/toolStore';
-import { CanvasEdge, CanvasNode, CustomCanvasEdge, TextNodeType } from '@/types/canvas';
+import { FlowEdge, FlowNode } from '@/types/canvas';
 import useInertialPan from '@/utils/useInertialPan';
+import { useTestRefChange } from '@/utils/useTestRefChange';
 import CustomConnectionLine from './CustomConnectionLine';
 import './styles.css';
-import { produce } from 'immer';
 
 // 注册自定义节点类型
 const nodeTypes: NodeTypes = {
@@ -47,9 +47,12 @@ const edgeTypes: EdgeTypes = {
 };
 
 const Canvas: React.FC = () => {
+  
   // 创建两个模块的 API 对象
   const uiDataApi = useCanvasUIData();
+  const flowDataApi = useCanvasFlowData();
   const evalApi = useCanvasEval();
+  const { isHydrated } = useCanvasStatePersistence(uiDataApi, flowDataApi);
 
   // 连接两个 API：双向订阅
   useEffect(() => {
@@ -65,10 +68,11 @@ const Canvas: React.FC = () => {
     };
   }, [uiDataApi, evalApi]);
 
-  // 使用 UI Data API 获取状态
-  const nodes = uiDataApi.useUIData((data) => data.nodes);
-  const edges = uiDataApi.useUIData((data) => data.edges);
-  const viewport = uiDataApi.useUIData((data) => data.viewport);
+  const uiNodes = uiDataApi.useUIData((data) => data.nodes);
+  const uiEdges = uiDataApi.useUIData((data) => data.edges);
+  const flowNodes = flowDataApi.useFlowData((data) => data.nodes);
+  const flowEdges = flowDataApi.useFlowData((data) => data.edges);
+  const viewport = flowDataApi.useFlowData((data) => data.viewport);
 
   // 当前活动工具（全局）
   const activeTool = useToolStore((state) => state.activeTool);
@@ -87,14 +91,13 @@ const Canvas: React.FC = () => {
   // 惯性/缓动式视野移动（WASD）
   useInertialPan({ setViewport: setFlowViewport, getViewport });
 
-  // 初始化时同步状态中的视角到 React Flow
+  // 将业务层 UIData 拓扑同步到 FlowData（先采用低效双遍历，后续 Map 化再优化）
   useEffect(() => {
-    if (!viewport) return;
-    setFlowViewport(viewport);
-  }, [viewport, setFlowViewport]);
+    flowDataApi.syncWithUI(uiNodes, uiEdges);
+  }, [uiNodes, uiEdges, flowDataApi]);
 
   // onInit 时主动推送一次视角，避免首次渲染时闪烁
-  const handleInit = useCallback((reactFlowInstance: ReactFlowInstance<CanvasNode, CanvasEdge>) => {
+  const handleInit = useCallback((reactFlowInstance: ReactFlowInstance<FlowNode, FlowEdge>) => {
     if (!viewport) return;
     reactFlowInstance.setViewport(viewport);
   }, [viewport]);
@@ -142,8 +145,8 @@ const Canvas: React.FC = () => {
         e.preventDefault();
       } else if (e.key === 'Delete' || e.key === 'Backspace') {
         // 删除选中的节点和边
-        const selectedNodes = nodes.filter(node => node.selected);
-        const selectedEdges = edges.filter(edge => edge.selected);
+        const selectedNodes = flowNodes.filter(node => node.selected);
+        const selectedEdges = flowEdges.filter(edge => edge.selected);
 
         // 删除选中的节点
         selectedNodes.forEach(node => uiDataApi.removeNode(node.id));
@@ -169,56 +172,58 @@ const Canvas: React.FC = () => {
       window.removeEventListener('keydown', handleKeyDown, true);
       document.removeEventListener('mousedown', handleMouseDown);
     };
-  }, [setActiveTool, activeTool, setConnectionStartNode, uiDataApi, nodes, edges]);
-
-  // 复用的创建新节点函数
-  const createTextNode = useCallback((position: { x: number; y: number }): TextNodeType => ({
-    id: `node-${Date.now()}`,
-    type: 'textNode',
-    position,
-    data: {
-      code: '',
-      initialEditing: true,
-      width: 400,  // 默认宽度
-      controls: [],
-      autoResizeWidth: true,
-      nodeName: '',
-      isCollapsed: false,
-      hiddenSections: {
-        inputs: false,
-        outputs: false,
-        logs: false,
-        errors: false,
-      },
-    },
-  }), []);
+  }, [setActiveTool, activeTool, setConnectionStartNode, uiDataApi, flowNodes, flowEdges]);
 
   // 重置画布为默认状态
   const handleReset = useCallback(() => {
     uiDataApi.resetToDefault();
+    flowDataApi.resetToDefault();
     setActiveTool('select');
     setConnectionStartNode(null);
-  }, [uiDataApi, setActiveTool, setConnectionStartNode]);
+  }, [uiDataApi, flowDataApi, setActiveTool, setConnectionStartNode]);
 
   // 处理画布空白点击事件
   const handlePaneClick = useCallback((event: React.MouseEvent) => {
     if (activeTool === 'text') {
       const position = screenToFlowPosition({ x: event.clientX, y: event.clientY });
-      const newNode = createTextNode(position);
-      uiDataApi.addNode(newNode);
+      const node = uiDataApi.createTextNode({
+        data: {
+          initialEditing: true,
+          width: 400,
+        },
+      });
+      flowDataApi.addNode({
+        id: node.id,
+        type: 'textNode',
+        position,
+        data: {},
+      });
       setActiveTool('select'); // 创建后切回选择模式
     }
 
     // 双击检测逻辑（简单实现）
     if (activeTool === 'select' && event.detail === 2) {
       const position = screenToFlowPosition({ x: event.clientX, y: event.clientY });
-      const newNode = createTextNode(position);
-      uiDataApi.addNode(newNode);
+      const node = uiDataApi.createTextNode({
+        data: {
+          initialEditing: true,
+          width: 400,
+        },
+      });
+      flowDataApi.addNode({
+        id: node.id,
+        type: 'textNode',
+        position,
+        data: {},
+      });
     }
-  }, [activeTool, screenToFlowPosition, createTextNode, uiDataApi, setActiveTool]);
+  }, [activeTool, screenToFlowPosition, uiDataApi, flowDataApi, setActiveTool]);
 
   // 处理连接事件
   const onConnect = useCallback((connection: Connection) => {
+    if (!connection.source || !connection.target) {
+      return;
+    }
     uiDataApi.createDepEdge(connection.source, connection.target);
 
     // 连接建立后，立即通知目标节点更新
@@ -236,7 +241,7 @@ const Canvas: React.FC = () => {
     if (activeTool === 'connect') {
       setActiveTool('select');
     }
-  }, [uiDataApi, setConnectionStartNode, activeTool, setActiveTool, evalApi]);
+  }, [uiDataApi, setConnectionStartNode, activeTool, setActiveTool]);
 
   // 处理节点点击（用于连接模式）
   const onNodeClick = useCallback((event: React.MouseEvent, node: Node) => {
@@ -262,11 +267,14 @@ const Canvas: React.FC = () => {
         setActiveTool('select');
       }
     }
-  }, [activeTool, connectionStartNode, setConnectionStartNode, uiDataApi, setActiveTool, evalApi]);
+  }, [activeTool, connectionStartNode, setConnectionStartNode, uiDataApi, setActiveTool]);
 
   // 导出画布数据
   const handleExport = useCallback(() => {
-    const data = uiDataApi.exportCanvasData();
+    const data = {
+      uiData: uiDataApi.exportUIData(),
+      flowData: flowDataApi.exportFlowData(),
+    };
     // 创建下载链接
     const dataStr = JSON.stringify(data, null, 2);
     const dataBlob = new Blob([dataStr], { type: 'application/json' });
@@ -276,7 +284,7 @@ const Canvas: React.FC = () => {
     link.download = 'canvas-data.json';
     link.click();
     URL.revokeObjectURL(url);
-  }, [uiDataApi]);
+  }, [uiDataApi, flowDataApi]);
 
   // 导入并替换画布数据
   const handleImportReplace = useCallback(async () => {
@@ -291,7 +299,17 @@ const Canvas: React.FC = () => {
           reader.onload = (e) => {
             try {
               const data = JSON.parse(e.target?.result as string);
-              uiDataApi.importCanvasData(data);
+              if (data?.uiData && data?.flowData) {
+                uiDataApi.importUIData(data.uiData);
+                flowDataApi.importFlowData(data.flowData);
+              } else {
+                uiDataApi.importUIData({ nodes: data?.nodes ?? [], edges: data?.edges ?? [] });
+                flowDataApi.importFlowData({
+                  nodes: data?.nodes ?? [],
+                  edges: data?.edges ?? [],
+                  viewport: data?.viewport,
+                });
+              }
               console.log('画布数据已替换');
             } catch (error) {
               console.error('导入画布失败:', error);
@@ -306,7 +324,7 @@ const Canvas: React.FC = () => {
       console.error('导入画布失败:', error);
       alert(error instanceof Error ? error.message : '导入失败');
     }
-  }, [uiDataApi]);
+  }, [uiDataApi, flowDataApi]);
 
   // 导入并添加节点到画布
   const handleImportAdd = useCallback(async () => {
@@ -321,10 +339,24 @@ const Canvas: React.FC = () => {
           reader.onload = (e) => {
             try {
               const data = JSON.parse(e.target?.result as string);
-              // 合并节点和边
-              const mergedNodes = [...nodes, ...data.nodes];
-              const mergedEdges = [...edges, ...data.edges];
-              uiDataApi.importCanvasData({ nodes: mergedNodes, edges: mergedEdges });
+              const exported = {
+                uiData: uiDataApi.exportUIData(),
+                flowData: flowDataApi.exportFlowData(),
+              };
+              const incomingUINodes = data?.uiData?.nodes ?? data?.nodes ?? [];
+              const incomingUIEdges = data?.uiData?.edges ?? data?.edges ?? [];
+              const incomingFlowNodes = data?.flowData?.nodes ?? data?.nodes ?? [];
+              const incomingFlowEdges = data?.flowData?.edges ?? data?.edges ?? [];
+
+              uiDataApi.importUIData({
+                nodes: [...exported.uiData.nodes, ...incomingUINodes],
+                edges: [...exported.uiData.edges, ...incomingUIEdges],
+              });
+              flowDataApi.importFlowData({
+                nodes: [...exported.flowData.nodes, ...incomingFlowNodes],
+                edges: [...exported.flowData.edges, ...incomingFlowEdges],
+                viewport: exported.flowData.viewport,
+              });
               console.log('节点已添加到画布');
             } catch (error) {
               console.error('导入节点失败:', error);
@@ -339,7 +371,7 @@ const Canvas: React.FC = () => {
       console.error('导入节点失败:', error);
       alert(error instanceof Error ? error.message : '导入失败');
     }
-  }, [nodes, edges, uiDataApi]);
+  }, [uiDataApi, flowDataApi]);
 
   // 连接线样式
   const connectionLineStyle = {
@@ -353,8 +385,6 @@ const Canvas: React.FC = () => {
     type: 'custom',
   };
 
-
-
   /*
   *      ----------- 组件结构 ------------
   */
@@ -363,17 +393,17 @@ const Canvas: React.FC = () => {
     <CanvasUIDataProvider api={uiDataApi}>
       <CanvasEvalProvider api={evalApi}>
         <div className={`canvas-container ${activeTool}-mode`}>
+          {isHydrated ? (
           <ReactFlow
-            nodes={nodes}
-            edges={edges}
-            onNodesChange={(changes) => uiDataApi.handleNodesChange(changes)}
-            onEdgesChange={(changes) => uiDataApi.handleEdgesChange(changes)}
+            nodes={flowNodes}
+            edges={flowEdges}
+            onNodesChange={(changes) => flowDataApi.handleNodesChange(changes)}
+            onEdgesChange={(changes) => flowDataApi.handleEdgesChange(changes)}
             onConnect={onConnect}
             onPaneClick={handlePaneClick}
             onNodeClick={onNodeClick}
             onInit={handleInit}
-            onMove={(_event, newViewport) => { if (newViewport) uiDataApi.setViewport(newViewport); }}
-            onMoveEnd={(_event, newViewport) => { if (newViewport) uiDataApi.setViewport(newViewport); }}
+            onMoveEnd={(_event, newViewport) => { if (newViewport) flowDataApi.setViewport(newViewport); }}
             nodeTypes={nodeTypes}
             edgeTypes={edgeTypes}
             defaultEdgeOptions={defaultEdgeOptions}
@@ -411,6 +441,11 @@ const Canvas: React.FC = () => {
               </defs>
             </svg>
           </ReactFlow>
+          ) : (
+            <div className="flex items-center justify-center h-full">
+              <div className="text-white">Loading...</div>
+            </div>
+          )}
 
           <Toolbar />
 

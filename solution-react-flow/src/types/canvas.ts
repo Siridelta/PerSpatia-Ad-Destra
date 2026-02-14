@@ -3,14 +3,28 @@ import type { Node, Edge } from '@xyflow/react';
 import type { TextNodeData, DesmosPreviewNodeData } from './nodeData';
 
 /**
- * 画布上可能出现的节点类型合集。
- * - TextCanvasNode：主文本节点，承载代码编辑器。
- * - DesmosPreviewCanvasNode：Desmos 预览节点，与文本节点输出联动。
+ * UIData 节点类型（业务层，不包含 React Flow 布局信息）
  */
-export type TextNodeType = Node<TextNodeData, 'textNode'>;
-export type DesmosPreviewNodeType = Node<DesmosPreviewNodeData, 'desmosPreviewNode'>;
+export interface TextNodeType {
+  id: string;
+  type: 'textNode';
+  data: TextNodeData;
+}
+
+export interface DesmosPreviewNodeType {
+  id: string;
+  type: 'desmosPreviewNode';
+  data: DesmosPreviewNodeData;
+}
 
 export type CanvasNode = TextNodeType | DesmosPreviewNodeType;
+
+/**
+ * FlowData 节点类型（仅用于 React Flow 渲染与交互）
+ */
+export type FlowTextNode = Node<Record<string, never>, 'textNode'>;
+export type FlowDesmosPreviewNode = Node<Record<string, never>, 'desmosPreviewNode'>;
+export type FlowNode = FlowTextNode | FlowDesmosPreviewNode;
 
 export interface CustomEdgeData extends Record<string, unknown> {
   label?: string;
@@ -31,5 +45,19 @@ export type CustomCanvasEdge = TypedEdge<CustomEdgeData, 'custom'>;
 export type DesmosPreviewEdge = TypedEdge<DesmosPreviewEdgeData, 'desmosPreviewEdge'>;
 
 export type CanvasEdge = CustomCanvasEdge | DesmosPreviewEdge;
+
+/**
+ * FlowData 边类型（仅用于 React Flow 渲染与交互）
+ * data 在 flow 层并非必需，所以保持可选。
+ */
+export type FlowCustomEdge = Edge<Record<string, unknown>, 'custom'> & {
+  type: 'custom';
+  data?: Record<string, unknown>;
+};
+export type FlowDesmosPreviewEdge = Edge<Record<string, unknown>, 'desmosPreviewEdge'> & {
+  type: 'desmosPreviewEdge';
+  data?: Record<string, unknown>;
+};
+export type FlowEdge = FlowCustomEdge | FlowDesmosPreviewEdge;
 
 

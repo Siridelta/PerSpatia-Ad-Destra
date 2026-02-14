@@ -65,11 +65,3 @@
         }
         ```
     *   加载时，分别填充 uiData 和 flowData。
-接下来跟你说说我的重构计划，然后你可以阅读新的文件（如果你需要的话）。
-我的重构计划分为如下几步：
-1. 我们现在可能Canvas组件通过ReactFlow组件向TextNode组件传递一些数据，即使这些数据实际上不被用到。为了逻辑清晰，以及绕开react flow使用数组形式存储图结构的天然缺陷，我们把面向reactflow的数据传递彻底弱化，我们向reactflow里传的nodes和edges数组不再包含任何我们业务的数据（代码内容，等等），只包含reactflow自带的数据（节点位置，等等），这两个数组变为独立状态（不用store，仅为react state）。我们把面向reactflow的数据从uiData里拆分出来命名为flowData（flowNodes, flowEdges），同样也是nodes数组+edges数组的形式，flowData只用于声明式的创建节点UI删除节点UI，以及创建删除边，以及维护位置等数据。需要保证flowData里的id和uiData的id能一致对上，临时使用低效的双遍历算法，因为后面我们会把uiData模块和eval模块都从数组形式改成Map形式。这时候存档时把flowData和uiData并列存储。然后ReactFlow的onNodeChange和onEdgeChange不再对接uiData的handlexxxChange，而是直接应用在flowData上。
-2. 把uiData模块和eval模块里面的nodes数据和edges数据从数组形式改成Map形式。然后这样的话node数据就不必再存储id了。重写delta resolution逻辑。
-3. 把eval模块重构成使用useSyncExternalStore的模块，方便以后做出其他版本（nix画布，julia画布，...）并且作为tauri跨平台应用时，搭建起前后端架构，后端计算。
-
-
-然后这里还有另一个AI关于这个重构计划的一些补充说明。

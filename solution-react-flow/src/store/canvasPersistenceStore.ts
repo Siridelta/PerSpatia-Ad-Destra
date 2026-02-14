@@ -1,5 +1,5 @@
 import { create } from 'zustand';
-import type { CanvasNode, CanvasEdge } from '@/types/canvas';
+import type { CanvasNode, CanvasEdge, FlowNode, FlowEdge } from '@/types/canvas';
 import type { Viewport } from '@xyflow/react';
 import type { Control } from '@/services/jsExecutor';
 
@@ -7,10 +7,15 @@ import type { Control } from '@/services/jsExecutor';
  * 画布持久化状态接口
  */
 export interface CanvasPersistedState {
-  nodes: CanvasNode[];
-  edges: CanvasEdge[];
-  viewport: Viewport;
-  controlsCache?: Record<string, Control[]>; // 可选，用于向后兼容
+  uiData: {
+    nodes: CanvasNode[];
+    edges: CanvasEdge[];
+  };
+  flowData: {
+    nodes: FlowNode[];
+    edges: FlowEdge[];
+    viewport: Viewport;
+  };
 }
 
 /**
@@ -30,13 +35,13 @@ interface CanvasPersistenceState {
 }
 
 const STORAGE_KEY = 'desmos-canvas-flow-state';
-const STORAGE_VERSION = 7; // 版本 7: 使用 desmosPreviewEdge 替代 desmosPreviewLinks
+const STORAGE_VERSION = 8; // 版本 8: 拆分为 uiData + flowData
 
 // 默认视角（React Flow 默认值）
 const defaultViewport: Viewport = { x: 0, y: 0, zoom: 1 };
 
-// 数据迁移函数（从旧版本迁移到新版本）
-const migrateState = (persistedState: any, version: number): CanvasPersistedState => {
+// 旧结构（混合存储）迁移到最新混合结构，用于后续拆分
+const migrateLegacyMixedState = (persistedState: any, version: number) => {
   if (!persistedState) {
     return {
       nodes: [],
@@ -160,6 +165,123 @@ const migrateState = (persistedState: any, version: number): CanvasPersistedStat
   }
 
   return newState;
+};
+
+const defaultHiddenSections = {
+  inputs: false,
+  outputs: false,
+  logs: false,
+  errors: false,
+};
+
+const normalizeUINodes = (nodes: any[]): CanvasNode[] =>
+  nodes.map((node) => {
+    if (node?.type === 'textNode') {
+      return {
+        id: String(node.id),
+        type: 'textNode',
+        data: {
+          code: typeof node?.data?.code === 'string' ? node.data.code : '',
+          controls: Array.isArray(node?.data?.controls) ? node.data.controls : [],
+          width: typeof node?.data?.width === 'number' ? node.data.width : undefined,
+          height: typeof node?.data?.height === 'number' ? node.data.height : undefined,
+          autoResizeWidth: node?.data?.autoResizeWidth ?? true,
+          nodeName: typeof node?.data?.nodeName === 'string' ? node.data.nodeName : '',
+          isCollapsed: node?.data?.isCollapsed ?? false,
+          hiddenSections: node?.data?.hiddenSections ?? defaultHiddenSections,
+        },
+      };
+    }
+
+    return {
+      id: String(node.id),
+      type: 'desmosPreviewNode',
+      data: (node?.data ?? {}) as Record<string, unknown>,
+    };
+  });
+
+const normalizeUIEdges = (edges: any[]): CanvasEdge[] =>
+  edges
+    .filter((edge) => edge?.id && edge?.source && edge?.target && edge?.type)
+    .map((edge) => {
+      if (edge.type === 'desmosPreviewEdge') {
+        return {
+          id: String(edge.id),
+          source: String(edge.source),
+          target: String(edge.target),
+          type: 'desmosPreviewEdge',
+          data: {
+            sourceOutputName: String(edge?.data?.sourceOutputName ?? ''),
+          },
+        };
+      }
+
+      return {
+        id: String(edge.id),
+        source: String(edge.source),
+        target: String(edge.target),
+        type: 'custom',
+        data: (edge?.data ?? {}) as Record<string, unknown>,
+      };
+    });
+
+const normalizeFlowNodes = (nodes: any[]): FlowNode[] =>
+  nodes.map((node) => ({
+    id: String(node.id),
+    type: node?.type === 'desmosPreviewNode' ? 'desmosPreviewNode' : 'textNode',
+    position: node?.position ?? { x: 0, y: 0 },
+    data: {},
+  }));
+
+const normalizeFlowEdges = (edges: any[]): FlowEdge[] =>
+  edges
+    .filter((edge) => edge?.id && edge?.source && edge?.target && edge?.type)
+    .map((edge) => ({
+      id: String(edge.id),
+      source: String(edge.source),
+      target: String(edge.target),
+      type: edge.type === 'desmosPreviewEdge' ? 'desmosPreviewEdge' : 'custom',
+      data: {},
+    }));
+
+// 数据迁移函数（从旧版本迁移到新版本）
+const migrateState = (persistedState: any, version: number): CanvasPersistedState => {
+  // 新结构：直接兜底修正
+  if (persistedState?.uiData || persistedState?.flowData) {
+    const uiNodesRaw = Array.isArray(persistedState?.uiData?.nodes) ? persistedState.uiData.nodes : [];
+    const uiEdgesRaw = Array.isArray(persistedState?.uiData?.edges) ? persistedState.uiData.edges : [];
+    const flowNodesRaw = Array.isArray(persistedState?.flowData?.nodes) ? persistedState.flowData.nodes : [];
+    const flowEdgesRaw = Array.isArray(persistedState?.flowData?.edges) ? persistedState.flowData.edges : [];
+
+    return {
+      uiData: {
+        nodes: normalizeUINodes(uiNodesRaw),
+        edges: normalizeUIEdges(uiEdgesRaw),
+      },
+      flowData: {
+        nodes: normalizeFlowNodes(flowNodesRaw),
+        edges: normalizeFlowEdges(flowEdgesRaw),
+        viewport: persistedState?.flowData?.viewport ?? defaultViewport,
+      },
+    };
+  }
+
+  // 旧结构：先迁移到最新混合结构，再拆分
+  const legacy = migrateLegacyMixedState(persistedState, version);
+  const legacyNodes = Array.isArray(legacy?.nodes) ? legacy.nodes : [];
+  const legacyEdges = Array.isArray(legacy?.edges) ? legacy.edges : [];
+
+  return {
+    uiData: {
+      nodes: normalizeUINodes(legacyNodes),
+      edges: normalizeUIEdges(legacyEdges),
+    },
+    flowData: {
+      nodes: normalizeFlowNodes(legacyNodes),
+      edges: normalizeFlowEdges(legacyEdges),
+      viewport: legacy?.viewport ?? defaultViewport,
+    },
+  };
 };
 
 export const useCanvasPersistenceStore = create<CanvasPersistenceState>()(() => ({
