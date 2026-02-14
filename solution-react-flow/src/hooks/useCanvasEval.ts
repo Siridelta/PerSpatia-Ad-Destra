@@ -5,7 +5,14 @@ import { immer } from 'zustand/middleware/immer';
 import { jsExecutor, Control, ExecutionResult } from '@/services/jsExecutor';
 import { produce } from 'immer';
 import type { CanvasUIDataApi, UIData } from './useCanvasUIData';
-import { CanvasEdgeUIDataEntry, CanvasNodeUIDataEntry, DesmosPreviewEdgeUIData, TextNodeUIDataEntry } from '@/types/canvas';
+import {
+  CanvasEdgeKind,
+  CanvasEdgeUIDataEntry,
+  CanvasNodeKind,
+  CanvasNodeUIDataEntry,
+  DesmosPreviewEdgeUIData,
+  TextNodeUIDataEntry
+} from '@/types/canvas';
 
 export interface ErrorInfo {
   message: string;
@@ -150,7 +157,7 @@ const buildDPIOs = (edges: CanvasEdgeUIDataEntry[]): CanvasEvalDPIOs => {
   const outgoing: Record<string, Record<string, string>> = {};
 
   edges.forEach((edge) => {
-    if (edge.type !== 'desmosPreviewEdge') return;
+    if (edge.type !== CanvasEdgeKind.DesmosPreviewEdge) return;
     const { source, target, data } = edge;
     const { sourceOutputName } = data;
     if (incoming[target]) {
@@ -221,9 +228,9 @@ const resolveDeltaByUIData = (
       addedNodeIds,
       removedNodeIds: [],
       updatedNodeIds: [],
-      addedDepEdges: uiData.edges.filter((edge) => edge.type === 'custom'),
+      addedDepEdges: uiData.edges.filter((edge) => edge.type === CanvasEdgeKind.CustomEdge),
       removedDepEdges: [],
-      addedDPEdges: uiData.edges.filter((edge) => edge.type === 'desmosPreviewEdge'),
+      addedDPEdges: uiData.edges.filter((edge) => edge.type === CanvasEdgeKind.DesmosPreviewEdge),
       removedDPEdges: [],
       impactedNodeIds,
       hasChanges: true,
@@ -239,8 +246,8 @@ const resolveDeltaByUIData = (
     node.id,
     {
       id: node.id,
-      code: node.type === 'textNode' ? node.data.code : '',
-      controls: node.type === 'textNode' ? node.data.controls : []
+      code: node.type === CanvasNodeKind.TextNode ? node.data.code : '',
+      controls: node.type === CanvasNodeKind.TextNode ? node.data.controls : []
     }
   ]));
 
@@ -296,7 +303,7 @@ const resolveDeltaByUIData = (
 
   const extractedPrevEdges = extractEdgesFromState(lastCompletedState);
   const prevDepEdges = extractedPrevEdges.dep;
-  const currDepEdges = uiData.edges.filter((edge) => edge.type === 'custom');
+  const currDepEdges = uiData.edges.filter((edge) => edge.type === CanvasEdgeKind.CustomEdge);
   const prevDepEdgeSet = new Set(prevDepEdges.map(createEdgeKey));
   const currDepEdgeSet = new Set(currDepEdges.map(createEdgeKey));
 
@@ -316,7 +323,7 @@ const resolveDeltaByUIData = (
   });
 
   const prevDPEdges = extractedPrevEdges.DP;
-  const currDPEdges = uiData.edges.filter((edge) => edge.type === 'desmosPreviewEdge');
+  const currDPEdges = uiData.edges.filter((edge) => edge.type === CanvasEdgeKind.DesmosPreviewEdge);
   const prevDPEdgeSet = new Set(prevDPEdges.map(createEdgeKey));
   const currDPEdgeSet = new Set(currDPEdges.map(createEdgeKey));
 
@@ -390,8 +397,8 @@ const createInitialEvalNodes = (
   const nextNodes: CanvasEvalNodes = {};
 
   uiData.nodes.forEach((node) => {
-    if (node.type === 'textNode') {
-      nextNodes[node.id] = createInitialNodeData('textNode', node.data.code, node.data.controls);
+    if (node.type === CanvasNodeKind.TextNode) {
+      nextNodes[node.id] = createInitialNodeData(CanvasNodeKind.TextNode, node.data.code, node.data.controls);
     } else {
       nextNodes[node.id] = createInitialNodeData(node.type, '', []);
     }
@@ -410,8 +417,8 @@ const buildNextEvalNodes = (
     delta.addedNodeIds.forEach((id) => {
       const node = currUIData.nodes.find((candidate) => candidate.id === id);
       if (!node) return;
-      if (node.type === 'textNode') {
-        draft[id] = createInitialNodeData('textNode', node.data.code, node.data.controls);
+      if (node.type === CanvasNodeKind.TextNode) {
+        draft[id] = createInitialNodeData(CanvasNodeKind.TextNode, node.data.code, node.data.controls);
       } else {
         draft[id] = createInitialNodeData(node.type, '', []);
       }
@@ -423,7 +430,7 @@ const buildNextEvalNodes = (
 
     delta.updatedNodeIds.forEach((id) => {
       const node = currUIData.nodes.find((node) => node.id === id)! as TextNodeUIDataEntry;
-      draft[id]!.type = 'textNode';
+      draft[id]!.type = CanvasNodeKind.TextNode;
       draft[id]!.code = node.data.code;
       draft[id]!.controls = node.data.controls.map((control) => ({ ...control }));
     });
@@ -433,8 +440,8 @@ const collectEvaluationScope = (
   entryNodeIds: string[],
   state: CanvasEvalStoreState,
 ) => {
-  const existingTextNodeIds = new Set(Object.keys(state.nodes).filter((id) => state.nodes[id].type === 'textNode'));
-  const existingDPNodeIds = new Set(Object.keys(state.nodes).filter((id) => state.nodes[id].type === 'desmosPreviewNode'));
+  const existingTextNodeIds = new Set(Object.keys(state.nodes).filter((id) => state.nodes[id].type === CanvasNodeKind.TextNode));
+  const existingDPNodeIds = new Set(Object.keys(state.nodes).filter((id) => state.nodes[id].type === CanvasNodeKind.DesmosPreviewNode));
 
   const textNodesScope = new Set<string>(entryNodeIds.filter((id) => existingTextNodeIds.has(id)));  // = entryTextNodeIds deduplicated
   const DPNodesScope = new Set<string>(entryNodeIds.filter((id) => existingDPNodeIds.has(id)));  // = entryDPNodeIds deduplicated
@@ -574,7 +581,7 @@ const runEvaluationPlan = async (
     const nodeState = stateSnapshot.nodes[nodeId];
     if (!nodeState) continue;
 
-    if (nodeState.type === 'desmosPreviewNode') {
+    if (nodeState.type === CanvasNodeKind.DesmosPreviewNode) {
       const {source, sourceOutputName} = stateSnapshot.DPIOs.incomingByTarget[nodeId] || [];
       const desmosState = 
         interimResults.get(source)?.outputs[sourceOutputName]

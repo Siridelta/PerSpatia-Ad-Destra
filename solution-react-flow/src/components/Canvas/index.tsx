@@ -25,12 +25,12 @@ import { useCanvasEval } from '@/hooks/useCanvasEval';
 import { useCanvasFlowData } from '@/hooks/useCanvasFlowData';
 import { useCanvasStatePersistence } from '@/hooks/useCanvasStatePersistence';
 import { useCanvasUIData } from '@/hooks/useCanvasUIData';
+import { parseCanvasArchiveText, serializeCanvasArchive } from '@/services/canvas-archive';
 import { useTheme } from '@/hooks/useTheme';
 import { useSettingsStore } from '@/store/settingsStore';
 import { useToolStore } from '@/store/toolStore';
 import { CanvasEdgeFlowData, CanvasNodeFlowData, CanvasNodeKind } from '@/types/canvas';
 import useInertialPan from '@/utils/useInertialPan';
-import { useTestRefChange } from '@/utils/useTestRefChange';
 import CustomConnectionLine from './CustomConnectionLine';
 import './styles.css';
 
@@ -87,6 +87,13 @@ const Canvas: React.FC = () => {
 
   // ReactFlow 实例引用
   const { screenToFlowPosition, setViewport: setFlowViewport, getViewport } = useReactFlow();
+
+  // viewport from flowData to ReactFlow
+  useEffect(() => {
+    if (viewport) {
+      setFlowViewport(viewport);
+    }
+  }, [viewport, setFlowViewport]);
 
   // 惯性/缓动式视野移动（WASD）
   useInertialPan({ setViewport: setFlowViewport, getViewport });
@@ -147,10 +154,7 @@ const Canvas: React.FC = () => {
         // 删除选中的节点和边
         const selectedNodes = flowNodes.filter(node => node.selected);
         const selectedEdges = flowEdges.filter(edge => edge.selected);
-
-        // 删除选中的节点
         selectedNodes.forEach(node => uiDataApi.removeNode(node.id));
-        // 删除选中的边
         selectedEdges.forEach(edge => uiDataApi.removeEdge(edge.id));
 
         e.preventDefault();
@@ -226,16 +230,6 @@ const Canvas: React.FC = () => {
     }
     uiDataApi.createDepEdge(connection.source, connection.target);
 
-    // 连接建立后，立即通知目标节点更新
-    if (connection.target) {
-      console.log('新连接建立，通知目标节点更新:', connection.source, '->', connection.target);
-
-      // 延迟一点时间确保连接已经添加到edges中
-      // setTimeout(() => {
-      //   evalApi.evaluateNode(connection.target);
-      // }, 50);
-    }
-
     // 连接完成后，清除连接状态并退出连接模式
     setConnectionStartNode(null);
     if (activeTool === 'connect') {
@@ -257,11 +251,6 @@ const Canvas: React.FC = () => {
         uiDataApi.createDepEdge(connectionStartNode, node.id);
         console.log('创建连接:', connectionStartNode, '->', node.id);
 
-        // 连接建立后，立即通知目标节点更新
-        // setTimeout(() => {
-        //   evalApi.evaluateNode(node.id);
-        // }, 50);
-
         // 重置连接状态并退出连接模式
         setConnectionStartNode(null);
         setActiveTool('select');
@@ -276,7 +265,7 @@ const Canvas: React.FC = () => {
       flowData: flowDataApi.exportFlowData(),
     };
     // 创建下载链接
-    const dataStr = JSON.stringify(data, null, 2);
+    const dataStr = serializeCanvasArchive(data);
     const dataBlob = new Blob([dataStr], { type: 'application/json' });
     const url = URL.createObjectURL(dataBlob);
     const link = document.createElement('a');
@@ -298,18 +287,12 @@ const Canvas: React.FC = () => {
           const reader = new FileReader();
           reader.onload = (e) => {
             try {
-              const data = JSON.parse(e.target?.result as string);
-              if (data?.uiData && data?.flowData) {
-                uiDataApi.importUIData(data.uiData);
-                flowDataApi.importFlowData(data.flowData);
-              } else {
-                uiDataApi.importUIData({ nodes: data?.nodes ?? [], edges: data?.edges ?? [] });
-                flowDataApi.importFlowData({
-                  nodes: data?.nodes ?? [],
-                  edges: data?.edges ?? [],
-                  viewport: data?.viewport,
-                });
+              const imported = parseCanvasArchiveText(e.target?.result as string);
+              if (!imported) {
+                throw new Error('导入失败：文件格式错误');
               }
+              uiDataApi.importUIData(imported.uiData);
+              flowDataApi.importFlowData(imported.flowData);
               console.log('画布数据已替换');
             } catch (error) {
               console.error('导入画布失败:', error);
@@ -338,15 +321,18 @@ const Canvas: React.FC = () => {
           const reader = new FileReader();
           reader.onload = (e) => {
             try {
-              const data = JSON.parse(e.target?.result as string);
+              const imported = parseCanvasArchiveText(e.target?.result as string);
+              if (!imported) {
+                throw new Error('导入失败：文件格式错误');
+              }
               const exported = {
                 uiData: uiDataApi.exportUIData(),
                 flowData: flowDataApi.exportFlowData(),
               };
-              const incomingUINodes = data?.uiData?.nodes ?? data?.nodes ?? [];
-              const incomingUIEdges = data?.uiData?.edges ?? data?.edges ?? [];
-              const incomingFlowNodes = data?.flowData?.nodes ?? data?.nodes ?? [];
-              const incomingFlowEdges = data?.flowData?.edges ?? data?.edges ?? [];
+              const incomingUINodes = imported.uiData.nodes;
+              const incomingUIEdges = imported.uiData.edges;
+              const incomingFlowNodes = imported.flowData.nodes;
+              const incomingFlowEdges = imported.flowData.edges;
 
               uiDataApi.importUIData({
                 nodes: [...exported.uiData.nodes, ...incomingUINodes],

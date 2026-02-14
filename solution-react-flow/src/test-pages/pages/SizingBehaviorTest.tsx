@@ -2,6 +2,7 @@ import React, { useEffect, useState } from 'react';
 import { ReactFlowProvider } from '@xyflow/react';
 import TextNode from '../../components/TextNode';
 import './TestPage.css';
+import { CanvasNodeKind } from '@/types/canvas';
 import { CanvasUIDataProvider } from '@/contexts/CanvasUIDataContext';
 import { CanvasEvalProvider } from '@/contexts/CanvasEvalContext';
 import { useCanvasUIData } from '@/hooks/useCanvasUIData';
@@ -195,7 +196,7 @@ node_output("result", x + y);`);
                       id={nodeId}
                       data={{}}
                       selected={false}
-                      type="textNode"
+                      type={CanvasNodeKind.TextNode}
                       dragging={false}
                       zIndex={0}
                       selectable={true}

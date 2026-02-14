@@ -9,6 +9,7 @@ import type {
   DesmosPreviewEdgeUIDataEntry,
   CustomEdgeUIDataEntry,
 } from '@/types/canvas';
+import { CanvasEdgeKind, CanvasNodeKind } from '@/types/canvas';
 import type { Control } from '@/services/jsExecutor';
 import { DesmosPreviewNodeUIData, TextNodeUIData } from '@/types/nodeData';
 import defaultCanvas from '@/components/Canvas/defaultCanvas';
@@ -54,7 +55,8 @@ export interface CanvasUIDataApi {
   updateNodeControlValue: (nodeId: string, controlName: string, value: unknown) => void;
 }
 
-const isDesmosPreviewEdge = (edge: CanvasEdgeUIDataEntry): edge is DesmosPreviewEdgeUIDataEntry => edge.type === 'desmosPreviewEdge';
+const isDesmosPreviewEdge = (edge: CanvasEdgeUIDataEntry): edge is DesmosPreviewEdgeUIDataEntry =>
+  edge.type === CanvasEdgeKind.DesmosPreviewEdge;
 
 const defaultTextNodeData: TextNodeUIData = {
   code: '',
@@ -72,17 +74,17 @@ const defaultTextNodeData: TextNodeUIData = {
 
 const normalizeUINodes = (nodes: any[]): CanvasNodeUIDataEntry[] =>
   nodes.map((node) => {
-    if (node?.type === 'desmosPreviewNode') {
+    if (node?.type === CanvasNodeKind.DesmosPreviewNode || node?.type === 'desmosPreviewNode') {
       return {
         id: String(node.id),
-        type: 'desmosPreviewNode',
+        type: CanvasNodeKind.DesmosPreviewNode,
         data: (node?.data ?? {}) as DesmosPreviewNodeUIData,
       };
     }
 
     return {
       id: String(node.id),
-      type: 'textNode',
+      type: CanvasNodeKind.TextNode,
       data: { ...defaultTextNodeData, ...(node?.data ?? {}) },
     };
   });
@@ -91,12 +93,12 @@ const normalizeUIEdges = (edges: any[]): CanvasEdgeUIDataEntry[] =>
   edges
     .filter((edge) => edge?.id && edge?.source && edge?.target)
     .map((edge) => {
-      if (edge.type === 'desmosPreviewEdge') {
+      if (edge.type === CanvasEdgeKind.DesmosPreviewEdge || edge.type === 'desmosPreviewEdge') {
         return {
           id: String(edge.id),
           source: String(edge.source),
           target: String(edge.target),
-          type: 'desmosPreviewEdge',
+          type: CanvasEdgeKind.DesmosPreviewEdge,
           data: {
             sourceOutputName: String(edge?.data?.sourceOutputName ?? ''),
           },
@@ -107,17 +109,14 @@ const normalizeUIEdges = (edges: any[]): CanvasEdgeUIDataEntry[] =>
         id: String(edge.id),
         source: String(edge.source),
         target: String(edge.target),
-        type: 'custom',
+        type: CanvasEdgeKind.CustomEdge,
         data: (edge?.data ?? {}) as Record<string, unknown>,
       };
     });
 
-const legacyDefaultNodes = (defaultCanvas as any)?.nodes ?? [];
-const legacyDefaultEdges = (defaultCanvas as any)?.edges ?? [];
-
 const getDefaultUIData = (): UIData => ({
-  nodes: normalizeUINodes(legacyDefaultNodes),
-  edges: normalizeUIEdges(legacyDefaultEdges),
+  nodes: normalizeUINodes(defaultCanvas.uiData.nodes),
+  edges: normalizeUIEdges(defaultCanvas.uiData.edges),
 });
 
 const createUIStore = (initial?: { nodes: CanvasNodeUIDataEntry[]; edges: CanvasEdgeUIDataEntry[] }) =>
@@ -153,7 +152,7 @@ const resolveDeltaByEvalData = (
   const updatedControls: Record<string, Control[]> = {};
   Object.entries(currentEvalData).forEach(([nodeId, nodeData]) => {
     const prevNode = prevState.nodes.find((node) => node.id === nodeId);
-    if (!prevNode || prevNode.type !== 'textNode') return;
+    if (!prevNode || prevNode.type !== CanvasNodeKind.TextNode) return;
 
     const prevControls = prevNode.data.controls || [];
     const currentControls = nodeData.controls || [];
@@ -183,7 +182,7 @@ const resolveDeltaByEvalData = (
   });
 
   prevState.nodes.forEach((node) => {
-    if (node.type === 'textNode' && !currentEvalData[node.id]) {
+    if (node.type === CanvasNodeKind.TextNode && !currentEvalData[node.id]) {
       updatedControls[node.id] = [];
     }
   });
@@ -208,7 +207,7 @@ export const useCanvasUIData = (): CanvasUIDataApi => {
         store.setState((draft) => {
           Object.entries(delta.updatedControls).forEach(([nodeId, controls]) => {
             const node = draft.nodes.find((n) => n.id === nodeId);
-            if (!node || node.type !== 'textNode') return;
+            if (!node || node.type !== CanvasNodeKind.TextNode) return;
             node.data.controls = controls;
           });
         });
@@ -260,7 +259,7 @@ export const useCanvasUIData = (): CanvasUIDataApi => {
       const snapshot = store.getState();
       const targetNode = snapshot.nodes.find((node) => node.id === id);
 
-      if (targetNode?.type === 'textNode') {
+      if (targetNode?.type === CanvasNodeKind.TextNode) {
         snapshot.edges.forEach((edge) => {
           if (isDesmosPreviewEdge(edge) && edge.source === id) {
             nodesToRemove.add(edge.target);
@@ -320,7 +319,7 @@ export const useCanvasUIData = (): CanvasUIDataApi => {
         id: `edge-${Date.now()}-${Math.random().toString(36).slice(2, 11)}`,
         source,
         target,
-        type: 'custom',
+        type: CanvasEdgeKind.CustomEdge,
         data: edgeData?.data ?? {},
         ...edgeData,
       };
@@ -332,7 +331,7 @@ export const useCanvasUIData = (): CanvasUIDataApi => {
       const nodeId = params?.id ?? `node-${Date.now()}-${Math.random().toString(36).slice(2, 11)}`;
       const uiNode: TextNodeUIDataEntry = {
         id: nodeId,
-        type: 'textNode',
+        type: CanvasNodeKind.TextNode,
         data: { ...defaultTextNodeData, ...(params?.data ?? {}) },
       };
       addNode(uiNode);
@@ -356,14 +355,14 @@ export const useCanvasUIData = (): CanvasUIDataApi => {
 
       const previewNode: DesmosPreviewNodeUIDataEntry = {
         id: previewNodeId,
-        type: 'desmosPreviewNode',
+        type: CanvasNodeKind.DesmosPreviewNode,
         data: {},
       };
       const previewEdge: DesmosPreviewEdgeUIDataEntry = {
         id: `edge-${sourceNodeId}-desmos-${Date.now()}`,
         source: sourceNodeId,
         target: previewNodeId,
-        type: 'desmosPreviewEdge',
+        type: CanvasEdgeKind.DesmosPreviewEdge,
         data: { sourceOutputName },
       };
 
@@ -374,7 +373,7 @@ export const useCanvasUIData = (): CanvasUIDataApi => {
     const updateNodeControlValues = (nodeId: string, values: Record<string, unknown>) =>
       store.setState((state) => {
         const node = state.nodes.find((n) => n.id === nodeId);
-        if (!node || node.type !== 'textNode' || !node.data.controls) return;
+        if (!node || node.type !== CanvasNodeKind.TextNode || !node.data.controls) return;
         node.data.controls.forEach((control) => {
           if (Object.prototype.hasOwnProperty.call(values, control.name)) {
             control.value = values[control.name];
@@ -385,7 +384,7 @@ export const useCanvasUIData = (): CanvasUIDataApi => {
     const updateNodeControlValue = (nodeId: string, controlName: string, value: unknown) =>
       store.setState((state) => {
         const node = state.nodes.find((n) => n.id === nodeId);
-        if (!node || node.type !== 'textNode' || !node.data.controls) return;
+        if (!node || node.type !== CanvasNodeKind.TextNode || !node.data.controls) return;
         const control = node.data.controls.find((item) => item.name === controlName);
         if (!control) return;
         control.value = value;

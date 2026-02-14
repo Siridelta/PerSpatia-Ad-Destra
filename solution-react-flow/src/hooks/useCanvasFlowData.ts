@@ -63,13 +63,10 @@ const normalizeFlowEdges = (edges: any[]): CanvasEdgeFlowData[] =>
     }));
 
 const getDefaultFlowData = (): FlowData => {
-  const defaultNodes = (defaultCanvas as any)?.nodes ?? [];
-  const defaultEdges = (defaultCanvas as any)?.edges ?? [];
-  const viewport = (defaultCanvas as any)?.viewport ?? defaultViewport;
   return {
-    nodes: normalizeFlowNodes(defaultNodes),
-    edges: normalizeFlowEdges(defaultEdges),
-    viewport,
+    nodes: normalizeFlowNodes(defaultCanvas.flowData.nodes),
+    edges: normalizeFlowEdges(defaultCanvas.flowData.edges),
+    viewport: defaultCanvas.flowData.viewport,
   };
 };
 
