@@ -5,7 +5,7 @@ import { Handle, Position, NodeProps } from '@xyflow/react';
 import { useNodeEval } from '@/contexts/CanvasEvalContext';
 
 import './styles.css';
-import { DesmosPreviewNodeType, DesmosPreviewEdge, TextNodeType } from '@/types/canvas';
+import { FlowDesmosPreviewNode, DesmosPreviewEdge } from '@/types/canvas';
 import { useCanvasUIDataApi } from '@/contexts/CanvasUIDataContext';
 
 // ============================================================================
@@ -63,7 +63,7 @@ const ensureDesmosLoaded = (): Promise<void> => {
 // 主组件实现
 // ============================================================================
 
-const DesmosPreviewNode: React.FC<NodeProps<DesmosPreviewNodeType>> = ({ id, selected }) => {
+const DesmosPreviewNode: React.FC<NodeProps<FlowDesmosPreviewNode>> = ({ id, selected }) => {
   const [isReady, setIsReady] = useState<boolean>(typeof window !== 'undefined' && !!window.Desmos);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
   const containerRef = useRef<HTMLDivElement | null>(null);

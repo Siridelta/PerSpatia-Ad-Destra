@@ -47,7 +47,7 @@ const edgeTypes: EdgeTypes = {
 };
 
 const Canvas: React.FC = () => {
-  // 创建两大 API
+  // 创建两个模块的 API 对象
   const uiDataApi = useCanvasUIData();
   const evalApi = useCanvasEval();
 

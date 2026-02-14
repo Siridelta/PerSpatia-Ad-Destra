@@ -8,7 +8,7 @@ import { SliderControl, ToggleControl, TextControl } from './controls';
 import { ErrorDisplay, WarningDisplay, LogDisplay, OutputDisplay } from './displays';
 import CodeEditor from '../CodeEditor';
 import { useNodeEval } from '@/contexts/CanvasEvalContext';
-import { TextNodeType } from '@/types/canvas';
+import { FlowTextNode } from '@/types/canvas';
 import { TextNodeData } from '@/types/nodeData';
 import { useCanvasUIDataApi } from '@/contexts/CanvasUIDataContext';
 
@@ -42,10 +42,39 @@ function placeCaretAtPoint(x: number, y: number) {
 // 主组件
 // ============================================================================
 
-const TextNode: React.FC<NodeProps<TextNodeType>> = ({ id, data, selected }) => {
-
-  const { code, controls, nodeName, width, height, autoResizeWidth, isCollapsed, hiddenSections } = data;
-  const { updateNodeData, updateNodeControlValues } = useCanvasUIDataApi();
+const TextNode: React.FC<NodeProps<FlowTextNode>> = ({ id, selected }) => {
+  const { updateNodeData, updateNodeControlValues, useUIData } = useCanvasUIDataApi();
+  const nodeData = useUIData((uiData) => {
+    const node = uiData.nodes.find((item) => item.id === id);
+    return node?.type === 'textNode' ? node.data : undefined;
+  });
+  const {
+    code,
+    controls,
+    nodeName,
+    width,
+    height,
+    autoResizeWidth,
+    isCollapsed,
+    hiddenSections,
+  } = {
+    ...{
+      code: '',
+      controls: [],
+      nodeName: '',
+      width: undefined,
+      height: undefined,
+      autoResizeWidth: true,
+      isCollapsed: false,
+      hiddenSections: {
+        inputs: false,
+        outputs: false,
+        logs: false,
+        errors: false,
+      },
+    },
+    ...(nodeData ?? {}),
+  };
 
   // 从 Eval API 获取节点的计算结果
   const nodeEval = useNodeEval(id);
