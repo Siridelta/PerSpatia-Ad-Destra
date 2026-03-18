@@ -22,9 +22,9 @@ export const useCanvasEvalApi = () => {
 
 export const useNodeEval = (nodeId: string) => {
   const evalApi = useCanvasEvalApi();
-  const node = evalApi.useEvalStore((state) => state[nodeId]) as CanvasEvalNode | undefined;
+  const node = evalApi.read.useEvalStore((state) => state[nodeId]) as CanvasEvalNode | undefined;
 
-  const evaluate = useCallback(() => evalApi.evaluateNode(nodeId), [evalApi, nodeId]);
+  const evaluate = useCallback(() => evalApi.manual.requestRecomputeNode(nodeId), [evalApi, nodeId]);
 
   return useMemo(
     () => (

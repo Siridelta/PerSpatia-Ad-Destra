@@ -70,11 +70,11 @@ const DesmosPreviewNode: React.FC<NodeProps<DesmosPreviewNodeFlowData>> = ({ id,
   const calculatorRef = useRef<Desmos.Calculator | null>(null);
   const lastSyncedState = useRef<string>('');
 
-  const { useUIData } = useCanvasDataApi();
-  const previewEdge = useUIData((ui) =>
+  const canvasDataApi = useCanvasDataApi();
+  const previewEdge = canvasDataApi.readUI.useUIData((ui) =>
     Array.from(ui.edges.values()).find((edge) => edge.type === 'desmosPreviewEdge' && edge.target === id) as DesmosPreviewEdgeUIData | undefined,
   );
-  const sourceNode = useUIData((ui) => {
+  const sourceNode = canvasDataApi.readUI.useUIData((ui) => {
     if (!previewEdge) return undefined;
     const candidate = ui.nodes.get(previewEdge.source);
     if (candidate?.type === 'textNode') {

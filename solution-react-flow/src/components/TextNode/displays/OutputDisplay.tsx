@@ -16,8 +16,8 @@ export interface OutputDisplayProps {
 
 const OutputDisplay: React.FC<OutputDisplayProps> = ({ outputs, isAnimatingOut = false, nodeId }) => {
 
-  const { createDesmosPreviewNode, useUIData } = useCanvasDataApi();
-  const edges = useUIData((data) => data.edges);
+  const canvasDataApi = useCanvasDataApi();
+  const edges = canvasDataApi.readUI.useUIData((data) => data.edges);
 
   const exportableOutputs = useMemo<ExportableOutputInfo[]>(() => {
     return Object.entries(outputs).map(([name, value]) => {
@@ -47,13 +47,13 @@ const OutputDisplay: React.FC<OutputDisplayProps> = ({ outputs, isAnimatingOut =
       return;
     }
 
-    const created = createDesmosPreviewNode({
+    const created = canvasDataApi.graph.createDesmosPreviewNode({
       sourceNodeId: nodeId,
       sourceOutputName: info.name,
     });
     // create API 为幂等：返回 null 表示这条预览关系已存在。
     if (!created) return;
-  }, [edges, nodeId, createDesmosPreviewNode]);
+  }, [canvasDataApi, edges, nodeId]);
 
   const renderExportButton = useCallback((info: ExportableOutputInfo) => {
     return (

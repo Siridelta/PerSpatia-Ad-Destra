@@ -31,14 +31,14 @@ export const useTextNodeData = (nodeId: string) => {
   const canvasDataApi = useCanvasDataApi();
 
   // 订阅节点的 UI 数据
-  const node = canvasDataApi.useUIData((data) => {
+  const node = canvasDataApi.readUI.useUIData((data) => {
     return data.nodes.get(nodeId);
   });
 
   // 更新节点数据的方法
   const updateNode = useCallback(
     (updates: Partial<TextNodeUIData>) => {
-      canvasDataApi.updateNode(nodeId, updates);
+      canvasDataApi.writeUI.updateNode(nodeId, updates);
     },
     [canvasDataApi, nodeId]
   );
@@ -46,7 +46,7 @@ export const useTextNodeData = (nodeId: string) => {
   // 更新节点的 control 值
   const updateNodeControlValues = useCallback(
     (values: Record<string, unknown>) => {
-      canvasDataApi.updateNodeControlValues(nodeId, values);
+      canvasDataApi.writeUI.updateNodeControlValues(nodeId, values);
     },
     [canvasDataApi, nodeId]
   );
@@ -87,14 +87,14 @@ export const useDesmosPreviewNodeData = (nodeId: string) => {
   const canvasDataApi = useCanvasDataApi();
 
   // 订阅节点的 UI 数据
-  const node = canvasDataApi.useUIData((data) => {
+  const node = canvasDataApi.readUI.useUIData((data) => {
     return data.nodes.get(nodeId);
   });
 
   // 更新节点数据的方法
   const updateNode = useCallback(
     (updates: Partial<CanvasNodeUIData>) => {
-      canvasDataApi.updateNode(nodeId, updates);
+      canvasDataApi.writeUI.updateNode(nodeId, updates);
     },
     [canvasDataApi, nodeId]
   );
@@ -102,7 +102,7 @@ export const useDesmosPreviewNodeData = (nodeId: string) => {
   // 更新节点的 control 值
   const updateNodeControlValues = useCallback(
     (values: Record<string, unknown>) => {
-      canvasDataApi.updateNodeControlValues(nodeId, values);
+      canvasDataApi.writeUI.updateNodeControlValues(nodeId, values);
     },
     [canvasDataApi, nodeId]
   );

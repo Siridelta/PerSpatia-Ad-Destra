@@ -39,15 +39,15 @@ const loadState = (): CanvasArchiveState | null => {
  * 清除 localStorage 中的画布状态
  */
 export const useCanvasStatePersistence = (canvasDataApi: CanvasDataApi): { isHydrated: boolean } => {
-  const uiData = canvasDataApi.useUIData((data) => data);
-  const flowData = canvasDataApi.useFlowData((data) => data);
+  const uiData = canvasDataApi.readUI.useUIData((data) => data);
+  const flowData = canvasDataApi.readFlow.useFlowData((data) => data);
   const [isHydrated, setIsHydrated] = useState(false);
 
   useEffect(() => {
     const persisted = loadState();
     if (persisted) {
       // 使用单次原子导入，避免 hydration 期间出现中间态。
-      canvasDataApi.importCanvasData(persisted);
+      canvasDataApi.porting.importCanvasData(persisted);
     }
     setIsHydrated(true);
   }, [canvasDataApi]);
@@ -55,7 +55,7 @@ export const useCanvasStatePersistence = (canvasDataApi: CanvasDataApi): { isHyd
   useEffect(() => {
     // 避免在未加载完成时保存状态
     if (!isHydrated) return;
-    saveState(canvasDataApi.exportCanvasData());
+    saveState(canvasDataApi.porting.exportCanvasData());
   }, [uiData, flowData, canvasDataApi, isHydrated]);
 
   return {

@@ -44,8 +44,8 @@ function placeCaretAtPoint(x: number, y: number) {
 
 const TextNode: React.FC<NodeProps<TextNodeFlowData>> = ({ id, selected }) => {
 
-  const { updateNodeData, updateNodeControlValues, useUIData } = useCanvasDataApi();
-  const nodeData = useUIData((uiData) => {
+  const canvasDataApi = useCanvasDataApi();
+  const nodeData = canvasDataApi.readUI.useUIData((uiData) => {
     const node = uiData.nodes.get(id);
     return node?.type === 'textNode' ? node.data : undefined;
   });
@@ -121,8 +121,8 @@ const TextNode: React.FC<NodeProps<TextNodeFlowData>> = ({ id, selected }) => {
 
   // 节点数据更新
   const updateData = useCallback((updates: Partial<TextNodeUIData>) => {
-    updateNodeData(id, updates);
-  }, [updateNodeData, id]);
+    canvasDataApi.writeUI.updateNodeData(id, updates);
+  }, [canvasDataApi, id]);
 
   // 文本变化处理
   const handleTextChange = (newText: string) => {
@@ -152,7 +152,7 @@ const TextNode: React.FC<NodeProps<TextNodeFlowData>> = ({ id, selected }) => {
   const handleNameSubmit = useCallback(() => {
     setIsEditingName(false);
     updateData({ nodeName: editingName });
-  }, [editingName, updateNodeData]);
+  }, [editingName, updateData]);
 
   const handleNameKeyDown = useCallback((e: React.KeyboardEvent) => {
     if (e.key === 'Enter') {
@@ -192,8 +192,8 @@ const TextNode: React.FC<NodeProps<TextNodeFlowData>> = ({ id, selected }) => {
       acc[control.name] = control.defaultValue;
       return acc;
     }, {});
-    updateNodeControlValues(id, defaultValues);
-  }, [controls, updateNodeControlValues, id]);
+    canvasDataApi.writeUI.updateNodeControlValues(id, defaultValues);
+  }, [canvasDataApi, controls, id]);
 
   // 复制代码
   const copyCode = useCallback(async () => {
@@ -205,8 +205,8 @@ const TextNode: React.FC<NodeProps<TextNodeFlowData>> = ({ id, selected }) => {
   }, [code]);
 
   const handleVariableChange = useCallback((name: string, value: unknown) => {
-    updateNodeControlValues(id, { [name]: value });
-  }, [updateNodeControlValues, id]);
+    canvasDataApi.writeUI.updateNodeControlValues(id, { [name]: value });
+  }, [canvasDataApi, id]);
 
   // ============================================================================
   // 动画管理逻辑 (集中管理)

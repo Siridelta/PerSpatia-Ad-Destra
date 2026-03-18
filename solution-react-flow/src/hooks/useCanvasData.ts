@@ -26,7 +26,7 @@ enableMapSet();
  * - flowData: React Flow 渲染层数据（position、连线、viewport）
  *
  * 使用方式仍保持拆分：
- * - 业务组件通过 useUIData/useNodeData 读取 uiData
+ * - 业务组件通过 useUIData/useNodeUIData 读取 uiData
  * - Canvas 通过 useFlowData 给 ReactFlow 传入最小渲染数据
  */
 export interface CanvasStoreState {
@@ -49,61 +49,73 @@ export interface FlowData {
 }
 
 export interface CanvasDataApi {
-  // ---- 订阅与读取（UI 分片）----
-  subscribeFromEval: (evalApi: CanvasEvalApi) => () => void;
-  subscribeData: (callback: (data: CanvasUIData) => void) => () => void;
-  getSnapshot: () => CanvasUIData;
-  useUIData: <T>(selector: (data: CanvasUIData) => T) => T;
-  useNodeData: (id: string) => TextNodeUIData | DesmosPreviewNodeUIData | undefined;
-
-  // ---- UI 分片写入（非结构）----
-  updateNode: <NodeType extends CanvasNodeUIData>(id: string, updates: Partial<NodeType>) => void;
-  updateNodeData: (id: string, updates: Record<string, unknown>) => void;
-  exportUIData: () => CanvasUIData;
-
-  // ---- 订阅与读取（Flow 分片）----
-  getFlowSnapshot: () => FlowData;
-  useFlowData: <T>(selector: (data: FlowData) => T) => T;
-
-  // ---- Flow 分片写入（仅布局/UI 变化，不处理结构改动）----
-  setViewport: (viewport: Viewport) => void;
-  handleFlowNodesChange: (changes: NodeChange[]) => void;
-  handleFlowEdgesChange: (changes: EdgeChange[]) => void;
-  exportFlowData: () => FlowData;
-
-  // ---- 图结构改动（统一入口，会同步更新 uiData + flowData）----
-  // 返回值只用于标识新创建实体的 identity，不代表可变数据快照。
-  createDepEdge: (input: {
-    id?: string;
-    sourceId: string;
-    targetId: string;
-    data?: CustomEdgePayload;
-  }) => string;
-  // 返回新建节点 id；节点内容请通过 store selector 获取最新值。
-  createTextNode: (input?: {
-    id?: string;
-    position?: { x: number; y: number };
-    data?: Partial<TextNodePayload>;
-  }) => string;
-  // 若 source/output 组合已存在预览边，则返回 null（幂等保护）。
-  createDesmosPreviewNode: (input: {
-    nodeId?: string;
-    edgeId?: string;
-    sourceNodeId: string;
-    sourceOutputName: string;
-  }) => { nodeId: string; edgeId: string } | null;
-  removeNode: (id: string) => void;
-  removeEdge: (id: string) => void;
-  clearCanvas: () => void;
-  resetToDefault: () => void;
-  importCanvasData: (state: CanvasArchiveState) => void;
-
-  // ---- 导出/配置 ----
-  exportCanvasData: () => CanvasArchiveState;
-  defaultTextNodeData: TextNodeUIData;
-
-  updateNodeControlValues: (nodeId: string, values: Record<string, unknown>) => void;
-  updateNodeControlValue: (nodeId: string, controlName: string, value: unknown) => void;
+  readUI: {
+    // ---- UI 快照读取 ----
+    getUISnapShot: () => CanvasUIData;
+    useUIData: <T>(selector: (data: CanvasUIData) => T) => T;
+    useNodeUIData: (id: string) => TextNodeUIData | DesmosPreviewNodeUIData | undefined;
+    defaultTextNodeData: TextNodeUIData;
+  };
+  readFlow: {
+    // ---- Flow 快照读取 ----
+    getFlowSnapshot: () => FlowData;
+    useFlowData: <T>(selector: (data: FlowData) => T) => T;
+  };
+  subscribe: {
+    // ---- UI 数据订阅 ----
+    onData: (callback: (data: CanvasUIData) => void) => () => void;
+  };
+  bridge: {
+    // ---- Eval -> UI 桥接 ----
+    connectEval: (evalApi: CanvasEvalApi) => () => void;
+  };
+  writeUI: {
+    // ---- UI 非结构写入（局部字段、控件值）----
+    updateNode: <NodeType extends CanvasNodeUIData>(id: string, updates: Partial<NodeType>) => void;
+    updateNodeData: (id: string, updates: Record<string, unknown>) => void;
+    updateNodeControlValues: (nodeId: string, values: Record<string, unknown>) => void;
+    updateNodeControlValue: (nodeId: string, controlName: string, value: unknown) => void;
+  };
+  writeFlow: {
+    // ---- Flow 非结构写入（视口/交互变更）----
+    setViewport: (viewport: Viewport) => void;
+    handleFlowNodesChange: (changes: NodeChange[]) => void;
+    handleFlowEdgesChange: (changes: EdgeChange[]) => void;
+  };
+  graph: {
+    // ---- 图结构入口（会同步更新 uiData + flowData）----
+    // 返回值只用于标识新创建实体的 identity，不代表可变数据快照。
+    createDepEdge: (input: {
+      id?: string;
+      sourceId: string;
+      targetId: string;
+      data?: CustomEdgePayload;
+    }) => string;
+    // 返回新建节点 id；节点内容请通过 store selector 获取最新值。
+    createTextNode: (input?: {
+      id?: string;
+      position?: { x: number; y: number };
+      data?: Partial<TextNodePayload>;
+    }) => string;
+    // 若 source/output 组合已存在预览边，则返回 null（幂等保护）。
+    createDesmosPreviewNode: (input: {
+      nodeId?: string;
+      edgeId?: string;
+      sourceNodeId: string;
+      sourceOutputName: string;
+    }) => { nodeId: string; edgeId: string } | null;
+    removeNode: (id: string) => void;
+    removeEdge: (id: string) => void;
+    clearCanvas: () => void;
+    resetToDefault: () => void;
+  };
+  porting: {
+    // ---- 导入导出（持久化/迁移边界）----
+    importCanvasData: (state: CanvasArchiveState) => void;
+    exportUIData: () => CanvasUIData;
+    exportFlowData: () => FlowData;
+    exportCanvasData: () => CanvasArchiveState;
+  };
 }
 
 const isDesmosPreviewEdge = (edge: CanvasEdgeUIData) =>
@@ -132,9 +144,12 @@ const isSameViewport = (a: Viewport, b: Viewport) => (
 );
 
 // ---- normalize helpers: 外部输入 -> 内部规范数据 ----
-const normalizeUINodes = (nodes: Record<string, any> | any[]): Map<string, CanvasNodeUIData> => {
+type RawNodeRecord = Record<string, { type?: unknown; data?: unknown }>;
+type RawEdgeRecord = Record<string, { source?: unknown; target?: unknown; type?: unknown; data?: unknown }>;
+
+const normalizeUINodes = (nodes: RawNodeRecord): Map<string, CanvasNodeUIData> => {
   const mapped = new Map<string, CanvasNodeUIData>();
-  const entries = Array.isArray(nodes) ? nodes.map((node) => [String(node?.id ?? ''), node] as const) : Object.entries(nodes ?? {});
+  const entries = Object.entries(nodes ?? {});
   entries.forEach(([id, node]) => {
     if (!id) return;
     if (node?.type === CanvasNodeKind.DesmosPreviewNode || node?.type === 'desmosPreviewNode') {
@@ -153,19 +168,20 @@ const normalizeUINodes = (nodes: Record<string, any> | any[]): Map<string, Canva
   return mapped;
 };
 
-const normalizeUIEdges = (edges: Record<string, any> | any[]): Map<string, CanvasEdgeUIData> => {
+const normalizeUIEdges = (edges: RawEdgeRecord): Map<string, CanvasEdgeUIData> => {
   const mapped = new Map<string, CanvasEdgeUIData>();
-  const entries = Array.isArray(edges) ? edges.map((edge) => [String(edge?.id ?? ''), edge] as const) : Object.entries(edges ?? {});
+  const entries = Object.entries(edges ?? {});
   entries
     .filter(([edgeId, edge]) => edgeId && edge?.source && edge?.target)
     .forEach(([edgeId, edge]) => {
       if (edge.type === CanvasEdgeKind.DesmosPreviewEdge || edge.type === 'desmosPreviewEdge') {
+        const desmosData = (edge.data ?? {}) as { sourceOutputName?: unknown };
         mapped.set(edgeId, {
           source: String(edge.source),
           target: String(edge.target),
           type: CanvasEdgeKind.DesmosPreviewEdge,
           data: {
-            sourceOutputName: String(edge?.data?.sourceOutputName ?? ''),
+            sourceOutputName: String(desmosData.sourceOutputName ?? ''),
           },
         });
         return;
@@ -217,8 +233,8 @@ const getDefaultFlowData = (): FlowData => ({
 const createCanvasStore = (initial?: Partial<CanvasArchiveState>) =>
   createStore<CanvasStoreState>()(
     immer(() => ({
-      nodes: normalizeUINodes((initial?.uiData?.nodes as Record<string, any>) ?? defaultCanvas.uiData.nodes),
-      edges: normalizeUIEdges((initial?.uiData?.edges as Record<string, any>) ?? defaultCanvas.uiData.edges),
+      nodes: normalizeUINodes(initial?.uiData?.nodes ?? defaultCanvas.uiData.nodes),
+      edges: normalizeUIEdges(initial?.uiData?.edges ?? defaultCanvas.uiData.edges),
       flowNodes: initial?.flowData?.nodes ?? getDefaultFlowData().nodes,
       flowEdges: initial?.flowData?.edges ?? getDefaultFlowData().edges,
       viewport: initial?.flowData?.viewport ?? getDefaultFlowData().viewport,
@@ -323,8 +339,8 @@ export const useCanvasData = (): CanvasDataApi => {
     // ----------------------------------------------------------------
     // 1) Eval -> UI controls 回写
     // ----------------------------------------------------------------
-    const subscribeFromEval = (evalApi: CanvasEvalApi): (() => void) => {
-      const unsubscribe = evalApi.subscribeData((evalData) => {
+    const connectEval = (evalApi: CanvasEvalApi): (() => void) => {
+      const unsubscribe = evalApi.subscribe.onData((evalData) => {
         const currNodesControls: Record<string, { controls: Control[] }> = {};
         Object.entries(evalData).forEach(([nodeId, nodeData]) => {
           currNodesControls[nodeId] = { controls: nodeData.controls || [] };
@@ -357,10 +373,10 @@ export const useCanvasData = (): CanvasDataApi => {
     // ----------------------------------------------------------------
     // 2) UI 分片 - 读取 API
     // ----------------------------------------------------------------
-    const subscribeData = (callback: (data: CanvasUIData) => void): (() => void) =>
+    const onData = (callback: (data: CanvasUIData) => void): (() => void) =>
       store.subscribe((state) => callback(toUIDataSlice(state)));
 
-    const getSnapshot = (): CanvasUIData => toUIDataSlice(store.getState());
+    const getUISnapShot = (): CanvasUIData => toUIDataSlice(store.getState());
 
     // 保持 selector 输入引用稳定，避免无关重渲染。
     const useUIData = <T,>(selector: (data: CanvasUIData) => T): T => {
@@ -375,7 +391,7 @@ export const useCanvasData = (): CanvasDataApi => {
       });
     };
 
-    const useNodeData = (id: string): TextNodeUIData | DesmosPreviewNodeUIData | undefined =>
+    const useNodeUIData = (id: string): TextNodeUIData | DesmosPreviewNodeUIData | undefined =>
       useUIData((data) => data.nodes.get(id)?.data);
 
     // ----------------------------------------------------------------
@@ -728,32 +744,48 @@ export const useCanvasData = (): CanvasDataApi => {
       });
 
     return {
-      subscribeFromEval,
-      subscribeData,
-      getSnapshot,
-      useUIData,
-      useNodeData,
-      updateNode,
-      updateNodeData,
-      exportUIData,
-      getFlowSnapshot,
-      useFlowData,
-      setViewport,
-      handleFlowNodesChange,
-      handleFlowEdgesChange,
-      exportFlowData,
-      createDepEdge,
-      createTextNode,
-      createDesmosPreviewNode,
-      removeNode,
-      removeEdge,
-      clearCanvas,
-      resetToDefault,
-      importCanvasData,
-      exportCanvasData,
-      defaultTextNodeData,
-      updateNodeControlValues,
-      updateNodeControlValue,
+      readUI: {
+        getUISnapShot,
+        useUIData,
+        useNodeUIData,
+        defaultTextNodeData,
+      },
+      readFlow: {
+        getFlowSnapshot,
+        useFlowData,
+      },
+      subscribe: {
+        onData,
+      },
+      bridge: {
+        connectEval,
+      },
+      writeUI: {
+        updateNode,
+        updateNodeData,
+        updateNodeControlValues,
+        updateNodeControlValue,
+      },
+      writeFlow: {
+        setViewport,
+        handleFlowNodesChange,
+        handleFlowEdgesChange,
+      },
+      graph: {
+        createDepEdge,
+        createTextNode,
+        createDesmosPreviewNode,
+        removeNode,
+        removeEdge,
+        clearCanvas,
+        resetToDefault,
+      },
+      porting: {
+        exportUIData,
+        exportFlowData,
+        exportCanvasData,
+        importCanvasData,
+      },
     };
   }, [store]);
 

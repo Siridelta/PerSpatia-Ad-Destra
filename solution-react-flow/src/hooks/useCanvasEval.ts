@@ -97,17 +97,20 @@ interface CanvasEvalStoreState {
 }
 
 export interface CanvasEvalApi {
-  // 订阅方法
-  subscribeFromUI: (uiDataApi: CanvasDataApi) => () => void;
-  subscribeData: (callback: (data: CanvasEvalNodes) => void) => () => void;
-
-  // 数据访问方法
-  getSnapshot: () => CanvasEvalNodes;
-  useEvalStore: <T>(selector: (state: CanvasEvalNodes) => T) => T;
-
-  // 计算控制方法
-  evaluateNode: (nodeId: string) => Promise<void>;
-  evaluateAll: () => Promise<void>;
+  read: {
+    getSnapshot: () => CanvasEvalNodes;
+    useEvalStore: <T>(selector: (state: CanvasEvalNodes) => T) => T;
+  };
+  manual: {
+    requestRecomputeNode: (nodeId: string) => Promise<void>;
+    recomputeAll: () => Promise<void>;
+  };
+  subscribe: {
+    onData: (callback: (data: CanvasEvalNodes) => void) => () => void;
+  };
+  bridge: {
+    connectUI: (uiDataApi: CanvasDataApi) => () => void;
+  };
 }
 
 /**
@@ -116,11 +119,12 @@ export interface CanvasEvalApi {
  * 我们这里自制 hooks 的设计是：
  * - 内部带状态（zustand store）；
  * - 返回一个集合多个函数/hook、可被解构使用的 api 对象；
- * - 并转介 zustand 的 subscribe 机制，暴露出 subscribeFrom{Otherside} 和 subscribeData 两个订阅方法。
+ * - 并转介 external-store 的订阅机制，按职责分组暴露 read/manual/subscribe/bridge。
  * 
- * 例如，在 Eval Hook 这一侧 subscribeFromUI 订阅 UI 数据变化，并调用 handleUIDataUpdate 处理 UI 数据更新；
- * handleUIDataUpdate 内调用 resolveDeltaByUIData 计算 delta，并判断有无与计算逻辑层有关的变更，并选择性调用 runEvaluationTask 触发计算；
- * 在 UI Hook 这一侧也类似如此。
+ * 例如，在 Eval Hook 这一侧 bridge.connectUI 订阅 UI 数据变化，并调用 handleUIDataUpdate 处理 UI 数据更新；
+ * handleUIDataUpdate 内调用 resolveDeltaByUIData 计算 delta，并判断有无与计算逻辑层有关的变更，
+ * 再按需触发 runEvaluationTask（manual.requestRecomputeNode/recomputeAll 也复用同一执行链）。
+ * 在 UI Hook 这一侧通过 subscribe.onData 消费 Eval 数据变化也遵循同样思路。
  * 
  * 在这里，update 偏指订阅上游传下来的全量更新数据，是 "raw" 的；
  * 而 delta 更偏指订阅下游响应过程中根据不同数据源综合判断出来的、与本模块实际相关的"实际"变化；既是真正增量式的数据，也是本模块真正关心的变化。
@@ -833,13 +837,13 @@ export const useCanvasEval = (): CanvasEvalApi => {
     };
 
     // 订阅来自 UI 的数据变化
-    const subscribeFromUI = (uiDataApi: CanvasDataApi): (() => void) => {
-      const unsubscribe = uiDataApi.subscribeData(async (uiData) => handleUIDataUpdate(uiData));
+    const connectUI = (uiDataApi: CanvasDataApi): (() => void) => {
+      const unsubscribe = uiDataApi.subscribe.onData(async (uiData) => handleUIDataUpdate(uiData));
       return unsubscribe;
     };
 
     // 订阅 Eval 数据变化
-    const subscribeData = (
+    const onData = (
       callback: (data: CanvasEvalNodes) => void
     ): (() => void) => {
       return evalStore.subscribeNodes(callback);
@@ -859,22 +863,30 @@ export const useCanvasEval = (): CanvasEvalApi => {
       }
     };
 
-    const evaluateNode = async (nodeId: string) => {
+    const requestRecomputeNode = async (nodeId: string) => {
       await requestEvaluation([nodeId]);
     };
 
-    const evaluateAll = async () => {
+    const recomputeAll = async () => {
       const ids = Object.keys(evalStore.getState().nodes);
       await requestEvaluation(ids);
     };
 
     return {
-      subscribeFromUI,
-      subscribeData,
-      getSnapshot,
-      useEvalStore,
-      evaluateNode,
-      evaluateAll,
+      read: {
+        getSnapshot,
+        useEvalStore,
+      },
+      manual: {
+        requestRecomputeNode,
+        recomputeAll,
+      },
+      subscribe: {
+        onData,
+      },
+      bridge: {
+        connectUI,
+      },
     };
   }, [evalStore, runEvaluationTask, handleUIDataUpdate]);
 

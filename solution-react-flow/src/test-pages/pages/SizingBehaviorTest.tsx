@@ -23,8 +23,8 @@ node_output("result", longVariableName + shortVar);`);
   const nodeId = 'sizing-test-node';
 
   useEffect(() => {
-    const unsubscribeEvalFromUI = evalApi.subscribeFromUI(canvasDataApi);
-    const unsubscribeUIFromEval = canvasDataApi.subscribeFromEval(evalApi);
+    const unsubscribeEvalFromUI = evalApi.bridge.connectUI(canvasDataApi);
+    const unsubscribeUIFromEval = canvasDataApi.bridge.connectEval(evalApi);
     return () => {
       unsubscribeEvalFromUI();
       unsubscribeUIFromEval();
@@ -32,9 +32,9 @@ node_output("result", longVariableName + shortVar);`);
   }, [evalApi, canvasDataApi]);
 
   useEffect(() => {
-    const existingNode = canvasDataApi.getSnapshot().nodes.get(nodeId);
+    const existingNode = canvasDataApi.readUI.getUISnapShot().nodes.get(nodeId);
     if (!existingNode) {
-      canvasDataApi.createTextNode({
+      canvasDataApi.graph.createTextNode({
         id: nodeId,
         position: { x: 0, y: 0 },
         data: {
@@ -48,7 +48,7 @@ node_output("result", longVariableName + shortVar);`);
       return;
     }
 
-    canvasDataApi.updateNodeData(nodeId, {
+    canvasDataApi.writeUI.updateNodeData(nodeId, {
       code: testCode,
       nodeName: '尺寸测试节点',
       width: 600,
