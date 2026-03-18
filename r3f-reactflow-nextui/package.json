@@ -13,7 +13,10 @@
     "@fontsource-variable/jetbrains-mono": "^5.2.8",
     "@fontsource/jetbrains-mono": "^5.2.8",
     "@fontsource/noto-sans-sc": "^5.2.9",
+    "@react-three/drei": "^10.7.7",
+    "@react-three/fiber": "^9.5.0",
     "@types/prismjs": "^1.26.6",
+    "@types/three": "^0.183.1",
     "@xyflow/react": "^12.10.0",
     "immer": "^10.2.0",
     "lodash": "^4.17.23",
@@ -22,6 +25,7 @@
     "react-dom": "^19.2.4",
     "react-router-dom": "^6.30.3",
     "reselect": "^5.1.1",
+    "three": "^0.183.2",
     "zustand": "^5.0.11"
   },
   "devDependencies": {

@@ -7,7 +7,7 @@
   overflow: hidden;
   opacity: 0;
   animation: canvasFadeIn 0.6s ease 0.1s forwards;
-  background: #000000;
+  background: transparent;
 }
 
 @keyframes canvasFadeIn {
@@ -34,6 +34,10 @@
 
 .connect-mode .reactflow-canvas {
   filter: brightness(0.98) contrast(1.02);
+}
+
+.react-flow .react-flow__attribution {
+  display: none;
 }
 
 /* 自定义边样式 */
@@ -82,7 +86,7 @@
 /* 选择框动画 */
 .react-flow__nodesselection-rect {
   stroke: rgba(125, 225, 234, 0.8);
-  fill: rgba(125, 225, 234, 0.1);
+  fill: rgba(125, 225, 234, 0.05);
   stroke-width: 1;
   stroke-dasharray: 3 3;
   animation: selectionDash 1s linear infinite;

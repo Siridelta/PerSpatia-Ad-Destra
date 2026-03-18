@@ -1,6 +1,6 @@
 import React, { useState, useCallback, useEffect, useRef } from 'react';
 import { Handle, Position, NodeProps, NodeResizeControl, useKeyPress } from '@xyflow/react';
-import './styles.css';
+import './styles-future.css';
 import '@/styles/syntax-highlighting.css';
 import { Control } from '@/services/jsExecutor';
 import { useToolStore } from '@/store/toolStore';
@@ -84,7 +84,7 @@ const TextNode: React.FC<NodeProps<TextNodeFlowData>> = ({ id, selected }) => {
   const errors = nodeEval?.errors ?? [];
   const warnings = nodeEval?.warnings ?? [];
   const isEvaluating = nodeEval?.isEvaluating ?? false;
-  const evaluateNode = nodeEval?.evaluate ?? (() => {});
+  const evaluateNode = nodeEval?.evaluate ?? (() => { });
 
   // ============================================================================
   // 状态定义 (按功能分组)
@@ -166,7 +166,7 @@ const TextNode: React.FC<NodeProps<TextNodeFlowData>> = ({ id, selected }) => {
   // 折叠/展开逻辑
   const toggleCollapse = useCallback(() => {
     updateData({ isCollapsed: !isCollapsed });
-  }, [isCollapsed, updateNodeData]);
+  }, [isCollapsed, updateData]);
 
   // 区域显示/隐藏逻辑
   const toggleHideSection = useCallback((section: 'inputs' | 'outputs' | 'logs' | 'errors') => {
@@ -250,7 +250,7 @@ const TextNode: React.FC<NodeProps<TextNodeFlowData>> = ({ id, selected }) => {
         });
       }, 100);
     }
-  }, [code, width, updateData, autoResizeWidth]);
+  }, [code, width, updateData, autoResizeWidth, id]);
 
   // ============================================================================
   // 渲染函数 (按区域分组)

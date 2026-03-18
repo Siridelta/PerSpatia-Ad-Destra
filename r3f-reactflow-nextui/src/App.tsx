@@ -15,7 +15,7 @@ const App: React.FC = () => {
       <div className="app-container">
         {/* 浮动选择器 */}
         <FloatingSelector />
-        
+
         {/* 页面内容 */}
         <Routes>
           <Route path="/" element={

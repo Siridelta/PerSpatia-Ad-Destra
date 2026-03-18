@@ -1,6 +1,4 @@
 import {
-  Background,
-  BackgroundVariant,
   Connection,
   Controls,
   EdgeTypes,
@@ -12,6 +10,7 @@ import {
 } from '@xyflow/react';
 import '@xyflow/react/dist/style.css';
 import React, { useCallback, useEffect } from 'react';
+import { Scene3D } from '../Scene3D';
 
 import BottomToolbar from '@/components/BottomToolbar';
 import FloatingEdge from '@/components/CustomEdge';
@@ -46,7 +45,7 @@ const edgeTypes: EdgeTypes = {
 };
 
 const Canvas: React.FC = () => {
-  
+
   // 创建 API 对象（UI/Flow 共享同一个 store）
   const canvasDataApi = useCanvasData();
   const evalApi = useCanvasEval();
@@ -357,82 +356,88 @@ const Canvas: React.FC = () => {
   */
 
   return (
-    <CanvasDataProvider api={canvasDataApi}>
-      <CanvasEvalProvider api={evalApi}>
-        <div className={`canvas-container ${activeTool}-mode`}>
-          {isHydrated ? (
-          <ReactFlow
-            nodes={flowNodes}
-            edges={flowEdges}
-            onNodesChange={(changes) => canvasDataApi.writeFlow.handleFlowNodesChange(changes)}
-            onEdgesChange={(changes) => canvasDataApi.writeFlow.handleFlowEdgesChange(changes)}
-            onConnect={onConnect}
-            onPaneClick={handlePaneClick}
-            onNodeClick={onNodeClick}
-            onInit={handleInit}
-            onMoveEnd={(_event, newViewport) => { if (newViewport) canvasDataApi.writeFlow.setViewport(newViewport); }}
-            nodeTypes={nodeTypes}
-            edgeTypes={edgeTypes}
-            defaultEdgeOptions={defaultEdgeOptions}
-            connectionLineComponent={CustomConnectionLine}
-            connectionLineStyle={connectionLineStyle}
-            className="reactflow-canvas"
-            fitViewOptions={{ padding: 0.2 }}
-            elementsSelectable={true}
-            selectNodesOnDrag={false}
-            deleteKeyCode={['Delete', 'Backspace']}
-            maxZoom={10}
-            minZoom={0.1}
-          >
-            <Background variant={BackgroundVariant.Dots} gap={20} size={1} />
-            <Controls position="bottom-right" />
-
-            {/* 自定义箭头标记 */}
-            <svg>
-              <defs>
-                <marker
-                  id="custom-edge-arrow"
-                  markerWidth={8}
-                  markerHeight={8}
-                  refX={6}
-                  refY={2}
-                  orient="auto"
-                  markerUnits="strokeWidth"
+    <>
+      <Scene3D>
+        <CanvasDataProvider api={canvasDataApi}>
+          <CanvasEvalProvider api={evalApi}>
+            <div className={`canvas-container ${activeTool}-mode`}>
+              {isHydrated ? (
+                <ReactFlow
+                  nodes={flowNodes}
+                  edges={flowEdges}
+                  onNodesChange={(changes) => canvasDataApi.writeFlow.handleFlowNodesChange(changes)}
+                  onEdgesChange={(changes) => canvasDataApi.writeFlow.handleFlowEdgesChange(changes)}
+                  onConnect={onConnect}
+                  onPaneClick={handlePaneClick}
+                  onNodeClick={onNodeClick}
+                  onInit={handleInit}
+                  onMoveEnd={(_event, newViewport) => { if (newViewport) canvasDataApi.writeFlow.setViewport(newViewport); }}
+                  nodeTypes={nodeTypes}
+                  edgeTypes={edgeTypes}
+                  defaultEdgeOptions={defaultEdgeOptions}
+                  connectionLineComponent={CustomConnectionLine}
+                  connectionLineStyle={connectionLineStyle}
+                  className="reactflow-canvas"
+                  fitViewOptions={{ padding: 0.2 }}
+                  elementsSelectable={true}
+                  selectNodesOnDrag={false}
+                  deleteKeyCode={['Delete', 'Backspace']}
+                  maxZoom={10}
+                  minZoom={0.1}
                 >
-                  <path
-                    d="M0,0 L0,4 L6,2 z"
-                    fill="rgba(100, 200, 255, 0.8)"
-                    stroke="rgba(100, 200, 255, 0.8)"
-                  />
-                </marker>
-              </defs>
-            </svg>
-          </ReactFlow>
-          ) : (
-            <div className="flex items-center justify-center h-full">
-              <div className="text-white">Loading...</div>
+                </ReactFlow>
+              ) : (
+                <div className="flex items-center justify-center h-full">
+                  <div className="text-white">Loading...</div>
+                </div>
+              )}
             </div>
-          )}
+          </CanvasEvalProvider>
+        </CanvasDataProvider>
+      </Scene3D>
 
-          <Toolbar />
+      <Toolbar />
 
-          {/* 底部工具栏 */}
-          <BottomToolbar
-            onSettingsClick={toggleSettingsPanel}
-            onExport={handleExport}
-            onImportReplace={handleImportReplace}
-            onImportAdd={handleImportAdd}
-            onReset={handleReset}
-          />
+      {/* 底部工具栏 */}
+      <BottomToolbar
+        onSettingsClick={toggleSettingsPanel}
+        onExport={handleExport}
+        onImportReplace={handleImportReplace}
+        onImportAdd={handleImportAdd}
+        onReset={handleReset}
+      />
 
-          {/* 设置面板 */}
-          <SettingsPanel
-            isOpen={isSettingsPanelOpen}
-            onClose={closeSettingsPanel}
-          />
-        </div>
-      </CanvasEvalProvider>
-    </CanvasDataProvider>
+      {/* 设置面板 */}
+      <SettingsPanel
+        isOpen={isSettingsPanelOpen}
+        onClose={closeSettingsPanel}
+      />
+
+      <div className="react-flow__panel react-flow__attribution bottom right" data-message="Please only hide this attribution when you are subscribed to React Flow Pro: https://pro.reactflow.dev">
+        <a href="https://reactflow.dev" target="_blank" rel="noopener noreferrer" aria-label="React Flow attribution">React Flow</a>
+      </div>
+
+      {/* 自定义箭头标记 */}
+      <svg>
+        <defs>
+          <marker
+            id="custom-edge-arrow"
+            markerWidth={8}
+            markerHeight={8}
+            refX={6}
+            refY={2}
+            orient="auto"
+            markerUnits="strokeWidth"
+          >
+            <path
+              d="M0,0 L0,4 L6,2 z"
+              fill="rgba(100, 200, 255, 0.8)"
+              stroke="rgba(100, 200, 255, 0.8)"
+            />
+          </marker>
+        </defs>
+      </svg>
+    </>
   );
 };
 
