@@ -1,8 +1,7 @@
-import { useCallback, useMemo, useRef, useState } from 'react';
+import { useCallback, useMemo, useRef, useState, useSyncExternalStore } from 'react';
 import { createStore } from 'zustand/vanilla';
-import { useStore } from 'zustand';
 import { immer } from 'zustand/middleware/immer';
-import { jsExecutor, Control, ExecutionResult } from '@/services/jsExecutor';
+import { Control, ExecutionResult } from '@/services/jsExecutor';
 import { produce } from 'immer';
 import type { CanvasDataApi, CanvasUIData } from './useCanvasData';
 import {
@@ -11,6 +10,9 @@ import {
   CanvasNodeKind,
   CanvasNodeUIData,
 } from '@/types/canvas';
+import type { EvalDependencyResolver, EvalExecutionEngine } from './eval-core/contracts';
+import { edgeDependencyResolver } from './eval-core/edgeDependencyResolver';
+import { jsExecutionEngine } from './eval-core/jsExecutionEngine';
 
 export interface ErrorInfo {
   message: string;
@@ -74,10 +76,24 @@ export interface CanvasEvalDPIOs {
   outgoingBySource: Record<string, Record<string, string>>;
 }
 
+export interface CanvasEvalAnalysisState {
+  /**
+   * 预留字段：后续用于存放语法分析/符号分析结果。
+   *
+   * 设计边界说明：
+   * - 第三步先完成 external-store 形态改造，保持现有计算行为不变；
+   * - analysis 只作为“快照结构占位”，当前不参与 delta / plan / execute；
+   * - 后续引入预处理器、符号解析、Observable runtime 时，可以在不破坏
+   *   现有 nodes 快照 API 的前提下，把分析结果并入同一外部存储体系。
+   */
+  nodeAnalysis: Record<string, unknown>;
+}
+
 interface CanvasEvalStoreState {
   nodes: CanvasEvalNodes;
   depIOs: CanvasEvalDepIOs;
   DPIOs: CanvasEvalDPIOs;
+  analysis: CanvasEvalAnalysisState;
 }
 
 export interface CanvasEvalApi {
@@ -132,44 +148,6 @@ const mergeControls = (prevControls: Control[], nextControls: Control[]) => {
     if (!prev) return control;
     return { ...control, value: control.value ?? prev.value ?? control.defaultValue };
   });
-};
-
-const buildDepIOs = (edges: CanvasEdgeUIData[]): CanvasEvalDepIOs => {
-  const incoming: Record<string, string[]> = {};
-  const outgoing: Record<string, string[]> = {};
-
-  edges.forEach((edge) => {
-    const { source, target } = edge;
-    if (!incoming[target]) incoming[target] = [];
-    if (!incoming[target].includes(source)) incoming[target].push(source);
-
-    if (!outgoing[source]) outgoing[source] = [];
-    if (!outgoing[source].includes(target)) outgoing[source].push(target);
-  });
-
-  return { incomingByTarget: incoming, outgoingBySource: outgoing };
-};
-
-const buildDPIOs = (edges: CanvasEdgeUIData[]): CanvasEvalDPIOs => {
-  const incoming: Record<string, { source: string, sourceOutputName: string }> = {};
-  const outgoing: Record<string, Record<string, string>> = {};
-
-  edges.forEach((edge) => {
-    if (edge.type !== CanvasEdgeKind.DesmosPreviewEdge) return;
-    const { source, target, data } = edge;
-    const { sourceOutputName } = data;
-    if (incoming[target]) {
-      throw new Error('A target can only have one Desmos Preview Edge');
-    }
-    incoming[target] = { source, sourceOutputName };
-    if (!outgoing[source]) outgoing[source] = {};
-    if (outgoing[source][sourceOutputName]) {
-      throw new Error('A source can only have one Desmos Preview Edge per output');
-    }
-    outgoing[source][sourceOutputName] = target;
-  });
-
-  return { incomingByTarget: incoming, outgoingBySource: outgoing };
 };
 
 
@@ -574,6 +552,7 @@ const collectLatestInputValues = (
 const runEvaluationPlan = async (
   order: string[],
   stateSnapshot: CanvasEvalStoreState,
+  engine: EvalExecutionEngine,
   latestVersionRef: { current: number },
   version: number,
 ) => {
@@ -625,7 +604,7 @@ const runEvaluationPlan = async (
     }, {});
 
     try {
-      const result: ExecutionResult = await jsExecutor.executeCode(trimmedCode, {
+      const result: ExecutionResult = await engine.executeCode(trimmedCode, {
         ...upstreamInputs,
         ...controlInputs,
       });
@@ -669,6 +648,10 @@ const runEvaluationPlan = async (
   return interimResults;
 };
 
+const createDefaultAnalysisState = (): CanvasEvalAnalysisState => ({
+  nodeAnalysis: {},
+});
+
 const createEvalStore = () => {
   return createStore<CanvasEvalStoreState>()(
     immer(() => ({
@@ -681,13 +664,50 @@ const createEvalStore = () => {
         incomingByTarget: {},
         outgoingBySource: {},
       },
+      analysis: createDefaultAnalysisState(),
     })),
   );
 };
 
+/**
+ * external-store 适配层：
+ * - 将内部 store 暴露为 subscribe/getSnapshot 语义；
+ * - 让上层 hook 使用 useSyncExternalStore 读取，保证并发渲染一致性。
+ */
+const createEvalExternalStore = () => {
+  const store = createEvalStore();
+
+  const getState = () => store.getState();
+  const setState = store.setState;
+
+  const getNodesSnapshot = (): CanvasEvalNodes => store.getState().nodes;
+
+  /**
+   * subscribe/getSnapshot 是 external-store 的最小契约。
+   *
+   * 一致性边界说明：
+   * - React 通过 useSyncExternalStore 在渲染期读取 getSnapshot；
+   * - 任何 setState 都会同步触发 subscribe，确保快照与订阅事件同源；
+   * - 这让 eval 读写链路在并发渲染场景下保持可预测，不依赖 zustand hook 细节。
+   */
+  const subscribe = (listener: () => void): (() => void) =>
+    store.subscribe(() => listener());
+
+  const subscribeNodes = (callback: (data: CanvasEvalNodes) => void): (() => void) =>
+    store.subscribe((state) => callback(state.nodes));
+
+  return {
+    getState,
+    setState,
+    getNodesSnapshot,
+    subscribe,
+    subscribeNodes,
+  };
+};
+
 export const useCanvasEval = (): CanvasEvalApi => {
-  // 内部 evaluation store（每个 Canvas 单独实例）
-  const [store] = useState(() => createEvalStore());
+  // 每个 Canvas 独立的 external store 实例（非 React 状态容器）。
+  const [evalStore] = useState(() => createEvalExternalStore());
 
   const evalTaskVerRef = useRef(0);
   const lastCompletedStateRef = useRef<CanvasEvalStoreState | null>(null);
@@ -710,6 +730,7 @@ export const useCanvasEval = (): CanvasEvalApi => {
       const interimResults = await runEvaluationPlan(
         order,
         baseState,
+        jsExecutionEngine,
         evalTaskVerRef,
         version
       );
@@ -742,7 +763,7 @@ export const useCanvasEval = (): CanvasEvalApi => {
       // 如果没有变化，直接恢复上次完成的状态
       if (!delta.hasChanges && baseState) {
         lastCompletedStateRef.current = baseState;
-        store.setState(baseState);
+        evalStore.setState(baseState);
         return;
       }
 
@@ -753,13 +774,13 @@ export const useCanvasEval = (): CanvasEvalApi => {
         : createInitialEvalNodes(uiData);
 
       const uiEdges = Array.from(uiData.edges.values());
-      const depIOs = buildDepIOs(uiEdges);
-      const DPIOs = buildDPIOs(uiEdges);
+      const { depIOs, DPIOs } = edgeDependencyResolver.resolve(uiEdges);
 
       const nextState: CanvasEvalStoreState = {
         nodes: nextNodes,
         depIOs,
         DPIOs,
+        analysis: baseState?.analysis ?? createDefaultAnalysisState(),
       };
 
       // 如果没有需要重新计算的节点，直接更新 lastCompletedState
@@ -767,7 +788,7 @@ export const useCanvasEval = (): CanvasEvalApi => {
       // 如果 lastCompletedState 没有及时更新，则 delta 无法计算为空，导致继续计算，无限循环
       if (!delta.impactedNodeIds.length) {
         lastCompletedStateRef.current = nextState;
-        store.setState(nextState);
+        evalStore.setState(nextState);
         return;
       }
 
@@ -775,17 +796,41 @@ export const useCanvasEval = (): CanvasEvalApi => {
       const completedState = await runEvaluationTask(delta.impactedNodeIds, nextState, currentVersion);
       if (completedState) {
         lastCompletedStateRef.current = completedState;
-        store.setState(completedState);
+        evalStore.setState(completedState);
       }
     },
-    [store, runEvaluationTask]
+    [evalStore, runEvaluationTask]
   );
 
   const api = useMemo<CanvasEvalApi>(() => {
-    const getSnapshot = () => store.getState().nodes;
+    const getSnapshot = () => evalStore.getNodesSnapshot();
 
-    const useEvalStore = <T>(selector: (state: CanvasEvalNodes) => T) =>
-      useStore(store, (state) => selector(state.nodes));
+    /**
+     * useSyncExternalStore 选择器读取：
+     * - subscribe/getSnapshot 由 external store 提供；
+     * - 使用“快照引用 + 选择结果”缓存，尽量减少无意义重渲染。
+     */
+    const useEvalStore = <T,>(selector: (state: CanvasEvalNodes) => T): T => {
+      const cacheRef = useRef<{ snapshot: CanvasEvalNodes; selected: T } | null>(null);
+      return useSyncExternalStore(
+        evalStore.subscribe,
+        () => {
+          const snapshot = evalStore.getNodesSnapshot();
+          const cached = cacheRef.current;
+          if (cached && cached.snapshot === snapshot) {
+            return cached.selected;
+          }
+          const nextSelected = selector(snapshot);
+          if (cached && Object.is(cached.selected, nextSelected)) {
+            cacheRef.current = { snapshot, selected: cached.selected };
+            return cached.selected;
+          }
+          cacheRef.current = { snapshot, selected: nextSelected };
+          return nextSelected;
+        },
+        () => selector(evalStore.getNodesSnapshot()),
+      );
+    };
 
     // 订阅来自 UI 的数据变化
     const subscribeFromUI = (uiDataApi: CanvasDataApi): (() => void) => {
@@ -797,10 +842,7 @@ export const useCanvasEval = (): CanvasEvalApi => {
     const subscribeData = (
       callback: (data: CanvasEvalNodes) => void
     ): (() => void) => {
-      return store.subscribe((state) => {
-        const currentData = state.nodes;
-        callback(currentData);
-      });
+      return evalStore.subscribeNodes(callback);
     };
 
     const requestEvaluation = async (entryNodeIds: string[]) => {
@@ -809,11 +851,11 @@ export const useCanvasEval = (): CanvasEvalApi => {
       evalTaskVerRef.current += 1;
       const currentVersion = evalTaskVerRef.current;
 
-      const baseState = store.getState();
+      const baseState = evalStore.getState();
       const completedState = await runEvaluationTask(entryNodeIds, baseState, currentVersion);
       if (completedState) {
         lastCompletedStateRef.current = completedState;
-        store.setState(completedState);
+        evalStore.setState(completedState);
       }
     };
 
@@ -822,7 +864,7 @@ export const useCanvasEval = (): CanvasEvalApi => {
     };
 
     const evaluateAll = async () => {
-      const ids = Object.keys(store.getState().nodes);
+      const ids = Object.keys(evalStore.getState().nodes);
       await requestEvaluation(ids);
     };
 
@@ -834,7 +876,7 @@ export const useCanvasEval = (): CanvasEvalApi => {
       evaluateNode,
       evaluateAll,
     };
-  }, [store, runEvaluationTask, handleUIDataUpdate]);
+  }, [evalStore, runEvaluationTask, handleUIDataUpdate]);
 
   return api;
 };
