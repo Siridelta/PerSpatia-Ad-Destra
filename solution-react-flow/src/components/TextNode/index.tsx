@@ -10,7 +10,7 @@ import CodeEditor from '../CodeEditor';
 import { useNodeEval } from '@/contexts/CanvasEvalContext';
 import { TextNodeFlowData } from '@/types/canvas';
 import { TextNodeUIData } from '@/types/nodeData';
-import { useCanvasUIDataApi } from '@/contexts/CanvasUIDataContext';
+import { useCanvasDataApi } from '@/contexts/CanvasDataContext';
 
 
 
@@ -44,9 +44,9 @@ function placeCaretAtPoint(x: number, y: number) {
 
 const TextNode: React.FC<NodeProps<TextNodeFlowData>> = ({ id, selected }) => {
 
-  const { updateNodeData, updateNodeControlValues, useUIData } = useCanvasUIDataApi();
+  const { updateNodeData, updateNodeControlValues, useUIData } = useCanvasDataApi();
   const nodeData = useUIData((uiData) => {
-    const node = uiData.nodes.find((item) => item.id === id);
+    const node = uiData.nodes.get(id);
     return node?.type === 'textNode' ? node.data : undefined;
   });
   const {

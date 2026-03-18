@@ -3,13 +3,13 @@ import { ReactFlowProvider } from '@xyflow/react';
 import TextNode from '../../components/TextNode';
 import './TestPage.css';
 import { CanvasNodeKind } from '@/types/canvas';
-import { CanvasUIDataProvider } from '@/contexts/CanvasUIDataContext';
+import { CanvasDataProvider } from '@/contexts/CanvasDataContext';
 import { CanvasEvalProvider } from '@/contexts/CanvasEvalContext';
-import { useCanvasUIData } from '@/hooks/useCanvasUIData';
+import { useCanvasData } from '@/hooks/useCanvasData';
 import { useCanvasEval } from '@/hooks/useCanvasEval';
 
 const SizingBehaviorTest: React.FC = () => {
-  const uiDataApi = useCanvasUIData();
+  const canvasDataApi = useCanvasData();
   const evalApi = useCanvasEval();
 
   const [testCode, setTestCode] = useState(`// 测试代码
@@ -23,18 +23,18 @@ node_output("result", longVariableName + shortVar);`);
   const nodeId = 'sizing-test-node';
 
   useEffect(() => {
-    const unsubscribeEvalFromUI = evalApi.subscribeFromUI(uiDataApi);
-    const unsubscribeUIFromEval = uiDataApi.subscribeFromEval(evalApi);
+    const unsubscribeEvalFromUI = evalApi.subscribeFromUI(canvasDataApi);
+    const unsubscribeUIFromEval = canvasDataApi.subscribeFromEval(evalApi);
     return () => {
       unsubscribeEvalFromUI();
       unsubscribeUIFromEval();
     };
-  }, [evalApi, uiDataApi]);
+  }, [evalApi, canvasDataApi]);
 
   useEffect(() => {
-    const existingNode = uiDataApi.getSnapshot().nodes.find((node) => node.id === nodeId);
+    const existingNode = canvasDataApi.getSnapshot().nodes.get(nodeId);
     if (!existingNode) {
-      uiDataApi.createTextNode({
+      canvasDataApi.createTextNode({
         id: nodeId,
         position: { x: 0, y: 0 },
         data: {
@@ -48,14 +48,14 @@ node_output("result", longVariableName + shortVar);`);
       return;
     }
 
-    uiDataApi.updateNodeData(nodeId, {
+    canvasDataApi.updateNodeData(nodeId, {
       code: testCode,
       nodeName: '尺寸测试节点',
       width: 600,
       height: 500,
       autoResizeWidth: false,
     });
-  }, [testCode, uiDataApi]);
+  }, [testCode, canvasDataApi]);
 
   const handleTestScenario = (scenario: string) => {
     setHasError(false);
@@ -189,7 +189,7 @@ node_output("result", x + y);`);
               <p>观察节点的尺寸调整行为</p>
             </div>
             <div className="node-display-area">
-              <CanvasUIDataProvider api={uiDataApi}>
+              <CanvasDataProvider api={canvasDataApi}>
                 <CanvasEvalProvider api={evalApi}>
                   <ReactFlowProvider>
                     <TextNode
@@ -208,7 +208,7 @@ node_output("result", x + y);`);
                     />
                   </ReactFlowProvider>
                 </CanvasEvalProvider>
-              </CanvasUIDataProvider>
+              </CanvasDataProvider>
             </div>
           </div>
         </div>

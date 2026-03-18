@@ -1,6 +1,9 @@
 import type { Node, Edge } from '@xyflow/react';
 
-import type { TextNodeUIData, DesmosPreviewNodeUIData } from './nodeData';
+import type {
+  TextNodeUIData as TextNodePayloadFromNodeData,
+  DesmosPreviewNodeUIData as DesmosPreviewNodePayloadFromNodeData,
+} from './nodeData';
 
 // --- Node Data Types ---
 
@@ -10,22 +13,26 @@ export enum CanvasNodeKind {
 }
 
 /**
- * UIData 节点类型（业务层，不包含 React Flow 布局信息）
- * 暂时保留 id+data 结构，但 UIData 迁移至 Map 存储后不再需要，需直接退化为 xxxUIData 类型
+ * Node payload：仅表示 node.data 的业务字段。
  */
-export interface TextNodeUIDataEntry {
-  id: string;
+export type TextNodePayload = TextNodePayloadFromNodeData;
+export type DesmosPreviewNodePayload = DesmosPreviewNodePayloadFromNodeData;
+
+/**
+ * UIData 节点类型（业务层，不包含 React Flow 布局信息）
+ * 运行态（Map value）不再携带 id，id 由 Map key 提供。
+ */
+export interface TextNodeUIData {
   type: CanvasNodeKind.TextNode;
-  data: TextNodeUIData;
+  data: TextNodePayload;
 }
 
-export interface DesmosPreviewNodeUIDataEntry {
-  id: string;
+export interface DesmosPreviewNodeUIData {
   type: CanvasNodeKind.DesmosPreviewNode;
-  data: DesmosPreviewNodeUIData;
+  data: DesmosPreviewNodePayload;
 }
 
-export type CanvasNodeUIDataEntry = TextNodeUIDataEntry | DesmosPreviewNodeUIDataEntry;
+export type CanvasNodeUIData = TextNodeUIData | DesmosPreviewNodeUIData;
 
 /**
  * FlowData 节点类型（仅用于 React Flow 渲染与交互）
@@ -43,25 +50,36 @@ export enum CanvasEdgeKind {
   DesmosPreviewEdge = 'desmosPreviewEdge',
 }
 
-export interface CustomEdgeUIData extends Record<string, unknown> {
+/**
+ * Edge payload：仅表示 edge.data 的业务字段。
+ */
+export interface CustomEdgePayload extends Record<string, unknown> {
   label?: string;
   [key: string]: unknown;
 }
 
-export interface DesmosPreviewEdgeUIData extends Record<string, unknown> {
+export interface DesmosPreviewEdgePayload extends Record<string, unknown> {
   sourceOutputName: string;
 }
 
-// 强制设定 type 字段为必选，项目代码须使用此 TypedEdge 类型，勿使用 type 字段可选的 react-flow Edge 类型。
-export type TypedEdge<EdgeData extends Record<string, unknown>, EdgeType extends string> = Edge<EdgeData, EdgeType> & {
-  type: EdgeType;
-  data: EdgeData;
-};
+/**
+ * 运行态 Edge（Map value）不再携带 id，id 由 Map key 提供。
+ */
+export interface CustomEdgeUIData {
+  source: string;
+  target: string;
+  type: CanvasEdgeKind.CustomEdge;
+  data: CustomEdgePayload;
+}
 
-export type CustomEdgeUIDataEntry = TypedEdge<CustomEdgeUIData, CanvasEdgeKind.CustomEdge>;
-export type DesmosPreviewEdgeUIDataEntry = TypedEdge<DesmosPreviewEdgeUIData, CanvasEdgeKind.DesmosPreviewEdge>;
+export interface DesmosPreviewEdgeUIData {
+  source: string;
+  target: string;
+  type: CanvasEdgeKind.DesmosPreviewEdge;
+  data: DesmosPreviewEdgePayload;
+}
 
-export type CanvasEdgeUIDataEntry = CustomEdgeUIDataEntry | DesmosPreviewEdgeUIDataEntry;
+export type CanvasEdgeUIData = CustomEdgeUIData | DesmosPreviewEdgeUIData;
 
 /**
  * FlowData 边类型（仅用于 React Flow 渲染与交互）

@@ -5,8 +5,8 @@ import { Handle, Position, NodeProps } from '@xyflow/react';
 import { useNodeEval } from '@/contexts/CanvasEvalContext';
 
 import './styles.css';
-import { DesmosPreviewNodeFlowData, DesmosPreviewEdgeUIDataEntry } from '@/types/canvas';
-import { useCanvasUIDataApi } from '@/contexts/CanvasUIDataContext';
+import { DesmosPreviewNodeFlowData, DesmosPreviewEdgeUIData } from '@/types/canvas';
+import { useCanvasDataApi } from '@/contexts/CanvasDataContext';
 
 // ============================================================================
 // 类型定义
@@ -70,13 +70,13 @@ const DesmosPreviewNode: React.FC<NodeProps<DesmosPreviewNodeFlowData>> = ({ id,
   const calculatorRef = useRef<Desmos.Calculator | null>(null);
   const lastSyncedState = useRef<string>('');
 
-  const { useUIData } = useCanvasUIDataApi();
+  const { useUIData } = useCanvasDataApi();
   const previewEdge = useUIData((ui) =>
-    ui.edges.find((edge) => edge.type === 'desmosPreviewEdge' && edge.target === id) as DesmosPreviewEdgeUIDataEntry | undefined,
+    Array.from(ui.edges.values()).find((edge) => edge.type === 'desmosPreviewEdge' && edge.target === id) as DesmosPreviewEdgeUIData | undefined,
   );
   const sourceNode = useUIData((ui) => {
     if (!previewEdge) return undefined;
-    const candidate = ui.nodes.find((node) => node.id === previewEdge.source);
+    const candidate = ui.nodes.get(previewEdge.source);
     if (candidate?.type === 'textNode') {
       return candidate;
     }
@@ -85,10 +85,10 @@ const DesmosPreviewNode: React.FC<NodeProps<DesmosPreviewNodeFlowData>> = ({ id,
 
   const sourceLabel = useMemo(() => {
     const nodeName = sourceNode?.data.nodeName?.trim();
-    const nodeDisplay = nodeName || sourceNode?.id || '未知节点';
+    const nodeDisplay = nodeName || previewEdge?.source || '未知节点';
     const outputName = previewEdge?.data?.sourceOutputName || '未知输出';
     return `${nodeDisplay} · ${outputName}`;
-  }, [previewEdge?.data?.sourceOutputName, sourceNode?.data.nodeName, sourceNode?.id]);
+  }, [previewEdge?.data?.sourceOutputName, previewEdge?.source, sourceNode?.data.nodeName]);
 
   const nodeEval = useNodeEval(id);
   const desmosState = nodeEval?.outputs?.desmosState as Desmos.GraphState | undefined;

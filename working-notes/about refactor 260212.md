@@ -24,7 +24,12 @@
 
 #### A. 数据结构拆分
 
-我们将状态分为三块：
+我们将状态分为三块（其中前两块在“使用方式上拆分”，但在“数据源上合并为一个 `canvas` store）：
+
+0.  **Canvas Store (`canvas`)**: **统一数据源**
+    *   **定义**: `canvas = flowData + uiData`。
+    *   **当前落地**: 单个 store（`canvasDataApi`）内部分片暴露 `useFlowData` 与 `useUIData`，避免双 store 导入时的中间态问题。
+    *   **原则**: ReactFlow 仍只消费 flowData；Node 组件仍绕过 ReactFlow 直接订阅 uiData。
 
 1.  **FlowData states (`flowNodes`, `flowEdges`, `viewport`)**: **React Flow 的“物理世界”**
     *   **结构**: `nodes: [{ id, position, type }]`, `edges: [{ id, source, target }]`, `viewport`。
@@ -51,17 +56,19 @@
 #### C. 对你计划的具体点评
 
 1.  **关于 ID 一致性 (Phase 1)**:
-    *   你的担心是对的。在 Phase 1（数组并存）阶段，必须严格保证 `flowData` 的增删操作同步触发 `uiData` 的增删。我们暂时用 useEffect 来进行
+    *   你的担心是对的。在 Phase 1（数组并存）阶段，确实需要保证 `flowData` 与 `uiData` 的 ID 一致。
+    *   **计划变更（已执行）**：不再使用双 store + `syncWithUI` 的 useEffect 同步，而是回到单个 `canvas` store，在增删改和导入时做原子更新，避免中间态。
 
 2.  **关于 Map 改造 (Phase 2)**:
     *   这是性能优化的关键。React Flow 内部其实也是用 Map 索引的，但暴露给用户的是数组。我们在 `uiData` 层改用 Map 后，`useNodeState(id)` 的复杂度从 O(n) 降为 O(1)，这对大图非常重要。
 
 3.  **关于存档 (Persistence)**:
-    *   存档结构应该变成：
+    *   概念上统一写作 `canvas = { flowData, uiData }`，强调两者是一个整体状态。
+    *   存档结构可以表达为：
         ```json
         {
-          "flow": { "nodes": [...], "edges": [...], "viewport": ... },
+          "flowData": { "nodes": [...], "edges": [...], "viewport": ... },
           "uiData": { "node-1": { "code": "...", "width": 400 ... }, ... }
         }
         ```
-    *   加载时，分别填充 uiData 和 flowData。
+    *   加载时应以 `canvas` 为单位进行原子填充（对外一次导入，避免中间态）。

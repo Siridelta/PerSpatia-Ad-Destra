@@ -1,18 +1,20 @@
 import type {
   CanvasEdgeFlowData,
-  CanvasEdgeUIDataEntry,
+  CanvasEdgeUIData,
   CanvasNodeFlowData,
-  CanvasNodeUIDataEntry,
+  CanvasNodeUIData,
 } from '@/types/canvas';
 import type { Viewport } from '@xyflow/react';
 
 /**
- * 画布持久化的最新结构（v8）
+ * 画布持久化的最新结构（v9）
+ * - 运行态使用 Map
+ * - 持久化层使用 Record，避免 id 在 value 内重复存储
  */
 export interface CanvasArchiveState {
   uiData: {
-    nodes: CanvasNodeUIDataEntry[];
-    edges: CanvasEdgeUIDataEntry[];
+    nodes: Record<string, CanvasNodeUIData>;
+    edges: Record<string, CanvasEdgeUIData>;
   };
   flowData: {
     nodes: CanvasNodeFlowData[];

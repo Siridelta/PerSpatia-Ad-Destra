@@ -4,14 +4,12 @@ import { useStore } from 'zustand';
 import { immer } from 'zustand/middleware/immer';
 import { jsExecutor, Control, ExecutionResult } from '@/services/jsExecutor';
 import { produce } from 'immer';
-import type { CanvasUIDataApi, UIData } from './useCanvasUIData';
+import type { CanvasDataApi, CanvasUIData } from './useCanvasData';
 import {
   CanvasEdgeKind,
-  CanvasEdgeUIDataEntry,
+  CanvasEdgeUIData,
   CanvasNodeKind,
-  CanvasNodeUIDataEntry,
-  DesmosPreviewEdgeUIData,
-  TextNodeUIDataEntry
+  CanvasNodeUIData,
 } from '@/types/canvas';
 
 export interface ErrorInfo {
@@ -54,7 +52,7 @@ export interface CanvasEvalDeltaDPEdge {
 // Eval Store/State Types
 
 export interface CanvasEvalNode {
-  type: CanvasNodeUIDataEntry['type'];
+  type: CanvasNodeUIData['type'];
   code: string;
   isEvaluating: boolean;
   controls: Control[];
@@ -84,7 +82,7 @@ interface CanvasEvalStoreState {
 
 export interface CanvasEvalApi {
   // 订阅方法
-  subscribeFromUI: (uiDataApi: CanvasUIDataApi) => () => void;
+  subscribeFromUI: (uiDataApi: CanvasDataApi) => () => void;
   subscribeData: (callback: (data: CanvasEvalNodes) => void) => () => void;
 
   // 数据访问方法
@@ -116,7 +114,7 @@ export interface CanvasEvalApi {
  */
 
 // create initial node data
-const createInitialNodeData = (type: CanvasNodeUIDataEntry['type'], code: string, controls: Control[]): CanvasEvalNode => ({
+const createInitialNodeData = (type: CanvasNodeUIData['type'], code: string, controls: Control[]): CanvasEvalNode => ({
   type,
   code,
   isEvaluating: false,
@@ -136,7 +134,7 @@ const mergeControls = (prevControls: Control[], nextControls: Control[]) => {
   });
 };
 
-const buildDepIOs = (edges: CanvasEdgeUIDataEntry[]): CanvasEvalDepIOs => {
+const buildDepIOs = (edges: CanvasEdgeUIData[]): CanvasEvalDepIOs => {
   const incoming: Record<string, string[]> = {};
   const outgoing: Record<string, string[]> = {};
 
@@ -152,7 +150,7 @@ const buildDepIOs = (edges: CanvasEdgeUIDataEntry[]): CanvasEvalDepIOs => {
   return { incomingByTarget: incoming, outgoingBySource: outgoing };
 };
 
-const buildDPIOs = (edges: CanvasEdgeUIDataEntry[]): CanvasEvalDPIOs => {
+const buildDPIOs = (edges: CanvasEdgeUIData[]): CanvasEvalDPIOs => {
   const incoming: Record<string, { source: string, sourceOutputName: string }> = {};
   const outgoing: Record<string, Record<string, string>> = {};
 
@@ -180,7 +178,7 @@ const buildDPIOs = (edges: CanvasEdgeUIDataEntry[]): CanvasEvalDPIOs => {
 
 
 // 为边生成唯一键，便于在 diff 过程中进行集合对比
-const createEdgeKey = ({ source, target }: Pick<CanvasEdgeUIDataEntry, 'source' | 'target'>) => `${source}->${target}`;
+const createEdgeKey = ({ source, target }: Pick<CanvasEdgeUIData, 'source' | 'target'>) => `${source}->${target}`;
 
 // 描述一次 CanvasEvalInput 变化中我们关心的增量信息
 interface CanvasEvalDelta {
@@ -193,6 +191,12 @@ interface CanvasEvalDelta {
   removedDPEdges: CanvasEvalDeltaDPEdge[];
   impactedNodeIds: string[];
   hasChanges: boolean;
+}
+
+interface EvalComparableNode {
+  id: string;
+  code: string;
+  controls: Control[];
 }
 
 
@@ -217,20 +221,21 @@ const extractEdgesFromState = (state: CanvasEvalStoreState): { dep: CanvasEvalDe
 // 改为基于 lastCompletedState 而非历史 input 来比较，这样能捕获所有状态变化（包括通过 requestEvaluation 等触发的）
 const resolveDeltaByUIData = (
   lastCompletedState: CanvasEvalStoreState | null,
-  uiData: UIData,
+  uiData: CanvasUIData,
 ): CanvasEvalDelta => {
+  const currEdges = Array.from(uiData.edges.values());
 
   // 如果没有上次完成的状态，则认为所有节点都是新增的
   if (!lastCompletedState) {
-    const addedNodeIds = uiData.nodes.map((node) => node.id);
+    const addedNodeIds = Array.from(uiData.nodes.keys());
     const impactedNodeIds = addedNodeIds;
     return {
       addedNodeIds,
       removedNodeIds: [],
       updatedNodeIds: [],
-      addedDepEdges: uiData.edges.filter((edge) => edge.type === CanvasEdgeKind.CustomEdge),
+      addedDepEdges: currEdges.filter((edge) => edge.type === CanvasEdgeKind.CustomEdge),
       removedDepEdges: [],
-      addedDPEdges: uiData.edges.filter((edge) => edge.type === CanvasEdgeKind.DesmosPreviewEdge),
+      addedDPEdges: currEdges.filter((edge) => edge.type === CanvasEdgeKind.DesmosPreviewEdge),
       removedDPEdges: [],
       impactedNodeIds,
       hasChanges: true,
@@ -238,16 +243,16 @@ const resolveDeltaByUIData = (
   }
 
   // 从 lastCompletedState 中提取节点和边信息
-  const prevNodeMap = new Map(
+  const prevNodeMap = new Map<string, EvalComparableNode>(
     Object.entries(lastCompletedState.nodes)
       .map(([id, nodeData]) => [id, { id, code: nodeData.code, controls: nodeData.controls }])
   );
-  const currNodeMap = new Map(uiData.nodes.map(node => [
-    node.id,
+  const currNodeMap = new Map<string, EvalComparableNode>(Array.from(uiData.nodes.entries()).map(([id, node]) => [
+    id,
     {
-      id: node.id,
-      code: node.type === CanvasNodeKind.TextNode ? node.data.code : '',
-      controls: node.type === CanvasNodeKind.TextNode ? node.data.controls : []
+      id,
+      code: node.type === CanvasNodeKind.TextNode ? (node.data.code as string) : '',
+      controls: node.type === CanvasNodeKind.TextNode ? (node.data.controls as Control[]) : []
     }
   ]));
 
@@ -269,7 +274,7 @@ const resolveDeltaByUIData = (
     }
     // 检查 controls 变化
     const prevControlsMap = new Map(prevNode.controls.map(c => [c.name, c]));
-    const currControlsMap = new Map(currNode.controls.map(c => [c.name, c]));
+    const currControlsMap = new Map(currNode.controls.map((c: Control) => [c.name, c]));
 
     currControlsMap.forEach((currControl) => {
       const prevControl = prevControlsMap.get(currControl.name);
@@ -303,7 +308,7 @@ const resolveDeltaByUIData = (
 
   const extractedPrevEdges = extractEdgesFromState(lastCompletedState);
   const prevDepEdges = extractedPrevEdges.dep;
-  const currDepEdges = uiData.edges.filter((edge) => edge.type === CanvasEdgeKind.CustomEdge);
+  const currDepEdges = currEdges.filter((edge) => edge.type === CanvasEdgeKind.CustomEdge);
   const prevDepEdgeSet = new Set(prevDepEdges.map(createEdgeKey));
   const currDepEdgeSet = new Set(currDepEdges.map(createEdgeKey));
 
@@ -323,7 +328,7 @@ const resolveDeltaByUIData = (
   });
 
   const prevDPEdges = extractedPrevEdges.DP;
-  const currDPEdges = uiData.edges.filter((edge) => edge.type === CanvasEdgeKind.DesmosPreviewEdge);
+  const currDPEdges = currEdges.filter((edge) => edge.type === CanvasEdgeKind.DesmosPreviewEdge);
   const prevDPEdgeSet = new Set(prevDPEdges.map(createEdgeKey));
   const currDPEdgeSet = new Set(currDPEdges.map(createEdgeKey));
 
@@ -392,15 +397,15 @@ const resolveDeltaByUIData = (
 
 // 根据最新 UI 数据构建下一版 eval 数据(nodes) --- 全量更新版，用于首次运行
 const createInitialEvalNodes = (
-  uiData: UIData,
+  uiData: CanvasUIData,
 ): CanvasEvalNodes => {
   const nextNodes: CanvasEvalNodes = {};
 
-  uiData.nodes.forEach((node) => {
+  uiData.nodes.forEach((node, nodeId) => {
     if (node.type === CanvasNodeKind.TextNode) {
-      nextNodes[node.id] = createInitialNodeData(CanvasNodeKind.TextNode, node.data.code, node.data.controls);
+      nextNodes[nodeId] = createInitialNodeData(CanvasNodeKind.TextNode, node.data.code as string, node.data.controls as Control[]);
     } else {
-      nextNodes[node.id] = createInitialNodeData(node.type, '', []);
+      nextNodes[nodeId] = createInitialNodeData(node.type, '', []);
     }
   });
 
@@ -410,15 +415,15 @@ const createInitialEvalNodes = (
 // 根据最新 UI 数据构建下一版 eval 数据(nodes) --- 增量更新版，用于非初次运行
 const buildNextEvalNodes = (
   currNodes: CanvasEvalNodes,
-  currUIData: UIData,
+  currUIData: CanvasUIData,
   delta: CanvasEvalDelta,
 ): CanvasEvalNodes =>
   produce(currNodes, (draft) => {
     delta.addedNodeIds.forEach((id) => {
-      const node = currUIData.nodes.find((candidate) => candidate.id === id);
+      const node = currUIData.nodes.get(id);
       if (!node) return;
       if (node.type === CanvasNodeKind.TextNode) {
-        draft[id] = createInitialNodeData(CanvasNodeKind.TextNode, node.data.code, node.data.controls);
+        draft[id] = createInitialNodeData(CanvasNodeKind.TextNode, node.data.code as string, node.data.controls as Control[]);
       } else {
         draft[id] = createInitialNodeData(node.type, '', []);
       }
@@ -429,10 +434,11 @@ const buildNextEvalNodes = (
     });
 
     delta.updatedNodeIds.forEach((id) => {
-      const node = currUIData.nodes.find((node) => node.id === id)! as TextNodeUIDataEntry;
+      const node = currUIData.nodes.get(id);
+      if (!node || node.type !== CanvasNodeKind.TextNode) return;
       draft[id]!.type = CanvasNodeKind.TextNode;
-      draft[id]!.code = node.data.code;
-      draft[id]!.controls = node.data.controls.map((control) => ({ ...control }));
+      draft[id]!.code = node.data.code as string;
+      draft[id]!.controls = (node.data.controls as Control[]).map((control) => ({ ...control }));
     });
   });
 
@@ -723,7 +729,7 @@ export const useCanvasEval = (): CanvasEvalApi => {
 
   // 处理 UI 数据更新的内部函数
   const handleUIDataUpdate = useCallback(
-    async (uiData: UIData) => {
+    async (uiData: CanvasUIData) => {
 
       evalTaskVerRef.current += 1;
       const currentVersion = evalTaskVerRef.current;
@@ -746,8 +752,9 @@ export const useCanvasEval = (): CanvasEvalApi => {
         ? buildNextEvalNodes(baseState.nodes, uiData, delta)
         : createInitialEvalNodes(uiData);
 
-      const depIOs = buildDepIOs(uiData.edges);
-      const DPIOs = buildDPIOs(uiData.edges);
+      const uiEdges = Array.from(uiData.edges.values());
+      const depIOs = buildDepIOs(uiEdges);
+      const DPIOs = buildDPIOs(uiEdges);
 
       const nextState: CanvasEvalStoreState = {
         nodes: nextNodes,
@@ -781,7 +788,7 @@ export const useCanvasEval = (): CanvasEvalApi => {
       useStore(store, (state) => selector(state.nodes));
 
     // 订阅来自 UI 的数据变化
-    const subscribeFromUI = (uiDataApi: CanvasUIDataApi): (() => void) => {
+    const subscribeFromUI = (uiDataApi: CanvasDataApi): (() => void) => {
       const unsubscribe = uiDataApi.subscribeData(async (uiData) => handleUIDataUpdate(uiData));
       return unsubscribe;
     };

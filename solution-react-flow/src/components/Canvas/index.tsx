@@ -20,16 +20,15 @@ import SettingsPanel from '@/components/SettingsPanel';
 import TextNode from '@/components/TextNode';
 import Toolbar from '@/components/Toolbar';
 import { CanvasEvalProvider } from '@/contexts/CanvasEvalContext';
-import { CanvasUIDataProvider } from '@/contexts/CanvasUIDataContext';
+import { CanvasDataProvider } from '@/contexts/CanvasDataContext';
 import { useCanvasEval } from '@/hooks/useCanvasEval';
-import { useCanvasFlowData } from '@/hooks/useCanvasFlowData';
 import { useCanvasStatePersistence } from '@/hooks/useCanvasStatePersistence';
-import { useCanvasUIData } from '@/hooks/useCanvasUIData';
+import { useCanvasData } from '@/hooks/useCanvasData';
 import { parseCanvasArchiveText, serializeCanvasArchive } from '@/services/canvas-archive';
 import { useTheme } from '@/hooks/useTheme';
 import { useSettingsStore } from '@/store/settingsStore';
 import { useToolStore } from '@/store/toolStore';
-import { CanvasEdgeFlowData, CanvasNodeFlowData, CanvasNodeKind } from '@/types/canvas';
+import { CanvasEdgeFlowData, CanvasNodeFlowData } from '@/types/canvas';
 import useInertialPan from '@/utils/useInertialPan';
 import CustomConnectionLine from './CustomConnectionLine';
 import './styles.css';
@@ -48,31 +47,28 @@ const edgeTypes: EdgeTypes = {
 
 const Canvas: React.FC = () => {
   
-  // 创建两个模块的 API 对象
-  const uiDataApi = useCanvasUIData();
-  const flowDataApi = useCanvasFlowData();
+  // 创建 API 对象（UI/Flow 共享同一个 store）
+  const canvasDataApi = useCanvasData();
   const evalApi = useCanvasEval();
-  const { isHydrated } = useCanvasStatePersistence(uiDataApi, flowDataApi);
+  const { isHydrated } = useCanvasStatePersistence(canvasDataApi);
 
   // 连接两个 API：双向订阅
   useEffect(() => {
     // Eval 订阅 UI 的变化（主要是 controls）
-    const unsubscribeEvalFromUI = evalApi.subscribeFromUI(uiDataApi);
+    const unsubscribeEvalFromUI = evalApi.subscribeFromUI(canvasDataApi);
 
     // UI 订阅 Eval 的变化
-    const unsubscribeUIFromEval = uiDataApi.subscribeFromEval(evalApi);
+    const unsubscribeUIFromEval = canvasDataApi.subscribeFromEval(evalApi);
 
     return () => {
       unsubscribeEvalFromUI();
       unsubscribeUIFromEval();
     };
-  }, [uiDataApi, evalApi]);
+  }, [canvasDataApi, evalApi]);
 
-  const uiNodes = uiDataApi.useUIData((data) => data.nodes);
-  const uiEdges = uiDataApi.useUIData((data) => data.edges);
-  const flowNodes = flowDataApi.useFlowData((data) => data.nodes);
-  const flowEdges = flowDataApi.useFlowData((data) => data.edges);
-  const viewport = flowDataApi.useFlowData((data) => data.viewport);
+  const flowNodes = canvasDataApi.useFlowData((data) => data.nodes);
+  const flowEdges = canvasDataApi.useFlowData((data) => data.edges);
+  const viewport = canvasDataApi.useFlowData((data) => data.viewport);
 
   // 当前活动工具（全局）
   const activeTool = useToolStore((state) => state.activeTool);
@@ -97,13 +93,6 @@ const Canvas: React.FC = () => {
 
   // 惯性/缓动式视野移动（WASD）
   useInertialPan({ setViewport: setFlowViewport, getViewport });
-
-  // 将业务层 UIData 拓扑同步到 FlowData（先采用低效双遍历，后续 Map 化再优化）
-  useEffect(() => {
-    // 避免在未加载完成时同步状态
-    if (!isHydrated) return;
-    flowDataApi.syncWithUI(uiNodes, uiEdges);
-  }, [uiNodes, uiEdges, flowDataApi, isHydrated]);
 
   // onInit 时主动推送一次视角，避免首次渲染时闪烁
   const handleInit = useCallback((reactFlowInstance: ReactFlowInstance<CanvasNodeFlowData, CanvasEdgeFlowData>) => {
@@ -156,8 +145,8 @@ const Canvas: React.FC = () => {
         // 删除选中的节点和边
         const selectedNodes = flowNodes.filter(node => node.selected);
         const selectedEdges = flowEdges.filter(edge => edge.selected);
-        selectedNodes.forEach(node => uiDataApi.removeNode(node.id));
-        selectedEdges.forEach(edge => uiDataApi.removeEdge(edge.id));
+        selectedNodes.forEach(node => canvasDataApi.removeNode(node.id));
+        selectedEdges.forEach(edge => canvasDataApi.removeEdge(edge.id));
 
         e.preventDefault();
       }
@@ -178,31 +167,25 @@ const Canvas: React.FC = () => {
       window.removeEventListener('keydown', handleKeyDown, true);
       document.removeEventListener('mousedown', handleMouseDown);
     };
-  }, [setActiveTool, activeTool, setConnectionStartNode, uiDataApi, flowNodes, flowEdges]);
+  }, [setActiveTool, activeTool, setConnectionStartNode, canvasDataApi, flowNodes, flowEdges]);
 
   // 重置画布为默认状态
   const handleReset = useCallback(() => {
-    uiDataApi.resetToDefault();
-    flowDataApi.resetToDefault();
+    canvasDataApi.resetToDefault();
     setActiveTool('select');
     setConnectionStartNode(null);
-  }, [uiDataApi, flowDataApi, setActiveTool, setConnectionStartNode]);
+  }, [canvasDataApi, setActiveTool, setConnectionStartNode]);
 
   // 处理画布空白点击事件
   const handlePaneClick = useCallback((event: React.MouseEvent) => {
     if (activeTool === 'text') {
       const position = screenToFlowPosition({ x: event.clientX, y: event.clientY });
-      const node = uiDataApi.createTextNode({
+      canvasDataApi.createTextNode({
+        position,
         data: {
           initialEditing: true,
           width: 400,
         },
-      });
-      flowDataApi.addNode({
-        id: node.id,
-        type: CanvasNodeKind.TextNode,
-        position,
-        data: {},
       });
       setActiveTool('select'); // 创建后切回选择模式
     }
@@ -210,34 +193,32 @@ const Canvas: React.FC = () => {
     // 双击检测逻辑（简单实现）
     if (activeTool === 'select' && event.detail === 2) {
       const position = screenToFlowPosition({ x: event.clientX, y: event.clientY });
-      const node = uiDataApi.createTextNode({
+      canvasDataApi.createTextNode({
+        position,
         data: {
           initialEditing: true,
           width: 400,
         },
       });
-      flowDataApi.addNode({
-        id: node.id,
-        type: CanvasNodeKind.TextNode,
-        position,
-        data: {},
-      });
     }
-  }, [activeTool, screenToFlowPosition, uiDataApi, flowDataApi, setActiveTool]);
+  }, [activeTool, screenToFlowPosition, canvasDataApi, setActiveTool]);
 
   // 处理连接事件
   const onConnect = useCallback((connection: Connection) => {
     if (!connection.source || !connection.target) {
       return;
     }
-    uiDataApi.createDepEdge(connection.source, connection.target);
+    canvasDataApi.createDepEdge({
+      sourceId: connection.source,
+      targetId: connection.target,
+    });
 
     // 连接完成后，清除连接状态并退出连接模式
     setConnectionStartNode(null);
     if (activeTool === 'connect') {
       setActiveTool('select');
     }
-  }, [uiDataApi, setConnectionStartNode, activeTool, setActiveTool]);
+  }, [canvasDataApi, setConnectionStartNode, activeTool, setActiveTool]);
 
   // 处理节点点击（用于连接模式）
   const onNodeClick = useCallback((event: React.MouseEvent, node: Node) => {
@@ -250,7 +231,10 @@ const Canvas: React.FC = () => {
         console.log('设置连接起始节点:', node.id);
       } else if (connectionStartNode !== node.id) {
         // 创建连接
-        uiDataApi.createDepEdge(connectionStartNode, node.id);
+        canvasDataApi.createDepEdge({
+          sourceId: connectionStartNode,
+          targetId: node.id,
+        });
         console.log('创建连接:', connectionStartNode, '->', node.id);
 
         // 重置连接状态并退出连接模式
@@ -258,14 +242,11 @@ const Canvas: React.FC = () => {
         setActiveTool('select');
       }
     }
-  }, [activeTool, connectionStartNode, setConnectionStartNode, uiDataApi, setActiveTool]);
+  }, [activeTool, connectionStartNode, setConnectionStartNode, canvasDataApi, setActiveTool]);
 
   // 导出画布数据
   const handleExport = useCallback(() => {
-    const data = {
-      uiData: uiDataApi.exportUIData(),
-      flowData: flowDataApi.exportFlowData(),
-    };
+    const data = canvasDataApi.exportCanvasData();
     // 创建下载链接
     const dataStr = serializeCanvasArchive(data);
     const dataBlob = new Blob([dataStr], { type: 'application/json' });
@@ -275,7 +256,7 @@ const Canvas: React.FC = () => {
     link.download = 'canvas-data.json';
     link.click();
     URL.revokeObjectURL(url);
-  }, [uiDataApi, flowDataApi]);
+  }, [canvasDataApi]);
 
   // 导入并替换画布数据
   const handleImportReplace = useCallback(async () => {
@@ -293,8 +274,7 @@ const Canvas: React.FC = () => {
               if (!imported) {
                 throw new Error('导入失败：文件格式错误');
               }
-              uiDataApi.importUIData(imported.uiData);
-              flowDataApi.importFlowData(imported.flowData);
+              canvasDataApi.importCanvasData(imported);
               console.log('画布数据已替换');
             } catch (error) {
               console.error('导入画布失败:', error);
@@ -309,7 +289,7 @@ const Canvas: React.FC = () => {
       console.error('导入画布失败:', error);
       alert(error instanceof Error ? error.message : '导入失败');
     }
-  }, [uiDataApi, flowDataApi]);
+  }, [canvasDataApi]);
 
   // 导入并添加节点到画布
   const handleImportAdd = useCallback(async () => {
@@ -327,23 +307,22 @@ const Canvas: React.FC = () => {
               if (!imported) {
                 throw new Error('导入失败：文件格式错误');
               }
-              const exported = {
-                uiData: uiDataApi.exportUIData(),
-                flowData: flowDataApi.exportFlowData(),
-              };
+              const exported = canvasDataApi.exportCanvasData();
               const incomingUINodes = imported.uiData.nodes;
               const incomingUIEdges = imported.uiData.edges;
               const incomingFlowNodes = imported.flowData.nodes;
               const incomingFlowEdges = imported.flowData.edges;
-
-              uiDataApi.importUIData({
-                nodes: [...exported.uiData.nodes, ...incomingUINodes],
-                edges: [...exported.uiData.edges, ...incomingUIEdges],
-              });
-              flowDataApi.importFlowData({
-                nodes: [...exported.flowData.nodes, ...incomingFlowNodes],
-                edges: [...exported.flowData.edges, ...incomingFlowEdges],
-                viewport: exported.flowData.viewport,
+              canvasDataApi.importCanvasData({
+                uiData: {
+                  // v9 持久化层使用 Record，合并时按 id 覆盖。
+                  nodes: { ...exported.uiData.nodes, ...incomingUINodes },
+                  edges: { ...exported.uiData.edges, ...incomingUIEdges },
+                },
+                flowData: {
+                  nodes: [...exported.flowData.nodes, ...incomingFlowNodes],
+                  edges: [...exported.flowData.edges, ...incomingFlowEdges],
+                  viewport: exported.flowData.viewport,
+                },
               });
               console.log('节点已添加到画布');
             } catch (error) {
@@ -359,7 +338,7 @@ const Canvas: React.FC = () => {
       console.error('导入节点失败:', error);
       alert(error instanceof Error ? error.message : '导入失败');
     }
-  }, [uiDataApi, flowDataApi]);
+  }, [canvasDataApi]);
 
   // 连接线样式
   const connectionLineStyle = {
@@ -378,20 +357,20 @@ const Canvas: React.FC = () => {
   */
 
   return (
-    <CanvasUIDataProvider api={uiDataApi}>
+    <CanvasDataProvider api={canvasDataApi}>
       <CanvasEvalProvider api={evalApi}>
         <div className={`canvas-container ${activeTool}-mode`}>
           {isHydrated ? (
           <ReactFlow
             nodes={flowNodes}
             edges={flowEdges}
-            onNodesChange={(changes) => flowDataApi.handleNodesChange(changes)}
-            onEdgesChange={(changes) => flowDataApi.handleEdgesChange(changes)}
+            onNodesChange={(changes) => canvasDataApi.handleFlowNodesChange(changes)}
+            onEdgesChange={(changes) => canvasDataApi.handleFlowEdgesChange(changes)}
             onConnect={onConnect}
             onPaneClick={handlePaneClick}
             onNodeClick={onNodeClick}
             onInit={handleInit}
-            onMoveEnd={(_event, newViewport) => { if (newViewport) flowDataApi.setViewport(newViewport); }}
+            onMoveEnd={(_event, newViewport) => { if (newViewport) canvasDataApi.setViewport(newViewport); }}
             nodeTypes={nodeTypes}
             edgeTypes={edgeTypes}
             defaultEdgeOptions={defaultEdgeOptions}
@@ -453,7 +432,7 @@ const Canvas: React.FC = () => {
           />
         </div>
       </CanvasEvalProvider>
-    </CanvasUIDataProvider>
+    </CanvasDataProvider>
   );
 };
 

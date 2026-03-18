@@ -1,6 +1,5 @@
 import { useEffect, useState } from 'react';
-import type { CanvasUIDataApi } from './useCanvasUIData';
-import type { CanvasFlowDataApi } from './useCanvasFlowData';
+import type { CanvasDataApi } from './useCanvasData';
 import { parseCanvasArchiveText, serializeCanvasArchive, STORAGE_KEY } from '@/services/canvas-archive';
 import { CanvasArchiveState } from '@/types/persistence';
 
@@ -39,36 +38,25 @@ const loadState = (): CanvasArchiveState | null => {
 /**
  * 清除 localStorage 中的画布状态
  */
-const clearState = () => {
-  try {
-    localStorage.removeItem(STORAGE_KEY);
-  } catch (error) {
-    console.error('清除画布状态失败:', error);
-  }
-};
-
-export const useCanvasStatePersistence = (uiDataApi: CanvasUIDataApi, flowDataApi: CanvasFlowDataApi): { isHydrated: boolean } => {
-  const uiData = uiDataApi.useUIData((data) => data);
-  const flowData = flowDataApi.useFlowData((data) => data);
+export const useCanvasStatePersistence = (canvasDataApi: CanvasDataApi): { isHydrated: boolean } => {
+  const uiData = canvasDataApi.useUIData((data) => data);
+  const flowData = canvasDataApi.useFlowData((data) => data);
   const [isHydrated, setIsHydrated] = useState(false);
 
   useEffect(() => {
     const persisted = loadState();
     if (persisted) {
-      uiDataApi.importUIData(persisted.uiData);
-      flowDataApi.importFlowData(persisted.flowData);
+      // 使用单次原子导入，避免 hydration 期间出现中间态。
+      canvasDataApi.importCanvasData(persisted);
     }
     setIsHydrated(true);
-  }, [loadState, uiDataApi, flowDataApi]);
+  }, [canvasDataApi]);
 
   useEffect(() => {
     // 避免在未加载完成时保存状态
     if (!isHydrated) return;
-    saveState({
-      uiData,
-      flowData,
-    });
-  }, [uiData, flowData, saveState, isHydrated]);
+    saveState(canvasDataApi.exportCanvasData());
+  }, [uiData, flowData, canvasDataApi, isHydrated]);
 
   return {
     isHydrated,

@@ -2,9 +2,7 @@ import {
   CanvasEdgeKind,
   CanvasNodeKind,
   type CanvasEdgeFlowData,
-  type CanvasEdgeUIDataEntry,
   type CanvasNodeFlowData,
-  type CanvasNodeUIDataEntry,
 } from '@/types/canvas';
 import type { CanvasArchiveLegacy, CanvasArchiveState } from '@/types/persistence';
 import { defaultViewport } from './to-v7';
@@ -16,7 +14,27 @@ const defaultHiddenSections = {
   errors: false,
 };
 
-const normalizeUINodes = (nodes: any[]): CanvasNodeUIDataEntry[] =>
+/**
+ * v8 UI 节点 entry 结构（仅用于迁移链路内部）。
+ */
+export interface V8NodeEntry {
+  id: string;
+  type: string;
+  data: any;
+}
+
+/**
+ * v8 UI 边 entry 结构（仅用于迁移链路内部）。
+ */
+export interface V8EdgeEntry {
+  id: string;
+  source: string;
+  target: string;
+  type: string;
+  data: any;
+}
+
+const normalizeUINodes = (nodes: any[]): V8NodeEntry[] =>
   nodes.map((node) => {
     if (node?.type === CanvasNodeKind.TextNode || node?.type === 'textNode') {
       return {
@@ -42,7 +60,7 @@ const normalizeUINodes = (nodes: any[]): CanvasNodeUIDataEntry[] =>
     };
   });
 
-const normalizeUIEdges = (edges: any[]): CanvasEdgeUIDataEntry[] =>
+const normalizeUIEdges = (edges: any[]): V8EdgeEntry[] =>
   edges
     .filter((edge) => edge?.id && edge?.source && edge?.target && edge?.type)
     .map((edge) => {

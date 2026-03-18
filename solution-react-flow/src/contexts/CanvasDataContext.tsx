@@ -1,22 +1,22 @@
 import { createContext, ReactNode, useContext, useMemo, useCallback } from 'react';
-import { CanvasUIDataApi } from '@/hooks/useCanvasUIData';
-import type { CanvasNodeUIDataEntry, TextNodeUIDataEntry } from '@/types/canvas';
+import { CanvasDataApi } from '@/hooks/useCanvasData';
+import type { CanvasNodeUIData, TextNodeUIData } from '@/types/canvas';
 
-interface CanvasUIDataProviderProps {
-  api: CanvasUIDataApi;
+interface CanvasDataProviderProps {
+  api: CanvasDataApi;
   children: ReactNode;
 }
 
-const CanvasUIDataContext = createContext<CanvasUIDataApi | null>(null);
+const CanvasDataContext = createContext<CanvasDataApi | null>(null);
 
-export const CanvasUIDataProvider = ({ api, children }: CanvasUIDataProviderProps) => (
-  <CanvasUIDataContext.Provider value={api}>{children}</CanvasUIDataContext.Provider>
+export const CanvasDataProvider = ({ api, children }: CanvasDataProviderProps) => (
+  <CanvasDataContext.Provider value={api}>{children}</CanvasDataContext.Provider>
 );
 
-export const useCanvasUIDataApi = () => {
-  const context = useContext(CanvasUIDataContext);
+export const useCanvasDataApi = () => {
+  const context = useContext(CanvasDataContext);
   if (!context) {
-    throw new Error('useCanvasUIDataApi must be used within CanvasUIDataProvider');
+    throw new Error('useCanvasDataApi must be used within CanvasDataProvider');
   }
   return context;
 };
@@ -28,27 +28,27 @@ export const useCanvasUIDataApi = () => {
  * 它从对应的 Provider 获取 api，并使用 api.useUIData 来订阅特定节点的数据。
  */
 export const useTextNodeData = (nodeId: string) => {
-  const uiDataApi = useCanvasUIDataApi();
+  const canvasDataApi = useCanvasDataApi();
 
   // 订阅节点的 UI 数据
-  const node = uiDataApi.useUIData((data) => {
-    return data.nodes.find((n) => n.id === nodeId);
+  const node = canvasDataApi.useUIData((data) => {
+    return data.nodes.get(nodeId);
   });
 
   // 更新节点数据的方法
   const updateNode = useCallback(
-    (updates: Partial<TextNodeUIDataEntry>) => {
-      uiDataApi.updateNode(nodeId, updates);
+    (updates: Partial<TextNodeUIData>) => {
+      canvasDataApi.updateNode(nodeId, updates);
     },
-    [uiDataApi, nodeId]
+    [canvasDataApi, nodeId]
   );
 
   // 更新节点的 control 值
   const updateNodeControlValues = useCallback(
     (values: Record<string, unknown>) => {
-      uiDataApi.updateNodeControlValues(nodeId, values);
+      canvasDataApi.updateNodeControlValues(nodeId, values);
     },
-    [uiDataApi, nodeId]
+    [canvasDataApi, nodeId]
   );
 
   return useMemo(
@@ -84,27 +84,27 @@ export const useTextNodeData = (nodeId: string) => {
  * 它从对应的 Provider 获取 api，并使用 api.useUIData 来订阅特定节点的数据。
  */
 export const useDesmosPreviewNodeData = (nodeId: string) => {
-  const uiDataApi = useCanvasUIDataApi();
+  const canvasDataApi = useCanvasDataApi();
 
   // 订阅节点的 UI 数据
-  const node = uiDataApi.useUIData((data) => {
-    return data.nodes.find((n) => n.id === nodeId);
+  const node = canvasDataApi.useUIData((data) => {
+    return data.nodes.get(nodeId);
   });
 
   // 更新节点数据的方法
   const updateNode = useCallback(
-    (updates: Partial<CanvasNodeUIDataEntry>) => {
-      uiDataApi.updateNode(nodeId, updates);
+    (updates: Partial<CanvasNodeUIData>) => {
+      canvasDataApi.updateNode(nodeId, updates);
     },
-    [uiDataApi, nodeId]
+    [canvasDataApi, nodeId]
   );
 
   // 更新节点的 control 值
   const updateNodeControlValues = useCallback(
     (values: Record<string, unknown>) => {
-      uiDataApi.updateNodeControlValues(nodeId, values);
+      canvasDataApi.updateNodeControlValues(nodeId, values);
     },
-    [uiDataApi, nodeId]
+    [canvasDataApi, nodeId]
   );
 
   return useMemo(

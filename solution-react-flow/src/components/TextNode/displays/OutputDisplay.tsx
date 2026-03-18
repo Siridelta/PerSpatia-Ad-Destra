@@ -1,5 +1,5 @@
 import React, { useCallback, useMemo } from 'react';
-import { useCanvasUIDataApi } from '@/contexts/CanvasUIDataContext';
+import { useCanvasDataApi } from '@/contexts/CanvasDataContext';
 
 interface ExportableOutputInfo {
   name: string;
@@ -16,7 +16,7 @@ export interface OutputDisplayProps {
 
 const OutputDisplay: React.FC<OutputDisplayProps> = ({ outputs, isAnimatingOut = false, nodeId }) => {
 
-  const { createDesmosPreviewNode, useUIData } = useCanvasUIDataApi();
+  const { createDesmosPreviewNode, useUIData } = useCanvasDataApi();
   const edges = useUIData((data) => data.edges);
 
   const exportableOutputs = useMemo<ExportableOutputInfo[]>(() => {
@@ -36,7 +36,7 @@ const OutputDisplay: React.FC<OutputDisplayProps> = ({ outputs, isAnimatingOut =
   const handleExport = useCallback((info: ExportableOutputInfo) => {
     if (!info.isExportable) return;
 
-    const existingPreviewEdge = edges.find(
+    const existingPreviewEdge = Array.from(edges.values()).find(
       (edge) =>
         edge.type === 'desmosPreviewEdge' &&
         edge.source === nodeId &&
@@ -47,11 +47,13 @@ const OutputDisplay: React.FC<OutputDisplayProps> = ({ outputs, isAnimatingOut =
       return;
     }
 
-    createDesmosPreviewNode({
+    const created = createDesmosPreviewNode({
       sourceNodeId: nodeId,
       sourceOutputName: info.name,
     });
-  }, [edges, nodeId]);
+    // create API 为幂等：返回 null 表示这条预览关系已存在。
+    if (!created) return;
+  }, [edges, nodeId, createDesmosPreviewNode]);
 
   const renderExportButton = useCallback((info: ExportableOutputInfo) => {
     return (
