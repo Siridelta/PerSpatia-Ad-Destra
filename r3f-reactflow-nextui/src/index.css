@@ -1,0 +1,46 @@
+/* 添加JetBrains Mono字体引入 */
+
+
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@font-face {
+  font-family: 'AlimamaFangYuanTi';
+  src: url('./assets/fonts/AlimamaFangYuanTiVF-Thin.woff2') format('woff2');
+}
+
+
+:root, input, textarea {
+
+  --font-family-default: 'JetBrains Mono', 'AlimamaFangYuanTi';
+  --font-family-code: 'JetBrains Mono', 'AlimamaFangYuanTi', monospace; 
+
+  /* 修改字体fallback顺序：JetBrains Mono优先，AlimamaFangYuanTi作为中文fallback */
+  font-family: var(--font-family-default);
+
+  /* this is some example, not understood yet */
+  /* font-family: 'JetBrains Mono', 'AlimamaFangYuanTi', 'Courier New', 'Monaco', 'Lucida Console', monospace, system-ui, Avenir, Helvetica, Arial, sans-serif; */
+  line-height: 1.5;
+  font-weight: 400;
+  font-variant-ligatures: none;
+  font-variation-settings: 'BEVL' 1, 'wght' 450;
+
+  color-scheme: dark;
+  color: rgba(255, 255, 255, 0.87);
+  background-color: #000000; /* 纯黑色背景 */
+
+  font-synthesis: none;
+  text-rendering: optimizeLegibility;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+}
+
+body {
+  margin: 0;
+  background-color: #000000; /* 确保body也是纯黑色背景 */
+}
+
+button {
+  font-family: var(--font-family-default);
+}

@@ -1,0 +1,165 @@
+/* 浮动导航 */
+.floating-nav {
+  position: fixed;
+  top: 20px;
+  right: 20px;
+  z-index: 1000;
+}
+
+/* 导航切换按钮 */
+.nav-toggle {
+  width: 48px;
+  height: 48px;
+  border-radius: 50%;
+  background: rgba(9, 14, 28, 0.9);
+  border: 1px solid rgba(125, 225, 234, 0.3);
+  color: #7de1ea;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: all 0.3s ease;
+  backdrop-filter: blur(10px);
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.3);
+}
+
+.nav-toggle:hover {
+  background: rgba(125, 225, 234, 0.1);
+  border-color: rgba(125, 225, 234, 0.5);
+  transform: scale(1.05);
+}
+
+.nav-toggle.active {
+  background: rgba(125, 225, 234, 0.2);
+  border-color: #7de1ea;
+}
+
+/* 导航面板 */
+.nav-panel {
+  position: absolute;
+  top: 60px;
+  right: 0;
+  width: 280px;
+  background: rgba(9, 14, 28, 0.95);
+  border: 1px solid rgba(125, 225, 234, 0.3);
+  border-radius: 8px;
+  backdrop-filter: blur(15px);
+  box-shadow: 0 8px 32px rgba(0, 0, 0, 0.4);
+  opacity: 0;
+  visibility: hidden;
+  transform: translateY(-10px);
+  transition: all 0.3s ease;
+}
+
+.nav-panel.open {
+  opacity: 1;
+  visibility: visible;
+  transform: translateY(0);
+}
+
+/* 导航头部 */
+.nav-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 16px 20px;
+  border-bottom: 1px solid rgba(125, 225, 234, 0.2);
+}
+
+.nav-header h3 {
+  color: #7de1ea;
+  margin: 0;
+  font-size: 16px;
+  font-weight: bold;
+}
+
+.nav-close {
+  background: transparent;
+  border: none;
+  color: rgba(125, 225, 234, 0.6);
+  cursor: pointer;
+  padding: 4px;
+  border-radius: 4px;
+  transition: all 0.2s ease;
+}
+
+.nav-close:hover {
+  color: #7de1ea;
+  background: rgba(125, 225, 234, 0.1);
+}
+
+/* 导航场景列表 */
+.nav-scenarios {
+  max-height: 400px;
+  overflow-y: auto;
+  padding: 8px 0;
+}
+
+.nav-scenario {
+  display: block;
+  padding: 12px 20px;
+  text-decoration: none;
+  color: rgba(125, 225, 234, 0.7);
+  transition: all 0.2s ease;
+  border-left: 3px solid transparent;
+}
+
+.nav-scenario:hover {
+  background: rgba(125, 225, 234, 0.1);
+  color: #7de1ea;
+}
+
+.nav-scenario.active {
+  background: rgba(125, 225, 234, 0.15);
+  color: #7de1ea;
+  border-left-color: #7de1ea;
+}
+
+.scenario-title {
+  font-weight: bold;
+  margin-bottom: 4px;
+  font-size: 14px;
+}
+
+.scenario-description {
+  font-size: 12px;
+  color: rgba(125, 225, 234, 0.6);
+  line-height: 1.4;
+}
+
+/* 响应式设计 */
+@media (max-width: 768px) {
+  .floating-nav {
+    top: 15px;
+    right: 15px;
+  }
+  
+  .nav-toggle {
+    width: 44px;
+    height: 44px;
+  }
+  
+  .nav-panel {
+    width: 260px;
+    right: -10px;
+  }
+}
+
+/* 滚动条样式 */
+.nav-scenarios::-webkit-scrollbar {
+  width: 6px;
+}
+
+.nav-scenarios::-webkit-scrollbar-track {
+  background: rgba(125, 225, 234, 0.1);
+  border-radius: 3px;
+}
+
+.nav-scenarios::-webkit-scrollbar-thumb {
+  background: rgba(125, 225, 234, 0.3);
+  border-radius: 3px;
+}
+
+.nav-scenarios::-webkit-scrollbar-thumb:hover {
+  background: rgba(125, 225, 234, 0.5);
+} 
