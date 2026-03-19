@@ -15,7 +15,10 @@
   background: transparent;
   border: 1px solid transparent;
   border-radius: 4px;
-  transition: all 0.3s ease;
+  transition: 
+      border-color 0.3s ease, 
+      box-shadow 0.3s ease, 
+      background-color 0.3s ease;
   max-width: none;
   padding: 16px;
   margin: -16px; /* 抵消padding，保持位置 */
