@@ -1,6 +1,7 @@
 import React, { useState, useCallback, useEffect, useRef } from 'react';
 import { Handle, Position, NodeProps, NodeResizeControl, useKeyPress } from '@xyflow/react';
-import './styles-future.css';
+// import './styles-future.css';
+import './styles.css';
 import '@/styles/syntax-highlighting.css';
 import { Control } from '@/services/jsExecutor';
 import { useToolStore } from '@/store/toolStore';

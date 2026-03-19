@@ -1,10 +1,11 @@
+import { ReactFlowInstance } from '@xyflow/react';
 import { useEffect } from 'react';
 
 // todo: a complete 3d coordinate system; it is also required if we need to make 3d animated background;
 
 interface InertialPanOptions {
-  setViewport: (v: { x: number; y: number; zoom: number }) => void;
-  getViewport: () => { x: number; y: number; zoom: number };
+  setViewport?: ReactFlowInstance['setViewport'];
+  getViewport?: ReactFlowInstance['getViewport'];
 }
 
 const keyDirectionMap: Record<string, { x: number; y: number }> = {
@@ -27,6 +28,11 @@ const zKeyMap: Record<string, number> = {
 
 export default function useInertialPan({ setViewport, getViewport }: InertialPanOptions) {
   useEffect(() => {
+    if (!getViewport || !setViewport) {
+      console.warn('Viewport methods are not provided');
+      return;
+    }
+
     const config = {
       move: { vmax: 10, vmin: 0.5, acc: 2, dec: 0.5 },
       z: { vmax: 0.03, vmin: 0.0005, acc: 0.02, dec: 0.01, max: 10, min: 1 / 3 },
@@ -65,6 +71,12 @@ export default function useInertialPan({ setViewport, getViewport }: InertialPan
     }
 
     function animate() {
+      if (!getViewport || !setViewport) {
+        console.warn('Viewport methods are not available');
+        rafId = null;
+        return;
+      }
+
       updateVelocity('x');
       updateVelocity('y');
       updateZVelocity();
@@ -73,7 +85,10 @@ export default function useInertialPan({ setViewport, getViewport }: InertialPan
       
       if (velocity.x !== 0 || velocity.y !== 0) {
         const { x, y, zoom } = getViewport();
-        setViewport({ x: x + velocity.x, y: y + velocity.y, zoom });
+        const setPromise = setViewport({ x: x + velocity.x, y: y + velocity.y, zoom });
+        setPromise.then((v) => {
+          console.log('Viewport update result:', v);
+        });
         hasChanges = true;
       }
       

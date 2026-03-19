@@ -1,15 +1,13 @@
 import {
   Connection,
-  Controls,
   EdgeTypes,
   Node,
   NodeTypes,
   ReactFlow,
-  ReactFlowInstance,
-  useReactFlow,
+  ReactFlowInstance
 } from '@xyflow/react';
 import '@xyflow/react/dist/style.css';
-import React, { useCallback, useEffect } from 'react';
+import React, { useCallback, useEffect, useRef } from 'react';
 import { Scene3D } from '../Scene3D';
 
 import BottomToolbar from '@/components/BottomToolbar';
@@ -18,13 +16,13 @@ import DesmosPreviewNode from '@/components/DesmosPreviewNode';
 import SettingsPanel from '@/components/SettingsPanel';
 import TextNode from '@/components/TextNode';
 import Toolbar from '@/components/Toolbar';
-import { CanvasEvalProvider } from '@/contexts/CanvasEvalContext';
 import { CanvasDataProvider } from '@/contexts/CanvasDataContext';
+import { CanvasEvalProvider } from '@/contexts/CanvasEvalContext';
+import { useCanvasData } from '@/hooks/useCanvasData';
 import { useCanvasEval } from '@/hooks/useCanvasEval';
 import { useCanvasStatePersistence } from '@/hooks/useCanvasStatePersistence';
-import { useCanvasData } from '@/hooks/useCanvasData';
-import { parseCanvasArchiveText, serializeCanvasArchive } from '@/services/canvas-archive';
 import { useTheme } from '@/hooks/useTheme';
+import { parseCanvasArchiveText, serializeCanvasArchive } from '@/services/canvas-archive';
 import { useSettingsStore } from '@/store/settingsStore';
 import { useToolStore } from '@/store/toolStore';
 import { CanvasEdgeFlowData, CanvasNodeFlowData } from '@/types/canvas';
@@ -80,23 +78,31 @@ const Canvas: React.FC = () => {
   const toggleSettingsPanel = useSettingsStore((state) => state.toggleSettingsPanel);
   const closeSettingsPanel = useSettingsStore((state) => state.closeSettingsPanel);
 
-  // ReactFlow 实例引用
-  const { screenToFlowPosition, setViewport: setFlowViewport, getViewport } = useReactFlow();
+  // ReactFlow 实例引用 - 用 ref 保存 instance，绕过 useReactFlow 的上下文问题
+  const flowInstanceRef = useRef<ReactFlowInstance<CanvasNodeFlowData, CanvasEdgeFlowData> | null>(null);
+  const screenToFlowPosition = flowInstanceRef.current?.screenToFlowPosition ?? null;
+  const setFlowViewport = flowInstanceRef.current?.setViewport ?? null;
+  const getFlowViewport = flowInstanceRef.current?.getViewport ?? null;
 
   // viewport from flowData to ReactFlow
   useEffect(() => {
-    if (viewport) {
+    if (viewport && setFlowViewport) {
       setFlowViewport(viewport);
     }
   }, [viewport, setFlowViewport]);
 
   // 惯性/缓动式视野移动（WASD）
-  useInertialPan({ setViewport: setFlowViewport, getViewport });
+  useInertialPan({
+    setViewport: setFlowViewport ?? undefined,
+    getViewport: getFlowViewport ?? undefined
+  });
 
-  // onInit 时主动推送一次视角，避免首次渲染时闪烁
+  // onInit 时保存 instance 并设置初始视角
   const handleInit = useCallback((reactFlowInstance: ReactFlowInstance<CanvasNodeFlowData, CanvasEdgeFlowData>) => {
-    if (!viewport) return;
-    reactFlowInstance.setViewport(viewport);
+    flowInstanceRef.current = reactFlowInstance;
+    if (viewport) {
+      reactFlowInstance.setViewport(viewport);
+    }
   }, [viewport]);
 
   // 应用主题设置
@@ -177,6 +183,11 @@ const Canvas: React.FC = () => {
 
   // 处理画布空白点击事件
   const handlePaneClick = useCallback((event: React.MouseEvent) => {
+    if (!screenToFlowPosition) {
+      console.warn('screenToFlowPosition is not available');
+      return;
+    }
+
     if (activeTool === 'text') {
       const position = screenToFlowPosition({ x: event.clientX, y: event.clientY });
       canvasDataApi.graph.createTextNode({
