@@ -1,7 +1,29 @@
-import React, { useRef, useEffect } from 'react';
+import React, { useRef, useEffect, forwardRef, useImperativeHandle } from 'react';
 import { Canvas, useFrame, useThree } from '@react-three/fiber';
 import { Html, OrbitControls, Stars } from '@react-three/drei';
 import * as THREE from 'three';
+
+/**
+ * Scene3D 组件
+ * 
+ * 架构说明：
+ * 这是一个"伪 3D 深度"场景。ReactFlow 的 HTML 元素作为一个固定的"显示屏"嵌入在 3D 场景中，
+ * 而 3D 背景元素（菱形、星星、渐变平面）则与 ReactFlow 同步缩放。
+ * 
+ * 伪缩放机制：
+ * - 当用户滚轮"放大"时，ReactFlow 内容变大，3D 背景元素也同步变大
+ * - 当用户滚轮"缩小"时，ReactFlow 内容变小，3D 背景元素也同步变小
+ * - 摄像机位置固定，不参与缩放变化
+ * 
+ * 所有可缩放的 3D 元素都放在 ScalableGroup 中统一管理。
+ */
+
+// 3D 场景缩放组接口
+export interface Scene3DRef {
+  /** 设置场景缩放系数 (0.1 ~ 10) */
+  setScale: (scale: number) => void;
+}
+
 
 // 3D 背景效果组件
 function BackgroundEffects() {
@@ -19,8 +41,8 @@ function BackgroundEffects() {
 
   return (
     <>
-      {/* 渐变背景平面 */}
-      <mesh ref={meshRef} position={[0, 0, -50]} scale={[100, 100, 1]}>
+      {/* 渐变背景平面 - 放在很远的距离，这样缩放时变化不明显 */}
+      <mesh ref={meshRef} position={[0, 0, -80]} scale={[200, 200, 1]}>
         <planeGeometry args={[1, 1]} />
         <shaderMaterial
           uniforms={{
@@ -63,12 +85,12 @@ function BackgroundEffects() {
       {/* 漂浮的菱形 */}
       <FloatingDiamonds />
       
-      {/* 星星粒子 */}
+      {/* 星星粒子 - 半径很大，缩放时产生视差 */}
       <Stars 
-        radius={100} 
-        depth={50} 
-        count={1000} 
-        factor={4} 
+        radius={150} 
+        depth={80}
+        count={2000} 
+        factor={6} 
         saturation={0.5} 
         fade 
       />
@@ -76,18 +98,18 @@ function BackgroundEffects() {
   );
 }
 
-// 漂浮菱形组件
+// 漂浮菱形组件 - 这些是前景元素，缩放效果明显
 function FloatingDiamonds() {
   const groupRef = useRef<THREE.Group>(null);
   
   const diamonds = React.useMemo(() => {
-    return Array.from({ length: 20 }, (_, i) => ({
+    return Array.from({ length: 30 }, (_, i) => ({
       position: [
+        (Math.random() - 0.5) * 120,
         (Math.random() - 0.5) * 80,
-        (Math.random() - 0.5) * 60,
-        -20 - Math.random() * 30
+        -10 - Math.random() * 60  // 分布在不同深度
       ] as [number, number, number],
-      scale: 0.5 + Math.random() * 1.5,
+      scale: 0.5 + Math.random() * 2,
       speed: 0.2 + Math.random() * 0.5,
       rotationSpeed: (Math.random() - 0.5) * 0.02,
     }));
@@ -124,60 +146,111 @@ function CameraController() {
   const { camera } = useThree();
   
   useEffect(() => {
-    // 初始角度：轻微俯视
+    // 固定摄像机位置，不跟随缩放变化
+    // 这样 ReactFlow HTML 元素在屏幕上的大小保持不变
     camera.position.set(0, 0, 30);
     camera.lookAt(0, 0, 0);
   }, [camera]);
 
   return (
     <OrbitControls
-      enablePan={true}
-      enableZoom={true}
-      enableRotate={true}
+      enablePan={false}      // 禁用平移，由 ReactFlow 接管
+      enableZoom={false}     // 禁用缩放，由伪缩放系统接管
+      enableRotate={true}    // 保留右键旋转
+      enableKeys={false}     // 禁用键盘控制
       mouseButtons={{
-        LEFT: undefined,      // 左键：React Flow 处理
-        // MIDDLE: THREE.MOUSE.DOLLY,  // 中键：缩放
-        RIGHT: THREE.MOUSE.ROTATE   // 右键：旋转
+        LEFT: undefined,     // 左键：React Flow 处理
+        RIGHT: THREE.MOUSE.ROTATE  // 右键：旋转
       }}
-      minDistance={10}
-      maxDistance={100}
-      maxPolarAngle={Math.PI / 6 * 4} // 限制俯视角度，避免看到地面
       minPolarAngle={Math.PI / 6 * 2}
-      maxAzimuthAngle={Math.PI / 6 * 1.5}
+      maxPolarAngle={Math.PI / 6 * 4}
       minAzimuthAngle={-Math.PI / 6 * 1.5}
+      maxAzimuthAngle={Math.PI / 6 * 1.5}
     />
   );
+}
+
+// 可缩放组组件 - 必须在 Canvas 内部使用
+interface ScalableGroupProps {
+  children: React.ReactNode;
+  initialScale: number;
+  scaleRef: React.RefObject<number>;
+}
+
+function ScalableGroup({ children, initialScale, scaleRef }: ScalableGroupProps) {
+  const groupRef = useRef<THREE.Group>(null);
+  const currentScaleRef = useRef(initialScale);
+
+  useFrame(() => {
+    if (groupRef.current && scaleRef.current !== undefined) {
+      const target = scaleRef.current;
+      const current = currentScaleRef.current;
+      const diff = target - current;
+      if (Math.abs(diff) > 0.001) {
+        currentScaleRef.current = current + diff * 0.15;
+        groupRef.current.scale.setScalar(currentScaleRef.current);
+      }
+    }
+  });
+
+  return <group ref={groupRef} scale={initialScale}>{children}</group>;
 }
 
 // 主场景组件
 interface Scene3DProps {
   children: React.ReactNode;
+  /** 场景缩放系数 (0.1 ~ 10)，与 pseudoZoom 相反：scale = 1 / pseudoZoom */
+  sceneScale?: number;
 }
 
-export function Scene3D({ children }: Scene3DProps) {
-  return (
-    <div style={{ width: '100vw', height: '100vh', position: 'fixed', top: 0, left: 0 }}>
-      <Canvas
-        camera={{ position: [0, 0, 30], fov: 50 }}
-        gl={{ antialias: true, alpha: true }}
-        style={{ background: 'transparent' }}
-      >
-        <CameraController />
-        <BackgroundEffects />
-        
-        {/* React Flow 嵌入 3D 场景 */}
-        <Html
-          transform
-          // occlude={false}
-          style={{
-            width: '100vw',
-            height: '100vh',
-            pointerEvents: 'auto',
-          }}
+export const Scene3D = forwardRef<Scene3DRef, Scene3DProps>(
+  function Scene3D({ children, sceneScale = 1 }, ref) {
+    const targetScaleRef = useRef(sceneScale);
+
+    // 暴露 setScale 方法
+    useImperativeHandle(ref, () => ({
+      setScale: (scale: number) => {
+        targetScaleRef.current = scale;
+      },
+    }));
+
+    return (
+      <div style={{
+        width: '100vw',
+        height: '100vh',
+        position: 'fixed',
+        top: 0,
+        left: 0,
+        overflow: 'hidden'  // 防止出现滚动条
+      }}>
+        <Canvas
+          camera={{ position: [0, 0, 30], fov: 50 }}
+          gl={{ antialias: true, alpha: true }}
+          style={{ background: 'transparent' }}
         >
-          {children}
-        </Html>
-      </Canvas>
-    </div>
-  );
-}
+          <CameraController />
+
+          {/* 所有可缩放的 3D 元素放在这个组里 */}
+          <ScalableGroup initialScale={sceneScale} scaleRef={targetScaleRef}>
+            <BackgroundEffects />
+          </ScalableGroup>
+
+          {/* React Flow 嵌入 3D 场景 - 固定大小，不参与 3D 缩放 */}
+          <Html
+            transform
+            style={{
+              width: '100vw',
+              height: '100vh',
+              pointerEvents: 'auto',
+              // ReactFlow 容器本身不缩放，由内部处理
+            }}
+          >
+            {children}
+          </Html>
+        </Canvas>
+      </div>
+    );
+  }
+);
+
+export default Scene3D;

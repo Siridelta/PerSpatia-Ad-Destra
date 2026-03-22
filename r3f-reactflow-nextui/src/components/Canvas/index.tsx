@@ -27,6 +27,8 @@ import { useSettingsStore } from '@/store/settingsStore';
 import { useToolStore } from '@/store/toolStore';
 import { CanvasEdgeFlowData, CanvasNodeFlowData } from '@/types/canvas';
 import useInertialPan from '@/utils/useInertialPan';
+import { usePseudoZoom } from '@/utils/usePseudoZoom';
+import { Scene3DRef } from '@/components/Scene3D';
 import CustomConnectionLine from './CustomConnectionLine';
 import './styles.css';
 
@@ -80,6 +82,32 @@ const Canvas: React.FC = () => {
 
   // ReactFlow 实例引用 - 用 ref 保存 instance，绕过 useReactFlow 的上下文问题
   const flowInstanceRef = useRef<ReactFlowInstance<CanvasNodeFlowData, CanvasEdgeFlowData> | null>(null);
+  const scene3DRef = useRef<Scene3DRef>(null);
+  
+  // 伪缩放系统：滚轮控制，同步影响 ReactFlow 和 3D 场景
+  const { pseudoZoom, sceneScale, cssTransform } = usePseudoZoom({
+    initialZoom: 1,
+    minZoom: 0.1,
+    maxZoom: 3,
+  });
+  
+  // 同步缩放值到 Scene3D
+  useEffect(() => {
+    scene3DRef.current?.setScale(sceneScale);
+  }, [sceneScale]);
+
+  // 同步伪缩放到 ReactFlow 的 viewport zoom
+  useEffect(() => {
+    if (flowInstanceRef.current && pseudoZoom > 0) {
+      const currentViewport = flowInstanceRef.current.getViewport();
+      flowInstanceRef.current.setViewport({
+        x: currentViewport.x,
+        y: currentViewport.y,
+        zoom: pseudoZoom,
+      });
+    }
+  }, [pseudoZoom]);
+  
   const screenToFlowPosition = flowInstanceRef.current?.screenToFlowPosition ?? null;
   const setFlowViewport = flowInstanceRef.current?.setViewport ?? null;
   const getFlowViewport = flowInstanceRef.current?.getViewport ?? null;
@@ -368,10 +396,22 @@ const Canvas: React.FC = () => {
 
   return (
     <>
-      <Scene3D>
+      <Scene3D ref={scene3DRef} sceneScale={sceneScale}>
         <CanvasDataProvider api={canvasDataApi}>
           <CanvasEvalProvider api={evalApi}>
-            <div className={`canvas-container ${activeTool}-mode`}>
+            {/*
+              ReactFlow 容器：
+              - 伪缩放通过 ReactFlow 的 zoom 控制，而非 CSS transform
+              - 这样保持 ReactFlow 内部坐标系正确
+              - 3D 场景根据 zoom 值反向缩放，产生深度透视效果
+            */}
+            <div
+              className={`canvas-container ${activeTool}-mode`}
+              style={{
+                width: '100vw',
+                height: '100vh',
+              }}
+            >
               {isHydrated ? (
                 <ReactFlow
                   nodes={flowNodes}
@@ -393,8 +433,13 @@ const Canvas: React.FC = () => {
                   elementsSelectable={true}
                   selectNodesOnDrag={false}
                   deleteKeyCode={['Delete', 'Backspace']}
-                  maxZoom={10}
+                  // 禁用 React Flow 默认滚轮缩放 - 由伪缩放系统接管
+                  zoomOnScroll={false}
+                  zoomOnPinch={false}
+                  zoomOnDoubleClick={false}
+                  // 同步 zoom 值与伪缩放
                   minZoom={0.1}
+                  maxZoom={3}
                 >
                 </ReactFlow>
               ) : (
@@ -406,6 +451,20 @@ const Canvas: React.FC = () => {
           </CanvasEvalProvider>
         </CanvasDataProvider>
       </Scene3D>
+      
+      {/* 缩放指示器（调试用，可删除） */}
+      <div style={{
+        position: 'fixed',
+        bottom: 80,
+        right: 20,
+        color: 'rgba(125, 225, 234, 0.6)',
+        fontFamily: 'JetBrains Mono, monospace',
+        fontSize: 12,
+        pointerEvents: 'none',
+        zIndex: 1000,
+      }}>
+        Zoom: {pseudoZoom.toFixed(2)}x
+      </div>
 
       <Toolbar />
 
