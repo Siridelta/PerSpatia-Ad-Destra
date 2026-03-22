@@ -7,16 +7,22 @@
 ## 文件位置
 
 ```
-r3f-reactflow-nextui/scripts/
+my-skills/screencast-debugging/
 ├── core/
 │   ├── obs-screencaster.cjs   # 一体化录屏（推荐）
 │   └── obs-controller.cjs     # 底层控制
-├── examples/
+├── examples/                  # 参考示例（供学习参考）
 │   ├── record-obs-zoom.cjs      # 简化示例
 │   └── record-obs-advanced.cjs  # 高级示例
+├── scripts/                   # 实际开发中使用的脚本
+│   └── test-pan-zoom-control.cjs  # 开发测试脚本
 └── templates/
     └── obs-record-template.cjs  # 任务模板
 ```
+
+**目录说明：**
+- `examples/` —— 参考示例，展示如何使用 API，供学习参考
+- `scripts/` —— 实际开发中使用的录屏脚本，放置正在进行的调试/测试脚本
 
 ## 前置设置
 
@@ -38,8 +44,8 @@ r3f-reactflow-nextui/scripts/
 ## 使用方法
 
 ```powershell
-cd r3f-reactflow-nextui
-node scripts/examples/record-obs-zoom.cjs
+cd my-skills/screencast-debugging
+node examples/record-obs-zoom.cjs
 ```
 
 ## 新版简化 API（推荐）
@@ -47,7 +53,7 @@ node scripts/examples/record-obs-zoom.cjs
 使用 `obs-screencaster.cjs`，只需关注操作逻辑，OBS 和浏览器自动管理：
 
 ```javascript
-const { record, zoom, pan, click } = require('./core/obs-screencaster.cjs');
+const { record, zoom, pan, click } = require('../core/obs-screencaster.cjs');
 
 await record({
   // OBS 配置
@@ -113,10 +119,10 @@ await obs.disconnect();
 ## 创建新任务
 
 ```powershell
-cd r3f-reactflow-nextui/scripts
-cp templates/obs-record-template.cjs examples/my-test.cjs
-# 编辑 examples/my-test.cjs，修改 action 函数
-node examples/my-test.cjs
+cd my-skills/screencast-debugging
+cp templates/obs-record-template.cjs scripts/my-test.cjs
+# 编辑 scripts/my-test.cjs，修改 action 函数
+node scripts/my-test.cjs
 ```
 
 ## 优点

@@ -42,7 +42,7 @@ msedge.exe --remote-debugging-port=9222
 ### 2. 运行示例
 
 ```powershell
-cd r3f-reactflow-nextui/scripts
+cd my-skills/screencast-debugging
 node examples/record-zoom-test.cjs
 ```
 

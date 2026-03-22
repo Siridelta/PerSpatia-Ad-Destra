@@ -26,8 +26,7 @@ import { parseCanvasArchiveText, serializeCanvasArchive } from '@/services/canva
 import { useSettingsStore } from '@/store/settingsStore';
 import { useToolStore } from '@/store/toolStore';
 import { CanvasEdgeFlowData, CanvasNodeFlowData } from '@/types/canvas';
-import useInertialPan from '@/utils/useInertialPan';
-import { usePseudoZoom } from '@/utils/usePseudoZoom';
+import { usePanAndZoomControl } from '@/hooks/usePanAndZoomControl';
 import { Scene3DRef } from '@/components/Scene3D';
 import CustomConnectionLine from './CustomConnectionLine';
 import './styles.css';
@@ -84,54 +83,57 @@ const Canvas: React.FC = () => {
   const flowInstanceRef = useRef<ReactFlowInstance<CanvasNodeFlowData, CanvasEdgeFlowData> | null>(null);
   const scene3DRef = useRef<Scene3DRef>(null);
   
-  // 伪缩放系统：滚轮控制，同步影响 ReactFlow 和 3D 场景
-  const { pseudoZoom, sceneScale, cssTransform } = usePseudoZoom({
-    initialZoom: 1,
+  // 统一的相机控制系统
+  const {
+    viewport: controlledViewport,
+    setViewport: setControlledViewport,
+    setReactFlowInstance,
+    syncFromReactFlow,
+    sceneScale,
+    setOrbitControls,
+  } = usePanAndZoomControl({
+    initialViewport: { x: 0, y: 0, zoom: 1 },
     minZoom: 0.1,
     maxZoom: 3,
   });
-  
-  // 同步缩放值到 Scene3D
+
+  // 当持久化的 viewport 加载后，同步到控制器
+  useEffect(() => {
+    if (viewport && isHydrated) {
+      setControlledViewport(viewport);
+    }
+  }, [viewport, isHydrated, setControlledViewport]);
+
+  // 同步 viewport 到 Scene3D
   useEffect(() => {
     scene3DRef.current?.setScale(sceneScale);
   }, [sceneScale]);
 
-  // 同步伪缩放到 ReactFlow 的 viewport zoom
+  // 同步 viewport 到 ReactFlow
   useEffect(() => {
-    if (flowInstanceRef.current && pseudoZoom > 0) {
-      const currentViewport = flowInstanceRef.current.getViewport();
-      flowInstanceRef.current.setViewport({
-        x: currentViewport.x,
-        y: currentViewport.y,
-        zoom: pseudoZoom,
-      });
+    if (flowInstanceRef.current) {
+      const currentRfViewport = flowInstanceRef.current.getViewport();
+      // 只有当差异足够大时才更新，避免循环
+      const dx = Math.abs(currentRfViewport.x - controlledViewport.x);
+      const dy = Math.abs(currentRfViewport.y - controlledViewport.y);
+      const dz = Math.abs(currentRfViewport.zoom - controlledViewport.zoom);
+      if (dx > 0.5 || dy > 0.5 || dz > 0.001) {
+        flowInstanceRef.current.setViewport(controlledViewport);
+      }
     }
-  }, [pseudoZoom]);
+  }, [controlledViewport]);
   
   const screenToFlowPosition = flowInstanceRef.current?.screenToFlowPosition ?? null;
-  const setFlowViewport = flowInstanceRef.current?.setViewport ?? null;
-  const getFlowViewport = flowInstanceRef.current?.getViewport ?? null;
-
-  // viewport from flowData to ReactFlow
-  useEffect(() => {
-    if (viewport && setFlowViewport) {
-      setFlowViewport(viewport);
-    }
-  }, [viewport, setFlowViewport]);
-
-  // 惯性/缓动式视野移动（WASD）
-  useInertialPan({
-    setViewport: setFlowViewport ?? undefined,
-    getViewport: getFlowViewport ?? undefined
-  });
 
   // onInit 时保存 instance 并设置初始视角
   const handleInit = useCallback((reactFlowInstance: ReactFlowInstance<CanvasNodeFlowData, CanvasEdgeFlowData>) => {
     flowInstanceRef.current = reactFlowInstance;
+    setReactFlowInstance(reactFlowInstance);
+    // 设置初始视角
     if (viewport) {
       reactFlowInstance.setViewport(viewport);
     }
-  }, [viewport]);
+  }, [viewport, setReactFlowInstance]);
 
   // 应用主题设置
   useTheme();
@@ -396,7 +398,7 @@ const Canvas: React.FC = () => {
 
   return (
     <>
-      <Scene3D ref={scene3DRef} sceneScale={sceneScale}>
+      <Scene3D ref={scene3DRef} sceneScale={sceneScale} onOrbitControlsReady={setOrbitControls}>
         <CanvasDataProvider api={canvasDataApi}>
           <CanvasEvalProvider api={evalApi}>
             {/*
@@ -422,7 +424,14 @@ const Canvas: React.FC = () => {
                   onPaneClick={handlePaneClick}
                   onNodeClick={onNodeClick}
                   onInit={handleInit}
-                  onMoveEnd={(_event, newViewport) => { if (newViewport) canvasDataApi.writeFlow.setViewport(newViewport); }}
+                  onMoveEnd={(_event, newViewport) => {
+                    if (newViewport) {
+                      // 更新 flowData（用于持久化）
+                      canvasDataApi.writeFlow.setViewport(newViewport);
+                      // 反向同步到控制器（外部扰动检测）
+                      syncFromReactFlow();
+                    }
+                  }}
                   nodeTypes={nodeTypes}
                   edgeTypes={edgeTypes}
                   defaultEdgeOptions={defaultEdgeOptions}
@@ -452,7 +461,7 @@ const Canvas: React.FC = () => {
         </CanvasDataProvider>
       </Scene3D>
       
-      {/* 缩放指示器（调试用，可删除） */}
+      {/* 相机状态指示器（调试用，可删除） */}
       <div style={{
         position: 'fixed',
         bottom: 80,
@@ -463,7 +472,7 @@ const Canvas: React.FC = () => {
         pointerEvents: 'none',
         zIndex: 1000,
       }}>
-        Zoom: {pseudoZoom.toFixed(2)}x
+        Zoom: {controlledViewport.zoom.toFixed(2)}x | Pos: ({controlledViewport.x.toFixed(0)}, {controlledViewport.y.toFixed(0)})
       </div>
 
       <Toolbar />

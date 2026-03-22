@@ -1,6 +1,7 @@
 import React, { useRef, useEffect, forwardRef, useImperativeHandle } from 'react';
 import { Canvas, useFrame, useThree } from '@react-three/fiber';
 import { Html, OrbitControls, Stars } from '@react-three/drei';
+import type { OrbitControls as OrbitControlsImpl } from 'three-stdlib';
 import * as THREE from 'three';
 
 /**
@@ -142,8 +143,13 @@ function FloatingDiamonds() {
 }
 
 // 摄像机控制器
-function CameraController() {
+interface CameraControllerProps {
+  onOrbitControlsReady?: (controls: OrbitControlsImpl) => void;
+}
+
+function CameraController({ onOrbitControlsReady }: CameraControllerProps) {
   const { camera } = useThree();
+  const controlsRef = useRef<OrbitControlsImpl>(null);
   
   useEffect(() => {
     // 固定摄像机位置，不跟随缩放变化
@@ -152,10 +158,17 @@ function CameraController() {
     camera.lookAt(0, 0, 0);
   }, [camera]);
 
+  useEffect(() => {
+    if (controlsRef.current && onOrbitControlsReady) {
+      onOrbitControlsReady(controlsRef.current);
+    }
+  }, [onOrbitControlsReady]);
+
   return (
     <OrbitControls
-      enablePan={false}      // 禁用平移，由 ReactFlow 接管
-      enableZoom={false}     // 禁用缩放，由伪缩放系统接管
+      ref={controlsRef}
+      enablePan={false}      // 禁用平移，由统一控制器接管
+      enableZoom={false}     // 禁用缩放，由统一控制器接管
       enableRotate={true}    // 保留右键旋转
       enableKeys={false}     // 禁用键盘控制
       mouseButtons={{
@@ -199,12 +212,14 @@ function ScalableGroup({ children, initialScale, scaleRef }: ScalableGroupProps)
 // 主场景组件
 interface Scene3DProps {
   children: React.ReactNode;
-  /** 场景缩放系数 (0.1 ~ 10)，与 pseudoZoom 相反：scale = 1 / pseudoZoom */
+  /** 场景缩放系数 (0.1 ~ 10)，与 zoom 同步 */
   sceneScale?: number;
+  /** OrbitControls 就绪回调 */
+  onOrbitControlsReady?: (controls: OrbitControlsImpl) => void;
 }
 
 export const Scene3D = forwardRef<Scene3DRef, Scene3DProps>(
-  function Scene3D({ children, sceneScale = 1 }, ref) {
+  function Scene3D({ children, sceneScale = 1, onOrbitControlsReady }, ref) {
     const targetScaleRef = useRef(sceneScale);
 
     // 暴露 setScale 方法
@@ -228,7 +243,7 @@ export const Scene3D = forwardRef<Scene3DRef, Scene3DProps>(
           gl={{ antialias: true, alpha: true }}
           style={{ background: 'transparent' }}
         >
-          <CameraController />
+          <CameraController onOrbitControlsReady={onOrbitControlsReady} />
 
           {/* 所有可缩放的 3D 元素放在这个组里 */}
           <ScalableGroup initialScale={sceneScale} scaleRef={targetScaleRef}>
