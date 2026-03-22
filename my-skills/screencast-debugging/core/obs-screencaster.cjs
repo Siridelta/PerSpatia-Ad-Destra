@@ -18,6 +18,8 @@
 
 const { chromium } = require('playwright');
 const OBSWebSocket = require('obs-websocket-js').default;
+const fs = require('fs');
+const path = require('path');
 
 /**
  * 一体化录屏：OBS 录制 + Playwright 操作
@@ -30,6 +32,7 @@ const OBSWebSocket = require('obs-websocket-js').default;
  * @param {number} options.postDelay - 操作后等待时间（默认 1000ms）
  * @param {number} options.viewport - 视口大小（默认 1920x1080）
  * @param {boolean} options.useExistingPage - 是否使用已有页面（默认 true，不开新窗口）
+ * @param {string} options.outputDir - 录制输出目录（默认使用 OBS 设置）
  * @param {Function} options.action - 操作函数，接收 page 参数
  */
 async function record(options) {
@@ -42,6 +45,7 @@ async function record(options) {
     postDelay = 1000,
     viewport = { width: 1920, height: 1080 },
     useExistingPage = true,
+    outputDir,
     action
   } = options;
 
@@ -125,7 +129,13 @@ async function record(options) {
     recordingStarted = false;
     console.log(`[OBS-Screencaster] Recording saved to: ${outputPath}`);
 
-    return { outputPath, page, browser };
+    // 如果指定了输出目录，移动文件到目标目录
+    let finalPath = outputPath;
+    if (outputDir && outputPath) {
+      finalPath = await moveRecordingToOutputDir(outputPath, outputDir);
+    }
+
+    return { outputPath: finalPath, page, browser };
 
   } catch (error) {
     console.error('[OBS-Screencaster] Error:', error.message);
@@ -152,6 +162,50 @@ async function record(options) {
       // 忽略断开错误
     }
   }
+}
+
+/**
+ * 将录制文件移动到指定输出目录
+ * @param {string} sourcePath - 源文件路径（OBS 录制路径）
+ * @param {string} outputDir - 目标输出目录
+ * @returns {string} 最终文件路径
+ */
+async function moveRecordingToOutputDir(sourcePath, outputDir) {
+  // 确保目标目录存在
+  if (!fs.existsSync(outputDir)) {
+    fs.mkdirSync(outputDir, { recursive: true });
+    console.log(`[OBS-Screencaster] Created output directory: ${outputDir}`);
+  }
+
+  // 构建目标路径
+  const fileName = path.basename(sourcePath);
+  const destPath = path.join(outputDir, fileName);
+
+  // 重试移动文件（OBS 可能需要时间释放文件句柄）
+  const maxRetries = 10;
+  const retryDelay = 500; // ms
+
+  for (let i = 0; i < maxRetries; i++) {
+    try {
+      fs.renameSync(sourcePath, destPath);
+      console.log(`[OBS-Screencaster] Moved recording to: ${destPath}`);
+      return destPath;
+    } catch (error) {
+      if (error.code === 'EBUSY' || error.code === 'EPERM') {
+        // 文件被占用，等待后重试
+        if (i < maxRetries - 1) {
+          console.log(`[OBS-Screencaster] File busy, waiting... (${i + 1}/${maxRetries})`);
+          await new Promise(r => setTimeout(r, retryDelay));
+          continue;
+        }
+      }
+      // 其他错误或重试耗尽
+      console.warn(`[OBS-Screencaster] Failed to move file: ${error.message}`);
+      return sourcePath;
+    }
+  }
+
+  return sourcePath;
 }
 
 /**

@@ -12,8 +12,12 @@
  */
 
 const { record, zoom, pan } = require('../core/obs-screencaster.cjs');
+const path = require('path');
 
 async function testPanAndZoomControl() {
+  // 计算 assets 目录路径（项目根目录下的 assets）
+  const assetsDir = path.resolve(__dirname, '../../../assets');
+
   await record({
     // OBS 配置
     obsAddress: 'ws://localhost:4455',
@@ -21,12 +25,15 @@ async function testPanAndZoomControl() {
 
     // 浏览器配置
     cdpUrl: 'http://localhost:9222',
-    url: 'http://localhost:5174',
+    url: 'http://localhost:5173',
     useExistingPage: true,
 
     // 录制参数
     preDelay: 3000,
     postDelay: 2000,
+
+    // 输出目录（录制完成后移动到该目录）
+    outputDir: assetsDir,
 
     // 核心操作
     action: async (page) => {

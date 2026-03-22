@@ -21,8 +21,21 @@ my-skills/screencast-debugging/
 ```
 
 **目录说明：**
+- `core/` —— 核心控制模块（OBS WebSocket 封装）
 - `examples/` —— 参考示例，展示如何使用 API，供学习参考
 - `scripts/` —— 实际开发中使用的录屏脚本，放置正在进行的调试/测试脚本
+- `templates/` —— 任务模板
+
+**输出目录：**
+使用 `outputDir` 参数指定录制文件的保存位置。录制完成后，文件会自动从 OBS 默认目录移动到指定目录，不会修改 OBS 的全局设置。示例：
+```javascript
+const path = require('path');
+
+await record({
+  // ... 其他配置
+  outputDir: path.resolve(__dirname, '../../../assets'),  // 项目根目录 assets
+});
+```
 
 ## 前置设置
 

@@ -139,7 +139,7 @@ class OBSController {
   }
 
   /**
-   * 获取录制设置
+   * 获取录制目录
    */
   async getRecordDirectory() {
     const { recordDirectory } = await this.obs.call('GetRecordDirectory');
