@@ -99,8 +99,8 @@ export function createPanAndZoomControl(options: PanAndZoomControlOptions = {}) 
     minZoom = 0.1,
     maxZoom = 3,
     zoomSpeed = 0.001,
-    panAcceleration = 2,
-    panMaxSpeed = 10,
+    panAcceleration = 0.3,      // 进一步降低加速度
+    panMaxSpeed = 2,            // 进一步降低最大速度
     scenePanSensitivity = 0.05, // 2D 像素到 3D 单位的转换
   } = options;
 
@@ -218,6 +218,8 @@ export function createPanAndZoomControl(options: PanAndZoomControlOptions = {}) 
 
   // 处理键盘按下
   function handleKeyDown(event: KeyboardEvent) {
+    console.log('[PanAndZoom] KeyDown:', event.key, 'target:', (event.target as HTMLElement)?.tagName);
+    
     // 检查是否是 Ctrl + Arrow Keys（在编辑状态下也可用）
     const isCtrlArrow = event.ctrlKey && ['ArrowUp', 'ArrowDown', 'ArrowLeft', 'ArrowRight'].includes(event.key);
     
@@ -226,12 +228,20 @@ export function createPanAndZoomControl(options: PanAndZoomControlOptions = {}) 
       const target = event.target as HTMLElement;
       const tag = target?.tagName?.toLowerCase();
       const isEditable = tag === 'input' || tag === 'textarea' || target?.isContentEditable;
-      if (isEditable) return;
+      if (isEditable) {
+        console.log('[PanAndZoom] Ignoring - editable target');
+        return;
+      }
     }
 
     const dir = keyDirectionMap[event.key];
-    if (!dir) return;
+    if (!dir) {
+      console.log('[PanAndZoom] No direction mapping for key:', event.key);
+      return;
+    }
 
+    console.log('[PanAndZoom] Starting pan, dir:', dir);
+    
     // 更新方向
     if (dir.x !== 0 && inertialState.directionX !== dir.x) {
       inertialState.directionX = dir.x;
@@ -267,6 +277,10 @@ export function createPanAndZoomControl(options: PanAndZoomControlOptions = {}) 
     let newVelocityX = velocityX;
     let newVelocityY = velocityY;
 
+    // 速度衰减系数（键盘释放后的滑行阻力）
+    const friction = 0.5;         // 增加衰减
+    const stopThreshold = 0.1;
+
     // 更新 X 方向速度
     if (directionX !== 0) {
       newVelocityX += panAcceleration * directionX;
@@ -274,9 +288,9 @@ export function createPanAndZoomControl(options: PanAndZoomControlOptions = {}) 
         newVelocityX = panMaxSpeed * directionX;
       }
     } else {
-      if (newVelocityX > 0) newVelocityX = Math.max(0, newVelocityX - 0.5);
-      if (newVelocityX < 0) newVelocityX = Math.min(0, newVelocityX + 0.5);
-      if (Math.abs(newVelocityX) < 0.1) newVelocityX = 0;
+      // 应用衰减
+      newVelocityX *= (1 - friction);
+      if (Math.abs(newVelocityX) < stopThreshold) newVelocityX = 0;
     }
 
     // 更新 Y 方向速度
@@ -286,19 +300,21 @@ export function createPanAndZoomControl(options: PanAndZoomControlOptions = {}) 
         newVelocityY = panMaxSpeed * directionY;
       }
     } else {
-      if (newVelocityY > 0) newVelocityY = Math.max(0, newVelocityY - 0.5);
-      if (newVelocityY < 0) newVelocityY = Math.min(0, newVelocityY + 0.5);
-      if (Math.abs(newVelocityY) < 0.1) newVelocityY = 0;
+      // 应用衰减
+      newVelocityY *= (1 - friction);
+      if (Math.abs(newVelocityY) < stopThreshold) newVelocityY = 0;
     }
 
     inertialState.velocityX = newVelocityX;
     inertialState.velocityY = newVelocityY;
 
-    // 应用位移
+    // 应用位移（根据当前 zoom 调整速度，保持视觉一致）
     if (newVelocityX !== 0 || newVelocityY !== 0) {
+      // zoom 越大，移动越慢（像素级移动）
+      const speedFactor = Math.max(0.2, 0.5 / currentViewport.zoom);
       updateViewport({
-        x: currentViewport.x + newVelocityX,
-        y: currentViewport.y + newVelocityY,
+        x: currentViewport.x + newVelocityX * speedFactor,
+        y: currentViewport.y + newVelocityY * speedFactor,
         zoom: currentViewport.zoom,
       });
     }

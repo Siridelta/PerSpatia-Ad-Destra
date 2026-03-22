@@ -37,7 +37,17 @@ async function testPanAndZoomControl() {
 
     // 核心操作
     action: async (page) => {
+      console.log('[Test] Reloading page to reset state...');
+      
+      // 强制刷新页面，完全重置状态
+      await page.reload({ waitUntil: 'networkidle' });
+      await page.waitForTimeout(2000);
+      
       console.log('[Test] Starting usePanAndZoomControl tests...');
+      
+      // 点击页面获取焦点
+      await page.click('body');
+      await page.waitForTimeout(500);
       
       // Test 1: 滚轮缩放（放大）
       console.log('[Test] Test 1: Wheel zoom in');
@@ -49,41 +59,59 @@ async function testPanAndZoomControl() {
       await zoom(page, 3, 150, 300);
       await page.waitForTimeout(1000);
       
-      // Test 3: 键盘平移 - 向右 (D key)
-      console.log('[Test] Test 3: Keyboard pan right (D key)');
-      await page.keyboard.down('d');
-      await page.waitForTimeout(1500);
-      await page.keyboard.up('d');
-      await page.waitForTimeout(500);
+      // Test 3-6: 键盘平移 - 使用 dispatchEvent
+      console.log('[Test] Test 3-6: Keyboard pan using dispatchEvent');
       
-      // Test 4: 键盘平移 - 向左 (A key)
-      console.log('[Test] Test 4: Keyboard pan left (A key)');
-      await page.keyboard.down('a');
-      await page.waitForTimeout(1500);
-      await page.keyboard.up('a');
-      await page.waitForTimeout(500);
+      await page.evaluate(() => {
+        const keyDown = (key) => {
+          const event = new KeyboardEvent('keydown', {
+            key: key,
+            bubbles: true,
+            cancelable: true,
+          });
+          window.dispatchEvent(event);
+        };
+        const keyUp = (key) => {
+          const event = new KeyboardEvent('keyup', {
+            key: key,
+            bubbles: true,
+            cancelable: true,
+          });
+          window.dispatchEvent(event);
+        };
+        
+        // D - right
+        keyDown('d');
+        setTimeout(() => keyUp('d'), 500);
+        
+        // A - left (after 1s)
+        setTimeout(() => {
+          keyDown('a');
+          setTimeout(() => keyUp('a'), 500);
+        }, 1000);
+        
+        // S - down (after 2s)
+        setTimeout(() => {
+          keyDown('s');
+          setTimeout(() => keyUp('s'), 500);
+        }, 2000);
+        
+        // W - up (after 3s)
+        setTimeout(() => {
+          keyDown('w');
+          setTimeout(() => keyUp('w'), 500);
+        }, 3000);
+      });
       
-      // Test 5: 键盘平移 - 向下 (S key)
-      console.log('[Test] Test 5: Keyboard pan down (S key)');
-      await page.keyboard.down('s');
-      await page.waitForTimeout(1500);
-      await page.keyboard.up('s');
-      await page.waitForTimeout(500);
-      
-      // Test 6: 键盘平移 - 向上 (W key)
-      console.log('[Test] Test 6: Keyboard pan up (W key)');
-      await page.keyboard.down('w');
-      await page.waitForTimeout(1500);
-      await page.keyboard.up('w');
-      await page.waitForTimeout(500);
+      await page.waitForTimeout(4000); // 等待所有键盘操作完成
       
       // Test 7: 组合操作 - 边移动边缩放
       console.log('[Test] Test 7: Combined pan and zoom');
       await page.keyboard.down('d');
-      await page.waitForTimeout(500);
+      await page.waitForTimeout(400);
       await zoom(page, 3, -80, 200);
       await page.keyboard.up('d');
-      await page.waitForTimeout(500);
+      await page.waitForTimeout(1000);
       
       console.log('[Test] All tests completed!');
     }

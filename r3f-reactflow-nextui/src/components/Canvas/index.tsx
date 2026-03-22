@@ -195,11 +195,12 @@ const Canvas: React.FC = () => {
       }
     };
 
-    window.addEventListener('keydown', handleKeyDown, true); // 使用 capture 模式
+    // 使用 bubble 模式，让其他监听器有机会捕获事件
+    window.addEventListener('keydown', handleKeyDown, false);
     document.addEventListener('mousedown', handleMouseDown);
 
     return () => {
-      window.removeEventListener('keydown', handleKeyDown, true);
+      window.removeEventListener('keydown', handleKeyDown, false);
       document.removeEventListener('mousedown', handleMouseDown);
     };
   }, [setActiveTool, activeTool, setConnectionStartNode, canvasDataApi, flowNodes, flowEdges]);
