@@ -1,18 +1,14 @@
-/**
- * Canvas 主组件 - 整合 3D 场景和 ReactFlow
- */
-
 import {
   Connection,
   EdgeTypes,
   Node,
   NodeTypes,
   ReactFlow,
-  ReactFlowInstance,
+  ReactFlowInstance
 } from '@xyflow/react';
 import '@xyflow/react/dist/style.css';
-import React, { useCallback, useEffect, useRef, useState } from 'react';
-import * as THREE from 'three';
+import React, { useCallback, useEffect, useRef } from 'react';
+import { Scene3D } from '../Scene3D';
 
 import BottomToolbar from '@/components/BottomToolbar';
 import FloatingEdge from '@/components/CustomEdge';
@@ -20,20 +16,18 @@ import DesmosPreviewNode from '@/components/DesmosPreviewNode';
 import SettingsPanel from '@/components/SettingsPanel';
 import TextNode from '@/components/TextNode';
 import Toolbar from '@/components/Toolbar';
-import { Scene3D, Scene3DRef } from '@/components/Scene3D';
-import { ReactFlow3D } from '@/components/ReactFlow3D';
 import { CanvasDataProvider } from '@/contexts/CanvasDataContext';
 import { CanvasEvalProvider } from '@/contexts/CanvasEvalContext';
 import { useCanvasData } from '@/hooks/useCanvasData';
 import { useCanvasEval } from '@/hooks/useCanvasEval';
 import { useCanvasStatePersistence } from '@/hooks/useCanvasStatePersistence';
 import { useTheme } from '@/hooks/useTheme';
-import { useCameraControl } from '@/hooks/useCameraControl';
-import type { CameraState } from '@/utils/coordinateTransform';
 import { parseCanvasArchiveText, serializeCanvasArchive } from '@/services/canvas-archive';
 import { useSettingsStore } from '@/store/settingsStore';
 import { useToolStore } from '@/store/toolStore';
 import { CanvasEdgeFlowData, CanvasNodeFlowData } from '@/types/canvas';
+import { usePanAndZoomControl } from '@/hooks/usePanAndZoomControl';
+import { Scene3DRef } from '@/components/Scene3D';
 import CustomConnectionLine from './CustomConnectionLine';
 import './styles.css';
 
@@ -48,8 +42,6 @@ const edgeTypes: EdgeTypes = {
   custom: FloatingEdge,
   desmosPreviewEdge: FloatingEdge,
 };
-
-const FOV = 50;
 
 const Canvas: React.FC = () => {
 
@@ -74,7 +66,7 @@ const Canvas: React.FC = () => {
 
   const flowNodes = canvasDataApi.readFlow.useFlowData((data) => data.nodes);
   const flowEdges = canvasDataApi.readFlow.useFlowData((data) => data.edges);
-  const persistedViewport = canvasDataApi.readFlow.useFlowData((data) => data.viewport);
+  const viewport = canvasDataApi.readFlow.useFlowData((data) => data.viewport);
 
   // 当前活动工具（全局）
   const activeTool = useToolStore((state) => state.activeTool);
@@ -90,61 +82,34 @@ const Canvas: React.FC = () => {
   // ReactFlow 实例引用 - 用 ref 保存 instance，绕过 useReactFlow 的上下文问题
   const flowInstanceRef = useRef<ReactFlowInstance<CanvasNodeFlowData, CanvasEdgeFlowData> | null>(null);
   const scene3DRef = useRef<Scene3DRef>(null);
-  const threeCameraRef = useRef<THREE.PerspectiveCamera | null>(null);
-
-  // screenToFlowPosition - 用于创建节点
-  const screenToFlowPosition = flowInstanceRef.current?.screenToFlowPosition ?? null;
-
-  // 视口尺寸
-  const [viewportSize, setViewportSize] = useState({ width: window.innerWidth, height: window.innerHeight });
-
-  useEffect(() => {
-    const handleResize = () => {
-      setViewportSize({ width: window.innerWidth, height: window.innerHeight });
-    };
-    window.addEventListener('resize', handleResize);
-    return () => window.removeEventListener('resize', handleResize);
-  }, []);
-
+  
   // 统一的相机控制系统
   const {
-    cameraState,
     viewport: controlledViewport,
+    setViewport: setControlledViewport,
+    setReactFlowInstance,
+    syncFromReactFlow,
     sceneScale,
-    handlers: cameraHandlers,
-    setCameraState,
-    syncFromViewport,  // 从 ReactFlow 视口反向同步
-  } = useCameraControl({
-    initialTargetX: 0,
-    initialTargetY: 0,
-    initialRadius: 30,
-    initialTheta: 0,
-    initialPhi: 0,
+    setOrbitControls,
+  } = usePanAndZoomControl({
+    initialViewport: { x: 0, y: 0, zoom: 1 },
+    minZoom: 0.1,
+    maxZoom: 3,
   });
 
   // 当持久化的 viewport 加载后，同步到控制器
   useEffect(() => {
-    if (persistedViewport && isHydrated) {
-      // 限制 radius 范围，避免 zoom 太小或太大
-      const calculatedRadius = 30 / persistedViewport.zoom;
-      const clampedRadius = Math.max(15, Math.min(60, calculatedRadius));
-      
-      setCameraState({
-        targetX: -persistedViewport.x,
-        targetY: persistedViewport.y,
-        radius: clampedRadius,
-        theta: 0,
-        phi: 0,
-      });
+    if (viewport && isHydrated) {
+      setControlledViewport(viewport);
     }
-  }, [persistedViewport, isHydrated, setCameraState]);
+  }, [viewport, isHydrated, setControlledViewport]);
 
   // 同步 viewport 到 Scene3D
   useEffect(() => {
     scene3DRef.current?.setScale(sceneScale);
   }, [sceneScale]);
 
-  // 同步 viewport 到 ReactFlow（防止循环）
+  // 同步 viewport 到 ReactFlow
   useEffect(() => {
     if (flowInstanceRef.current) {
       const currentRfViewport = flowInstanceRef.current.getViewport();
@@ -157,14 +122,18 @@ const Canvas: React.FC = () => {
       }
     }
   }, [controlledViewport]);
+  
+  const screenToFlowPosition = flowInstanceRef.current?.screenToFlowPosition ?? null;
 
   // onInit 时保存 instance 并设置初始视角
   const handleInit = useCallback((reactFlowInstance: ReactFlowInstance<CanvasNodeFlowData, CanvasEdgeFlowData>) => {
     flowInstanceRef.current = reactFlowInstance;
-    if (persistedViewport) {
-      reactFlowInstance.setViewport(persistedViewport);
+    setReactFlowInstance(reactFlowInstance);
+    // 设置初始视角
+    if (viewport) {
+      reactFlowInstance.setViewport(viewport);
     }
-  }, [persistedViewport]);
+  }, [viewport, setReactFlowInstance]);
 
   // 应用主题设置
   useTheme();
@@ -424,34 +393,21 @@ const Canvas: React.FC = () => {
     type: 'custom',
   };
 
-  
   /*
   *      ----------- 组件结构 ------------
   */
+
   return (
     <>
-      {/* 3D 场景 - 最底层 */}
-      <Scene3D
-        ref={scene3DRef}
-        cameraState={cameraState}
-        onCameraReady={(cam) => { threeCameraRef.current = cam; }}
-      />
-
-      {/* ReactFlow 3D 容器 - 中层 */}
-      <ReactFlow3D
-        cameraState={cameraState}
-        camera={threeCameraRef.current}
-        viewportWidth={viewportSize.width}
-        viewportHeight={viewportSize.height}
-        fov={FOV}
-        onStartPan={cameraHandlers.startPan}
-        onStartRotate={cameraHandlers.startRotate}
-        onPointerMove={cameraHandlers.handlePointerMove}
-        onPointerUp={cameraHandlers.handlePointerUp}
-        onWheel={cameraHandlers.handleWheel}
-      >
+      <Scene3D ref={scene3DRef} sceneScale={sceneScale} onOrbitControlsReady={setOrbitControls}>
         <CanvasDataProvider api={canvasDataApi}>
           <CanvasEvalProvider api={evalApi}>
+            {/*
+              ReactFlow 容器：
+              - 伪缩放通过 ReactFlow 的 zoom 控制，而非 CSS transform
+              - 这样保持 ReactFlow 内部坐标系正确
+              - 3D 场景根据 zoom 值反向缩放，产生深度透视效果
+            */}
             <div
               className={`canvas-container ${activeTool}-mode`}
               style={{
@@ -473,8 +429,8 @@ const Canvas: React.FC = () => {
                     if (newViewport) {
                       // 更新 flowData（用于持久化）
                       canvasDataApi.writeFlow.setViewport(newViewport);
-                      // 反向同步到相机控制器
-                      syncFromViewport(newViewport);
+                      // 反向同步到控制器（外部扰动检测）
+                      syncFromReactFlow();
                     }
                   }}
                   nodeTypes={nodeTypes}
@@ -487,15 +443,15 @@ const Canvas: React.FC = () => {
                   elementsSelectable={true}
                   selectNodesOnDrag={false}
                   deleteKeyCode={['Delete', 'Backspace']}
-                  // 完全禁用 ReactFlow 的视口控制，由外部接管
-                  panOnDrag={false}
+                  // 禁用 React Flow 默认滚轮缩放 - 由伪缩放系统接管
                   zoomOnScroll={false}
                   zoomOnPinch={false}
                   zoomOnDoubleClick={false}
-                  panOnScroll={false}
+                  // 同步 zoom 值与伪缩放
                   minZoom={0.1}
                   maxZoom={3}
-                />
+                >
+                </ReactFlow>
               ) : (
                 <div className="flex items-center justify-center h-full">
                   <div className="text-white">Loading...</div>
@@ -504,8 +460,8 @@ const Canvas: React.FC = () => {
             </div>
           </CanvasEvalProvider>
         </CanvasDataProvider>
-      </ReactFlow3D>
-
+      </Scene3D>
+      
       {/* 相机状态指示器（调试用，可删除） */}
       <div style={{
         position: 'fixed',
@@ -516,12 +472,8 @@ const Canvas: React.FC = () => {
         fontSize: 12,
         pointerEvents: 'none',
         zIndex: 1000,
-        textAlign: 'right',
-        lineHeight: 1.5,
       }}>
-        <div>Target: ({cameraState.targetX.toFixed(0)}, {cameraState.targetY.toFixed(0)})</div>
-        <div>Radius: {cameraState.radius.toFixed(1)} | θ: {(cameraState.theta * 180 / Math.PI).toFixed(0)}° φ: {(cameraState.phi * 180 / Math.PI).toFixed(0)}°</div>
-        <div>Zoom: {controlledViewport.zoom.toFixed(2)}x</div>
+        Zoom: {controlledViewport.zoom.toFixed(2)}x | Pos: ({controlledViewport.x.toFixed(0)}, {controlledViewport.y.toFixed(0)})
       </div>
 
       <Toolbar />
