@@ -30,6 +30,7 @@ import { useCanvasStatePersistence } from '@/hooks/useCanvasStatePersistence';
 import { useTheme } from '@/hooks/useTheme';
 import { useCameraControl } from '@/hooks/useCameraControl';
 import type { CameraState } from '@/utils/coordinateTransform';
+import { screenToWorld } from '@/utils/coordinateTransform';
 import { parseCanvasArchiveText, serializeCanvasArchive } from '@/services/canvas-archive';
 import { useSettingsStore } from '@/store/settingsStore';
 import { useToolStore } from '@/store/toolStore';
@@ -90,7 +91,6 @@ const Canvas: React.FC = () => {
   // ReactFlow 实例引用 - 用 ref 保存 instance，绕过 useReactFlow 的上下文问题
   const flowInstanceRef = useRef<ReactFlowInstance<CanvasNodeFlowData, CanvasEdgeFlowData> | null>(null);
   const scene3DRef = useRef<Scene3DRef>(null);
-  const threeCameraRef = useRef<THREE.PerspectiveCamera | null>(null);
 
   // screenToFlowPosition - 用于创建节点
   const screenToFlowPosition = flowInstanceRef.current?.screenToFlowPosition ?? null;
@@ -121,6 +121,8 @@ const Canvas: React.FC = () => {
     initialTheta: 0,
     initialPhi: 0,
   });
+  
+
 
   // 当持久化的 viewport 加载后，同步到控制器
   useEffect(() => {
@@ -434,13 +436,11 @@ const Canvas: React.FC = () => {
       <Scene3D
         ref={scene3DRef}
         cameraState={cameraState}
-        onCameraReady={(cam) => { threeCameraRef.current = cam; }}
       />
 
       {/* ReactFlow 3D 容器 - 中层 */}
       <ReactFlow3D
         cameraState={cameraState}
-        camera={threeCameraRef.current}
         viewportWidth={viewportSize.width}
         viewportHeight={viewportSize.height}
         fov={FOV}

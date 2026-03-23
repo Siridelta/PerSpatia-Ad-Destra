@@ -15,13 +15,11 @@ import type { CameraState } from '../../utils/coordinateTransform';
 
 export interface Scene3DRef {
   setScale: (scale: number) => void;
-  getCamera: () => THREE.PerspectiveCamera | null;
 }
 
 interface Scene3DProps {
   cameraState?: CameraState;
   sceneScale?: number;  // 兼容旧版
-  onCameraReady?: (camera: THREE.PerspectiveCamera) => void;
 }
 
 // 3D 背景效果组件
@@ -64,6 +62,13 @@ function BackgroundEffects({ scale = 1 }: { scale?: number }) {
 
   return (
     <>
+      {/* Debug: XY 平面网格 (Z=0，与 ReactFlow 画布对齐) */}
+      <gridHelper 
+        args={[200, 40, '#e94560', '#444444']} 
+        position={[0, 0, 0]} 
+        rotation={[0, 0, 0]}
+      />
+      
       {/* 渐变背景平面 */}
       <mesh ref={meshRef} position={[0, 0, -80]} scale={[200, 200, 1]}>
         <planeGeometry args={[1, 1]} />
@@ -134,19 +139,10 @@ function BackgroundEffects({ scale = 1 }: { scale?: number }) {
 // 相机同步组件
 interface CameraSyncProps {
   cameraState: CameraState;
-  onCameraReady: (camera: THREE.PerspectiveCamera) => void;
 }
 
-function CameraSync({ cameraState, onCameraReady }: CameraSyncProps) {
+function CameraSync({ cameraState }: CameraSyncProps) {
   const { camera } = useThree();
-  const isReadyRef = useRef(false);
-  
-  useEffect(() => {
-    if (!isReadyRef.current && camera instanceof THREE.PerspectiveCamera) {
-      isReadyRef.current = true;
-      onCameraReady(camera);
-    }
-  }, [camera, onCameraReady]);
   
   // 每帧同步相机位置
   useFrame(() => {
@@ -154,10 +150,10 @@ function CameraSync({ cameraState, onCameraReady }: CameraSyncProps) {
     
     const { targetX, targetY, radius, theta, phi } = cameraState;
     
-    // 球坐标转笛卡尔
-    camera.position.x = targetX + radius * Math.sin(theta) * Math.cos(phi);
+    // 球坐标转笛卡尔（theta 取反让水平方向正确，phi 不取反让竖直方向正确）
+    camera.position.x = targetX + radius * Math.sin(-theta) * Math.cos(phi);
     camera.position.y = targetY + radius * Math.sin(phi);
-    camera.position.z = radius * Math.cos(theta) * Math.cos(phi);
+    camera.position.z = radius * Math.cos(-theta) * Math.cos(phi);
     
     camera.lookAt(targetX, targetY, 0);
   });
@@ -167,9 +163,8 @@ function CameraSync({ cameraState, onCameraReady }: CameraSyncProps) {
 
 // 主场景组件
 export const Scene3D = forwardRef<Scene3DRef, Scene3DProps>(
-  function Scene3D({ cameraState, sceneScale = 1, onCameraReady }, ref) {
+  function Scene3D({ cameraState, sceneScale = 1 }, ref) {
     const scaleRef = useRef(sceneScale);
-    const cameraRef = useRef<THREE.PerspectiveCamera | null>(null);
     
     // 默认相机状态
     const defaultState: CameraState = {
@@ -186,13 +181,7 @@ export const Scene3D = forwardRef<Scene3DRef, Scene3DProps>(
       setScale: (scale: number) => {
         scaleRef.current = scale;
       },
-      getCamera: () => cameraRef.current,
     }));
-    
-    const handleCameraReady = (camera: THREE.PerspectiveCamera) => {
-      cameraRef.current = camera;
-      onCameraReady?.(camera);
-    };
     
     return (
       <div style={{
@@ -209,10 +198,7 @@ export const Scene3D = forwardRef<Scene3DRef, Scene3DProps>(
           gl={{ antialias: true, alpha: true }}
           style={{ background: 'transparent' }}
         >
-          <CameraSync 
-            cameraState={state} 
-            onCameraReady={handleCameraReady}
-          />
+          <CameraSync cameraState={state} />
           
           {/* 3D 背景效果（带缩放） */}
           <BackgroundEffects scale={scaleRef.current} />

@@ -10,18 +10,12 @@
 
 import React, { useRef, useEffect, useCallback, useState } from 'react';
 import type { PointerEvent as ReactPointerEvent } from 'react';
-import * as THREE from 'three';
 import type { CameraState } from '../../utils/coordinateTransform';
-import { 
-  screenToWorld, 
-  worldToLocal, 
-  calculateCSSPerspective 
-} from '../../utils/coordinateTransform';
+import { calculateCSSPerspective } from '../../utils/coordinateTransform';
 
 interface ReactFlow3DProps {
   children: React.ReactNode;
   cameraState: CameraState;
-  camera: THREE.PerspectiveCamera | null;
   viewportWidth: number;
   viewportHeight: number;
   fov: number;
@@ -37,7 +31,6 @@ interface ReactFlow3DProps {
 export function ReactFlow3D({
   children,
   cameraState,
-  camera,
   viewportWidth,
   viewportHeight,
   fov,
@@ -58,7 +51,8 @@ export function ReactFlow3D({
   useEffect(() => {
     // 旋转匹配相机视角，让 ReactFlow 层与 Three.js 场景对齐
     // 注意：theta 是水平旋转，phi 是垂直旋转
-    const transform = `rotateX(${phi}rad) rotateY(${-theta}rad)`;
+    // 注意：两个旋转都取反，让 CSS 旋转方向与 Three.js 相机视角一致
+    const transform = `rotateX(${-phi}rad) rotateY(${theta}rad)`;
     setCssTransform(transform);
     // 透视值根据 FOV 计算
     const perspective = calculateCSSPerspective(viewportHeight, fov);
@@ -87,21 +81,6 @@ export function ReactFlow3D({
     if (!element) return false;
     return isFlowElement(element);
   }, [isFlowElement]);
-  
-  // 屏幕坐标 → ReactFlow 局部坐标
-  const screenToFlowLocal = useCallback((screenX: number, screenY: number): { x: number; y: number } | null => {
-    if (!camera) return null;
-    
-    const worldPos = screenToWorld(screenX, screenY, camera, viewportWidth, viewportHeight);
-    if (!worldPos) return null;
-    
-    const local = worldToLocal(worldPos.x, worldPos.y, cameraState);
-    
-    return {
-      x: local.x + viewportWidth / 2,
-      y: local.y + viewportHeight / 2,
-    };
-  }, [camera, cameraState, viewportWidth, viewportHeight]);
   
   // 创建合成事件
   const createSyntheticEvent = useCallback((
@@ -203,7 +182,7 @@ export function ReactFlow3D({
           height: '100vh',
           transformStyle: 'preserve-3d',
           transform: cssTransform,
-          transformOrigin: '0 0',
+          transformOrigin: '50% 50%', // 围绕视口中心旋转
           willChange: 'transform',
         }}
       >

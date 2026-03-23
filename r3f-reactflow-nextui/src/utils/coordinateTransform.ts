@@ -10,7 +10,7 @@ import * as THREE from 'three';
 const XY_PLANE = new THREE.Plane(new THREE.Vector3(0, 0, 1), 0);
 
 /**
- * 屏幕坐标 → 世界坐标（与 Z=0 平面交点）
+ * 屏幕坐标 → 世界坐标（与 Z=0 平面交点）- 使用 Three.js Camera
  */
 export function screenToWorld(
   screenX: number,
@@ -31,6 +31,76 @@ export function screenToWorld(
   const intersected = raycaster.ray.intersectPlane(XY_PLANE, target);
 
   return intersected ? target : null;
+}
+
+/**
+ * 屏幕坐标 → 世界坐标（纯数学计算，不依赖 Three.js 运行时）
+ * 
+ * 基于相机状态直接计算射线与 Z=0 平面的交点
+ */
+export function screenToWorldFromState(
+  screenX: number,
+  screenY: number,
+  state: CameraState,
+  viewportWidth: number,
+  viewportHeight: number,
+  fovDegrees: number = 50
+): { x: number; y: number; z: number } | null {
+  const { targetX, targetY, radius, theta, phi } = state;
+  
+  // 1. 计算相机位置（与 Scene3D 使用相同的公式）
+  const camX = targetX + radius * Math.sin(-theta) * Math.cos(phi);
+  const camY = targetY + radius * Math.sin(phi);
+  const camZ = radius * Math.cos(-theta) * Math.cos(phi);
+  
+  // 2. 计算屏幕坐标对应的 NDC (-1 到 1)
+  const ndcX = (screenX / viewportWidth) * 2 - 1;
+  const ndcY = -(screenY / viewportHeight) * 2 + 1;
+  
+  // 3. 计算射线方向（透视投影）
+  const tanFov = Math.tan((fovDegrees * Math.PI / 180) / 2);
+  const aspect = viewportWidth / viewportHeight;
+  
+  // 相机朝向（lookAt 方向）
+  const forwardX = targetX - camX;
+  const forwardY = targetY - camY;
+  const forwardZ = -camZ; // 看向原点方向
+  const forwardLen = Math.sqrt(forwardX * forwardX + forwardY * forwardY + forwardZ * forwardZ);
+  const fx = forwardX / forwardLen;
+  const fy = forwardY / forwardLen;
+  const fz = forwardZ / forwardLen;
+  
+  // 相机右方向（与 forward 和 world up (0,1,0) 垂直）
+  const rightX = fz; // cross(forward, up).x = forward.z * up.y - forward.y * up.z
+  const rightY = 0;
+  const rightZ = -fx; // cross(forward, up).z = forward.x * up.y - forward.y * up.x = -forward.x
+  const rightLen = Math.sqrt(rightX * rightX + rightZ * rightZ);
+  const rx = rightX / rightLen;
+  const rz = rightZ / rightLen;
+  
+  // 相机上方向（cross(right, forward)）
+  const upX = -fy * rz;
+  const upY = rx * fz - rz * fx;
+  const upZ = fy * rx;
+  
+  // 射线方向 = forward + ndcX * right * tanFov * aspect + ndcY * up * tanFov
+  const rayDirX = fx + ndcX * rx * tanFov * aspect + ndcY * upX * tanFov;
+  const rayDirY = fy + ndcY * upY * tanFov; // right 的 y 分量为 0
+  const rayDirZ = fz + ndcX * rz * tanFov * aspect + ndcY * upZ * tanFov;
+  
+  // 4. 求与 Z=0 平面的交点
+  // ray = cameraPos + t * rayDir, 求 z=0 时的 t
+  // camZ + t * rayDirZ = 0 => t = -camZ / rayDirZ
+  if (Math.abs(rayDirZ) < 0.0001) return null; // 射线平行于平面
+  
+  const t = -camZ / rayDirZ;
+  if (t < 0) return null; // 交点在相机后方
+  
+  return {
+    x: camX + t * rayDirX,
+    y: camY + t * rayDirY,
+    z: 0
+  };
 }
 
 /**

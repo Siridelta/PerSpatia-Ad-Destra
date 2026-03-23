@@ -15,8 +15,10 @@
  */
 
 import { useCallback, useEffect, useRef, useState } from 'react';
+import * as THREE from 'three';
 import type { Viewport } from '@xyflow/react';
 import type { CameraState } from '../utils/coordinateTransform';
+import { screenToWorldFromState } from '../utils/coordinateTransform';
 
 // 配置选项
 interface Options {
@@ -49,7 +51,10 @@ const DEFAULT: Required<Options> = {
   zoomDamping: 0.88,
 };
 
-export function useCameraControl(options: Options = {}) {
+export function useCameraControl(
+  options: Options = {},
+  viewportSize: { width: number; height: number } = { width: window.innerWidth, height: window.innerHeight }
+) {
   const cfgRef = useRef({ ...DEFAULT, ...options });
   const cfg = cfgRef.current;
 
@@ -78,7 +83,21 @@ export function useCameraControl(options: Options = {}) {
     isRotating: false,
     lastX: 0,
     lastY: 0,
+    // 拖拽起始状态（用于基于固定相机的计算）
+    startState: null as CameraState | null,
+    startScreen: { x: 0, y: 0 },
+    // Raycast 抓点
+    grabPoint: null as { x: number; y: number } | null,
   });
+
+  // 幽灵相机 - 只用于 raycast 计算，不挂载到场景
+  const ghostCameraRef = useRef<THREE.PerspectiveCamera | null>(null);
+  if (!ghostCameraRef.current) {
+    ghostCameraRef.current = new THREE.PerspectiveCamera(50, viewportSize.width / viewportSize.height, 0.1, 1000);
+  }
+  
+  // XY 平面用于 raycast
+  const xyPlaneRef = useRef(new THREE.Plane(new THREE.Vector3(0, 0, 1), 0));
 
   // 计算 ReactFlow viewport（从相机状态）
   const viewport: Viewport = {
@@ -184,12 +203,56 @@ export function useCameraControl(options: Options = {}) {
     input.current.keys.delete(e.key.toLowerCase());
   }, []);
 
-  // 开始平移
+  // 更新幽灵相机位置
+  const updateGhostCamera = (camState: CameraState) => {
+    const camera = ghostCameraRef.current;
+    if (!camera) return;
+    
+    const { targetX, targetY, radius, theta, phi } = camState;
+    camera.position.x = targetX + radius * Math.sin(-theta) * Math.cos(phi);
+    camera.position.y = targetY + radius * Math.sin(phi);
+    camera.position.z = radius * Math.cos(-theta) * Math.cos(phi);
+    camera.lookAt(targetX, targetY, 0);
+    camera.updateMatrixWorld();
+  };
+
+  // 屏幕坐标 → 世界坐标（使用幽灵相机）
+  const screenToWorldWithGhost = (screenX: number, screenY: number, camState: CameraState): { x: number; y: number; z: number } | null => {
+    const camera = ghostCameraRef.current;
+    if (!camera) return null;
+    
+    // 更新相机到指定状态
+    updateGhostCamera(camState);
+    
+    // NDC 坐标
+    const mouse = new THREE.Vector2(
+      (screenX / viewportSize.width) * 2 - 1,
+      -(screenY / viewportSize.height) * 2 + 1
+    );
+    
+    const raycaster = new THREE.Raycaster();
+    raycaster.setFromCamera(mouse, camera);
+    
+    const target = new THREE.Vector3();
+    const intersected = raycaster.ray.intersectPlane(xyPlaneRef.current, target);
+    
+    return intersected ? { x: target.x, y: target.y, z: target.z } : null;
+  };
+
+  // 开始平移（计算抓点并记录）
   const startPan = useCallback(
     (clientX: number, clientY: number) => {
+      const startState = stateRef.current;
       input.current.isPanning = true;
       input.current.lastX = clientX;
       input.current.lastY = clientY;
+      input.current.startState = { ...startState };
+      input.current.startScreen = { x: clientX, y: clientY };
+      
+      // 计算抓点：在当前相机状态下，鼠标指向 XY 平面的哪里
+      const grab = screenToWorldWithGhost(clientX, clientY, startState);
+      input.current.grabPoint = grab ? { x: grab.x, y: grab.y } : null;
+      
       startAnim();
     },
     [startAnim]
@@ -206,17 +269,16 @@ export function useCameraControl(options: Options = {}) {
     [startAnim]
   );
 
-  // 指针移动 - 直接修改 target/angle，不经过 velocity（velocity 只用于惯性）
+  // 指针移动 - 计算目标位置（拖拽时用指数逼近）
   const handlePointerMove = useCallback(
     (e: PointerEvent) => {
-      const { isPanning, isRotating, lastX, lastY } = input.current;
-      const dx = e.clientX - lastX;
-      const dy = e.clientY - lastY;
-
+      const { isPanning, isRotating, lastX, lastY, startState, grabPoint } = input.current;
+      
       if (isRotating) {
-        // 直接修改角度（类似平移），速度用于惯性
+        const dx = e.clientX - lastX;
+        const dy = e.clientY - lastY;
         const deltaTheta = dx * 0.005;
-        const deltaPhi = -dy * 0.005; // 反转垂直方向
+        const deltaPhi = dy * 0.005;
         velocity.current.theta = deltaTheta;
         velocity.current.phi = deltaPhi;
         setState((prev) => ({
@@ -225,23 +287,30 @@ export function useCameraControl(options: Options = {}) {
           phi: Math.max(-Math.PI / 2 + 0.1, Math.min(Math.PI / 2 - 0.1, prev.phi + deltaPhi)),
         }));
         if (!rafId.current) startAnim();
-      } else if (isPanning) {
-        // 直接位置映射（拖拽中）
-        const deltaX = -dx * Math.cos(stateRef.current.theta);
-        velocity.current.x = deltaX;
-        velocity.current.y = dy;
-        setState((prev) => ({
-          ...prev,
-          targetX: prev.targetX + deltaX,
-          targetY: prev.targetY + dy,
-        }));
+      } else if (isPanning && grabPoint && startState) {
+        // 计算当前鼠标位置在当前相机状态下指向哪里
+        const currentPoint = screenToWorldWithGhost(e.clientX, e.clientY, stateRef.current);
+        
+        if (currentPoint) {
+          // 想让 currentPoint 对齐 grabPoint
+          // target = startTarget + (grabPoint - currentPoint)
+          const targetX = startState.targetX + (grabPoint.x - currentPoint.x);
+          const targetY = startState.targetY + (grabPoint.y - currentPoint.y);
+          
+          // 指数逼近目标（而不是直接设置）
+          const dx = targetX - stateRef.current.targetX;
+          const dy = targetY - stateRef.current.targetY;
+          velocity.current.x = dx * 0.5; // 每帧移动 50%
+          velocity.current.y = dy * 0.5;
+        }
+        
         if (!rafId.current) startAnim();
       }
 
       input.current.lastX = e.clientX;
       input.current.lastY = e.clientY;
     },
-    [startAnim]
+    [startAnim, viewportSize.width, viewportSize.height]
   );
 
   // 指针释放

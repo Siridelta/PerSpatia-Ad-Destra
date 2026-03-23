@@ -1,12 +1,12 @@
 # 相机控制架构 v2.0
 
-## 设计理念：双透视对齐
+## 设计理念：伪 3D 透视
 
-我们同时运行两个透视投影系统，并保持它们完全同步：
-- **Three.js PerspectiveCamera**: 渲染 3D 背景
-- **CSS 3D Transform**: 控制 ReactFlow 容器的 3D 变换
+我们使用**简化的透视方案**：
+- **Three.js PerspectiveCamera**: 渲染真正的 3D 背景
+- **CSS 3D 旋转 + ReactFlow Viewport**: ReactFlow 层只做旋转变换
 
-这样 ReactFlow 看起来就像"贴在 3D 场景里的一面墙"，但实际上是独立的 DOM 层。
+这样 ReactFlow 看起来"大致在 3D 空间里"，但保持 2D 交互的简洁性。
 
 ## 坐标系定义
 
@@ -20,7 +20,7 @@
 
 相机参数:
 ├── target: {x, y}  // 相机看向 XY 平面上的点
-├── radius: number  // 相机到 target 的距离
+├── radius: number  // 相机到 target 的距离（决定 zoom）
 ├── theta: number   // 水平环绕角度（绕 Y 轴，0=正面）
 └── phi: number     // 垂直仰角（绕 X 轴，0=水平）
 
@@ -30,116 +30,87 @@
   camera.z = radius × cos(theta) × cos(phi)
 ```
 
-## 物理系统（统一指数逼近）
+## 物理系统
 
-所有运动使用同一套物理模型：
+### 平移
+- **拖拽**: 直接 1:1 映射，鼠标不动则场景不动
+- **键盘 WASD**: 指数逼近目标速度
+- **惯性**: 松手后速度按阻尼衰减
 
-### 加速模式（按键/滚轮）
-```
-value = target + (value - target) × damping
-```
-- 平移：WASD 改变 target.x/y，速度指数逼近 maxSpeed
-- 旋转：鼠标拖拽改变 theta/phi，角速度指数逼近 maxAngularSpeed
-- 缩放（距离）：滚轮改变 radius，指数逼近目标距离
+### 旋转
+- **右键拖拽**: 直接修改 theta/phi
+- **惯性**: 松手后角速度衰减
 
-### 减速模式（松手）
-```
-velocity = velocity × damping
-value = value + velocity
-```
-- 松开后速度按阻尼衰减，直到低于阈值停止
+### 缩放
+- **滚轮**: 指数逼近目标 radius
 
 ### 配置参数
 ```typescript
 const physicsConfig = {
-  panDamping: 0.85,      // 平移阻尼
-  panMaxSpeed: 2,        // 最大平移速度 (world units/frame)
+  panDamping: 0.92,      // 平移阻尼
+  panMaxSpeed: 2,        // 最大平移速度
   
   rotateDamping: 0.9,    // 旋转阻尼
-  rotateMaxSpeed: 0.02,  // 最大角速度 (radians/frame)
+  rotateMaxSpeed: 0.02,  // 最大角速度
   
   zoomDamping: 0.88,     // 缩放阻尼
-  minRadius: 5,          // 最近距离
-  maxRadius: 100,        // 最远距离
+  minRadius: 5,
+  maxRadius: 100,
 }
 ```
 
-## 透视同步
+## 双视角同步
 
-### CSS Transform 计算
-ReactFlow 容器需要应用与相机相反的变换，让它"看起来"在正确位置：
+### ReactFlow Viewport
+```typescript
+viewport = {
+  x: -targetX,           // 反向
+  y: targetY,
+  zoom: 30 / radius,     // 距离越近，zoom 越大
+}
+```
+
+### CSS 3D 变换（简化版）
+ReactFlow 容器只应用旋转，保持 2D 内容不变形：
 
 ```css
-.react-flow-wrapper {
+.react-flow-3d-container {
   transform-style: preserve-3d;
-  transform:
-    /* 1. 移动到屏幕中心 */
-    translate(-50%, -50%)
-    translate3d(50vw, 50vh, 0)
-    
-    /* 2. 应用相机透视 */
-    translateZ(${-radius}px)
-    rotateX(${-phi}rad)
-    rotateY(${theta}rad)
-    
-    /* 3. 平移补偿 */
-    translate3d(${-target.x}px, ${target.y}px, 0);
-    
-  /* 透视匹配 Three.js FOV */
+  transform: rotateX(${phi}rad) rotateY(${-theta}rad);
   perspective: ${(height / 2) / Math.tan(fov / 2)}px;
 }
 ```
 
-### 坐标转换流程
-
-**屏幕 → 世界** (用于判断命中):
-```
-screen (x, y)
-  ↓ unproject with Three.js camera
-ray (origin, direction)
-  ↓ intersect with Z=0 plane
-world (wx, wy, 0)
-  ↓ apply inverse CSS transform
-local (lx, ly) for ReactFlow
-```
-
-**世界 → 屏幕** (用于 3D gizmo 等):
-```
-world (wx, wy, wz)
-  ↓ project with Three.js camera
-screen (x, y)
-```
+**为什么简化？**
+1. ReactFlow 是 2D 工具，完整 3D 透视会让文字/控件变形
+2. 旋转角度对齐已足够营造"3D 空间感"
+3. 性能更好，兼容 ReactFlow 内置交互
 
 ## 事件流
 
 ```
-Window Pointer Event
+Pointer Event
   ↓
-拦截层 (CameraEventInterceptor)
-  ├─ 转换为世界坐标
-  ├─ 检查是否命中 ReactFlow 元素
-  │   ├─ 是 → 转换为局部坐标 → 创建合成事件 → 传给 ReactFlow
-  │   └─ 否 → 进入相机控制模式
-  ↓
-相机控制
-  ├─ 左键拖拽: 平移 target (XY平面滑动)
-  ├─ 右键拖拽: 旋转相机 (改变 theta/phi)
-  └─ 滚轮: 改变 radius (缩放)
+ReactFlow3D 拦截层
+  ├─ 命中节点/边 → 传给 ReactFlow 处理
+  └─ 未命中 → 相机控制
+        ├─ 左键拖拽: 平移 target
+        ├─ 右键拖拽: 旋转 theta/phi
+        └─ 滚轮: 缩放 radius
 ```
 
 ## ReactFlow 配置
 
-ReactFlow 需要禁用默认的视口控制，完全由外部接管：
+必须禁用默认控制，完全由外部接管：
 
 ```jsx
 <ReactFlow
-  panOnDrag={false}      // 禁用拖拽平移
-  zoomOnScroll={false}   // 禁用滚轮缩放
-  zoomOnPinch={false}    // 禁用双指缩放
+  panOnDrag={false}
+  zoomOnScroll={false}
+  zoomOnPinch={false}
   zoomOnDoubleClick={false}
   panOnScroll={false}
-  selectionOnDrag={true} // 允许框选
-  // 保留节点拖拽、连接等交互
+  selectionOnDrag={true}
 />
 ```
 
@@ -148,21 +119,45 @@ ReactFlow 需要禁用默认的视口控制，完全由外部接管：
 ```
 src/
 ├── hooks/
-│   └── useCameraControl.ts      # 核心：相机状态 + 物理 + 同步
+│   └── useCameraControl.ts      # 核心：相机状态 + 物理
 ├── components/
-│   ├── Scene3D/
-│   │   └── index.tsx             # 3D 场景，接收 camera 状态
-│   └── ReactFlow3D/
-│       └── index.tsx             # ReactFlow 容器，应用 CSS 3D 变换
-├── utils/
-│   └── coordinateTransform.ts    # 坐标转换工具函数
+│   ├── Scene3D/                 # 3D 场景渲染
+│   └── ReactFlow3D/             # ReactFlow 3D 容器
 └── docs/
-    └── camera-control-architecture.md  # 本文档
+    └── camera-control-architecture.md
 ```
+
+## 操作直觉与数学映射
+
+### 为什么向右拖动 = 相机向左转？
+
+**心智模型：拖动 = 抓住场景墙移动**
+
+想象你和场景之间有一面"玻璃墙"（位于 z+ 方向）：
+- **向右拖动** = 抓住墙往右拉
+- 如果墙真的跟着动，它会**逆时针**旋转（从上往下看）
+- 但墙不动，所以相机必须**顺时针**旋转来产生相同的视觉效果
+
+**数学实现**（theta 增加时）：
+```
+相机位置 x = radius × sin(-theta)
+theta↑ 时 sin(-theta)↓（负得更多）→ x 减小 → 相机向左移（顺时针）✓
+```
+
+**方向对照表**（拖动时看到更多哪一侧）：
+| 拖动方向 | theta/phi 变化 | Three.js 坐标 | 结果 |
+|---------|---------------|--------------|------|
+| 右拖 | theta ↑ | `sin(-theta)` 减小 | 看到右侧 |
+| 左拖 | theta ↓ | `sin(-theta)` 增大 | 看到左侧 |
+| 下拖 | phi ↑ | `sin(phi)` 增大 | 看到下方 |
+| 上拖 | phi ↓ | `sin(phi)` 减小 | 看到上方 |
+
+**CSS 同步**：
+- CSS `rotateY(theta)` 正方向 = 顺时针
+- 所以直接用 `theta`（不用负号）即可与 Three.js 视角对齐
 
 ## 注意事项
 
-1. **性能**: 每帧更新 CSS transform 可能触发重排，使用 `will-change: transform` 优化
-2. **精度**: CSS 和 WebGL 的浮点精度略有差异，远距离可能出现 1-2px 偏差
-3. **事件冒泡**: 合成事件需要正确处理 `stopPropagation` 避免循环
-4. **边界情况**: 当 phi 接近 90°（垂直俯视）时，鼠标平移逻辑需要特殊处理
+1. **精度**: CSS 和 WebGL 浮点精度略有差异，极端角度可能有 1-2px 偏差
+2. **性能**: `will-change: transform` 优化 CSS 动画
+3. **边界**: phi 限制在 (-89°, 89°) 避免万向锁
