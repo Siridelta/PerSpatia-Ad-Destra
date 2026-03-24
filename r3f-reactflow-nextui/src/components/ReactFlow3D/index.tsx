@@ -10,7 +10,7 @@
 import React, { useRef, useEffect, useCallback } from 'react';
 import type { PointerEvent as ReactPointerEvent } from 'react';
 import { useCameraStore } from '../../store/cameraStore';
-import { calculateCSSPerspective } from '../../utils/coordinateTransform';
+import { calculateCSSPerspective, DEFAULT_SPHERICAL_PHI } from '../../utils/coordinateTransform';
 
 interface ReactFlow3DProps {
   children: React.ReactNode;
@@ -30,7 +30,7 @@ export function ReactFlow3D({
     // 初始状态设置
     const state = useCameraStore.getState();
     if (transformRef.current) {
-      transformRef.current.style.transform = `rotateX(${-state.cameraState.phi}rad) rotateY(${state.cameraState.theta}rad)`;
+      transformRef.current.style.transform = `rotateX(${DEFAULT_SPHERICAL_PHI - state.cameraState.phi}rad) rotateY(${state.cameraState.theta}rad)`;
     }
     if (containerRef.current) {
       containerRef.current.style.perspective = `${calculateCSSPerspective(state.viewportSize.height, fov)}px`;
@@ -39,7 +39,7 @@ export function ReactFlow3D({
     // 订阅状态变化
     const unsubscribe = useCameraStore.subscribe((newState) => {
       if (transformRef.current) {
-        transformRef.current.style.transform = `rotateX(${-newState.cameraState.phi}rad) rotateY(${newState.cameraState.theta}rad)`;
+        transformRef.current.style.transform = `rotateX(${DEFAULT_SPHERICAL_PHI - newState.cameraState.phi}rad) rotateY(${newState.cameraState.theta}rad)`;
       }
       if (containerRef.current) {
         containerRef.current.style.perspective = `${calculateCSSPerspective(newState.viewportSize.height, fov)}px`;

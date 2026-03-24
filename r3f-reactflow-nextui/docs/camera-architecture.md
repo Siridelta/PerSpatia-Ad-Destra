@@ -119,16 +119,44 @@ React Flow API **只能稳定表达** `viewport: { x, y, zoom }`，**不包含**
 
 - `targetX`, `targetY`：相机注视点在 XY 平面上。
 - `radius`：相机到该点的距离；与 React Flow 的 `zoom` 约定为 **`zoom = 30 / radius`**（见 `Canvas` 中 `controlledViewport`）。
-- `theta`：水平朝向偏移（绕竖直轴相对「正视墙」摆动）；`phi`：相对 **平视** 的俯仰（实现里会夹紧，避免万向锁；**后续产品上会进一步限制在接近平视的锥形内**，避免从头顶/脚底看墙或绕到墙后）。
+- `theta`、`phi`：**与 `THREE.Spherical` / `Vector3.setFromSphericalCoords(radius, phi, theta)` / drei OrbitControls 内部约定一致**（见 Three 文档与 `three.core.js` 中 `Spherical`）。
+- `tick` 里将 `phi` 夹在 **`(SPHERICAL_PHI_MIN, SPHERICAL_PHI_MAX)`**（约 `0.01`～`π - 0.01`），等价于 `Spherical.makeSafe` 量级，避免极点；**+Z 锥体**等产品向约束留待后续与物理一起设计。
 
-**相机位置（代码中的公式，便于对照调试）**
+**相机位置（实现直接调用 Three API，便于对照）**
 
 ```text
-position.x = targetX + radius * sin(-theta) * cos(phi)
-position.y = targetY + radius * sin(phi)
-position.z = radius * cos(-theta) * cos(phi)
+position.setFromSphericalCoords(radius, phi, theta)
+position.x += targetX
+position.y += targetY
 lookAt(targetX, targetY, 0)
 ```
+
+展开后与 Three 一致：
+
+```text
+x = targetX + radius * sin(phi) * sin(theta)
+y = targetY + radius * cos(phi)
+z = radius * sin(phi) * cos(theta)
+```
+
+#### `theta` / `phi`：零点与正方向（与 OrbitControls 对齐）
+
+**零点（默认 `initialTheta = 0`、`initialPhi = π/2`，常量 `DEFAULT_SPHERICAL_PHI`）**
+
+- 注视点在 **`(targetX, targetY, 0)`**（墙面 z=0）。
+- **`theta = 0` 且 `phi = π/2`（赤道）**：相对注视点偏移 **`(0, 0, +radius)`**，沿 **+Z** **正视墙**，即产品上的 **平视基准**。
+- **`phi`**：从 **+Y** 向下的极角；**小于 π/2** 偏向 **+Y**（更高），**大于 π/2** 偏向 **-Y**（更低）。
+- **`theta`**：在 **XZ** 平面内从 **+Z** 起算的方位角（与 `Math.atan2(x, z)` 一致）。
+
+**指针映射**：右键拖时 **`theta -= dx * sens`**（与 Spherical 正向相反），以保留迁移前大致的左右手感；**`phi += dy * sens`** 接近常见 Orbit 纵向行为。可调。
+
+**与 OrbitControls**：`getAzimuthalAngle()` / `getPolarAngle()`（或内部 `spherical`）可与本 store 的 **`theta` / `phi` 直接对照**（注意 Orbit 的 target 与 min/max 限制仍由自研 `tick` 负责）。
+
+#### 视角约束：我们要的是「+Z 锥体」，不是 drei 那种「分角夹逼」
+
+产品上要的是：视线大致沿 **正视墙时的法向** 活动，偏离不能太大——几何上写成 **以该法向为轴的圆锥**（或相机方向与 **+Z** 夹角上限）。
+
+**@react-three/drei** 的 `OrbitControls` 仍主要是 **对 polar/azimuth 做区间限制**（在 **同一套 Spherical 角** 上切盒），**不等于**「绕视轴的锥体」；锥体约束需在自研 **`tick`** 里对 **方向向量** 做夹逼并与物理整合。**当前**仅 **phi 全范围安全夹紧**，锥体未实现。
 
 **React Flow `viewport`（仅表达平移+缩放，不含旋转）**
 
@@ -162,24 +190,28 @@ viewport.zoom = 30 / radius
 
 - **必须关掉 RF 自带平移/缩放**（否则与自定义控制打架），例如：`panOnDrag={false}`、`zoomOnScroll={false}` 等（具体以 `Canvas` 里实际 props 为准）。
 - **`Canvas` 用 `controlledViewport` + `setViewport`** 把 store 推到 RF；与 store 差异小于阈值时不写，减轻循环抖动。
-- **勿在 `onMoveEnd` 调用 `syncFromReactFlowViewport`**：`syncFromReactFlowViewport` 只写 `targetX/targetY/radius`，**不写 `theta/phi`**，反复调用会把旋转状态搞乱。持久化只在加载时用 `setCameraState` 一次性对齐即可。
+- **勿在 `onMoveEnd` 调用 `syncFromReactFlowViewport`**：`syncFromReactFlowViewport` 只写 `targetX/targetY/radius`，**不写 `theta/phi`**，反复调用会把旋转状态搞乱。
 
-### 2.7 操作直觉与 CSS 符号
+### 2.7 持久化已知债：`theta` / `phi` 尚未进存档
+
+画布持久化当前走 **React Flow 的 `viewport`（x, y, zoom）**；**不包含** `theta`、`phi`。`Canvas` 在 hydration 时会把 **`targetX` / `targetY` / `radius`** 从 viewport 还原，并把角度写回 **`theta = 0`、`phi = DEFAULT_SPHERICAL_PHI（π/2）`**（与默认正视墙一致）。因此：**重载后用户曾转过的视角会丢**，**后续**再在 `flowData`（或侧车字段）里 **序列化 `theta`/`phi`** 并改加载逻辑即可。
+
+### 2.8 操作直觉与 CSS 符号
 
 心智模型：**拖拽像在抓「面前的玻璃」**。向右拖希望看到更多右侧内容，对应实现里对 `theta`/`phi` 的符号与相机公式耦合；若调试时觉得「方向反了」，应对照 `updateSimulatedCamera` 与 `ReactFlow3D` 的 `rotateX`/`rotateY` 符号一起改，避免只改一侧。
 
-**CSS 与 Three 的符号**：`ReactFlow3D` 当前为 `rotateX(-phi) rotateY(theta)`，与旧文档中的写法可能差一个负号，**以组件源码为准**。
+**CSS 与 Three 的符号**：`ReactFlow3D` 为 `rotateX((π/2 - phi)rad) rotateY(theta rad)`（常量 `DEFAULT_SPHERICAL_PHI - phi`），与赤道基准 `phi = π/2` 对齐；**以 `ReactFlow3D/index.tsx` 为准**。
 
-### 2.8 常见问题（排错）
+### 2.9 常见问题（排错）
 
 | 现象 | 优先查 |
 |------|--------|
 | 一转视角再平移就跳 | 是否仍缓存了「旧相机下的平面点」；应用「仅 `lastPointerScreen` + 当帧双射线」方案 |
-| 旋转突然被清零 | RF 回调里是否调用了 `syncFromReactFlowViewport` 或只根据 viewport 重设了相机 |
+| 旋转突然被清零 | RF 回调里是否调用了 `syncFromReactFlowViewport` 或只根据 viewport 重设了相机；**或**刷新/重载（持久化只存 viewport，见 **§2.7**） |
 | 3D 与 2D 不同步 | `subscribe` 是否生效、`viewportSize` 是否与窗口一致、`controlledViewport` 公式是否改动 |
 | 节点上拖动画布 | `ReactFlow3D` 的 `closest` 选择器是否覆盖该类节点容器 |
 
-### 2.9 归档里还有什么
+### 2.10 归档里还有什么
 
 - **`archive/usePanAndZoomControl.md`**：`usePanAndZoomControl` + `onMoveEnd` 反向同步——**已非当前主线**，保留作历史对比。
 - **`archive/camera-control-architecture.md`**：坐标与操作直觉仍有用，但文中的文件路径与钩子名已过期。

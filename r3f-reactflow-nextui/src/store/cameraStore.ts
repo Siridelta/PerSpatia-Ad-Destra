@@ -3,6 +3,11 @@ import { immer } from 'zustand/middleware/immer';
 import { enableMapSet } from 'immer';
 import * as THREE from 'three';
 import type { CameraState } from '../utils/coordinateTransform';
+import {
+  DEFAULT_SPHERICAL_PHI,
+  SPHERICAL_PHI_MAX,
+  SPHERICAL_PHI_MIN,
+} from '../utils/coordinateTransform';
 
 // 启用 Immer 对 Set 的支持
 enableMapSet();
@@ -26,7 +31,8 @@ export const DEFAULT_CAMERA_OPTIONS: CameraOptions = {
   initialTargetY: 0,
   initialRadius: 30,
   initialTheta: 0,
-  initialPhi: 0,
+  /** 与 THREE.Spherical 一致：π/2 = 赤道，相机在 +Z 侧正视 z=0 墙面 */
+  initialPhi: DEFAULT_SPHERICAL_PHI,
   minRadius: 5,
   maxRadius: 100,
   panDamping: 0.92,
@@ -185,14 +191,18 @@ export const useCameraStore = create<CameraStore>()(immer((set, get) => ({
   },
 
   // 辅助方法
+  /**
+   * 球坐标与 THREE.Spherical / Vector3.setFromSphericalCoords / OrbitControls 一致。
+   * 默认 theta=0、phi=π/2 → 偏移 (0,0,+radius)，沿 +Z 正视 z=0 墙面。
+   */
   updateSimulatedCamera: () => {
     const state = get();
     const { cameraState, simulatedCamera } = state;
     const { targetX, targetY, radius, theta, phi } = cameraState;
 
-    simulatedCamera.position.x = targetX + radius * Math.sin(-theta) * Math.cos(phi);
-    simulatedCamera.position.y = targetY + radius * Math.sin(phi);
-    simulatedCamera.position.z = radius * Math.cos(-theta) * Math.cos(phi);
+    simulatedCamera.position.setFromSphericalCoords(radius, phi, theta);
+    simulatedCamera.position.x += targetX;
+    simulatedCamera.position.y += targetY;
     simulatedCamera.lookAt(targetX, targetY, 0);
     simulatedCamera.updateMatrixWorld();
   },
@@ -274,7 +284,8 @@ export const useCameraStore = create<CameraStore>()(immer((set, get) => ({
 
       set(draft => {
         draft.input.lastPointerScreen = { x: clientX, y: clientY };
-        draft.physics.rotateOffset.desired.theta += dx * 0.005;
+        // 与旧版左右手感一致：theta 增加方向与 Spherical 正向相反
+        draft.physics.rotateOffset.desired.theta -= dx * 0.005;
         draft.physics.rotateOffset.desired.phi += dy * 0.005;
       });
     } else if (input.isPanning) {
@@ -389,7 +400,7 @@ export const useCameraStore = create<CameraStore>()(immer((set, get) => ({
 
         dCamera.theta += dTheta;
         dCamera.phi += dPhi;
-        dCamera.phi = Math.max(-Math.PI / 2 + 0.1, Math.min(Math.PI / 2 - 0.1, dCamera.phi));
+        dCamera.phi = Math.max(SPHERICAL_PHI_MIN, Math.min(SPHERICAL_PHI_MAX, dCamera.phi));
       }
 
       // ===== Pan Velocity 系统 =====
@@ -421,7 +432,7 @@ export const useCameraStore = create<CameraStore>()(immer((set, get) => ({
 
         dCamera.theta += dPhysics.rotateVelocity.current.theta;
         dCamera.phi += dPhysics.rotateVelocity.current.phi;
-        dCamera.phi = Math.max(-Math.PI / 2 + 0.1, Math.min(Math.PI / 2 - 0.1, dCamera.phi));
+        dCamera.phi = Math.max(SPHERICAL_PHI_MIN, Math.min(SPHERICAL_PHI_MAX, dCamera.phi));
       }
 
       // ===== 缩放系统 =====

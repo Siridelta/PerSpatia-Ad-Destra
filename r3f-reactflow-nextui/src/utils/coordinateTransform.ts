@@ -1,10 +1,36 @@
 /**
  * 坐标转换工具
- * 
+ *
  * 负责在屏幕坐标、世界坐标、ReactFlow 局部坐标之间转换
+ *
+ * 相机球坐标与 THREE.Spherical / OrbitControls 一致：
+ * - phi：从 +Y 轴向下的极角（0 = +Y 顶端，π/2 = XZ 赤道，π = -Y）
+ * - theta：在 XZ 平面内从 +Z 轴起算的方位角（Math.atan2(x, z) 与 Three 源码一致）
+ * - 位置：Vector3.setFromSphericalCoords(radius, phi, theta)，再平移到注视点 (targetX, targetY, 0)
  */
 
 import * as THREE from 'three';
+
+/** 正视 +Z（墙面在 z=0）时的默认极角：赤道 */
+export const DEFAULT_SPHERICAL_PHI = Math.PI / 2;
+
+/** 默认方位：+Z 方向 */
+export const DEFAULT_SPHERICAL_THETA = 0;
+
+/** 与 Spherical.makeSafe 同量级，避免 cos(phi) 极点 */
+export const SPHERICAL_PHI_MIN = 0.01;
+
+export const SPHERICAL_PHI_MAX = Math.PI - 0.01;
+
+/** 由球坐标得到相对注视点 (0,0,0) 的相机位置偏移（与 Three 一致） */
+export function offsetFromSpherical(
+  radius: number,
+  phi: number,
+  theta: number,
+  out: THREE.Vector3 = new THREE.Vector3()
+): THREE.Vector3 {
+  return out.setFromSphericalCoords(radius, phi, theta);
+}
 
 // 平面 Z=0，用于射线相交
 const XY_PLANE = new THREE.Plane(new THREE.Vector3(0, 0, 1), 0);
@@ -47,11 +73,12 @@ export function screenToWorldFromState(
   fovDegrees: number = 50
 ): { x: number; y: number; z: number } | null {
   const { targetX, targetY, radius, theta, phi } = state;
-  
-  // 1. 计算相机位置（与 Scene3D 使用相同的公式）
-  const camX = targetX + radius * Math.sin(-theta) * Math.cos(phi);
-  const camY = targetY + radius * Math.sin(phi);
-  const camZ = radius * Math.cos(-theta) * Math.cos(phi);
+
+  // 1. 相机位置（THREE.Spherical / setFromSphericalCoords）
+  const off = offsetFromSpherical(radius, phi, theta);
+  const camX = targetX + off.x;
+  const camY = targetY + off.y;
+  const camZ = off.z;
   
   // 2. 计算屏幕坐标对应的 NDC (-1 到 1)
   const ndcX = (screenX / viewportWidth) * 2 - 1;
@@ -126,14 +153,16 @@ export function worldToScreen(
 }
 
 /**
- * 相机状态
+ * 相机状态（球坐标与 THREE.Spherical / OrbitControls 一致）
  */
 export interface CameraState {
   targetX: number;
   targetY: number;
   radius: number;
-  theta: number;  // 水平角度
-  phi: number;    // 垂直角度
+  /** XZ 平面内方位角（弧度），从 +Z 起算，同 THREE.Spherical.theta */
+  theta: number;
+  /** 从 +Y 向下的极角（弧度），同 THREE.Spherical.phi；π/2 为赤道 = 正视 +Z */
+  phi: number;
 }
 
 /**
@@ -145,10 +174,9 @@ export function updateCameraFromState(
 ): void {
   const { targetX, targetY, radius, theta, phi } = state;
 
-  // 球坐标转笛卡尔
-  camera.position.x = targetX + radius * Math.sin(theta) * Math.cos(phi);
-  camera.position.y = targetY + radius * Math.sin(phi);
-  camera.position.z = radius * Math.cos(theta) * Math.cos(phi);
+  offsetFromSpherical(radius, phi, theta, camera.position);
+  camera.position.x += targetX;
+  camera.position.y += targetY;
 
   camera.lookAt(targetX, targetY, 0);
 }
@@ -179,8 +207,8 @@ export function calculateCSSTransform(
     // 2. 应用相机的逆变换
     // 先移动半径距离（相机到原点的距离）
     `translateZ(${-radius}px)`,
-    // 逆旋转（注意符号）
-    `rotateX(${-phi}rad)`,
+    // 与 ReactFlow3D 一致：相对赤道 π/2 的倾角
+    `rotateX(${DEFAULT_SPHERICAL_PHI - phi}rad)`,
     `rotateY(${theta}rad)`,
     
     // 3. 平移补偿 target
@@ -215,9 +243,10 @@ export function worldToLocal(
   x = x2;
   z = z2;
 
-  // 3. 逆旋转 X（-phi）
-  const cosX = Math.cos(phi);
-  const sinX = Math.sin(phi);
+  // 3. 逆旋转 X（赤道基准：-(π/2 - phi) = phi - π/2）
+  const ax = phi - DEFAULT_SPHERICAL_PHI;
+  const cosX = Math.cos(-ax);
+  const sinX = Math.sin(-ax);
   const y3 = y * cosX - z * sinX;
   z = y * sinX + z * cosX;
   y = y3;
@@ -241,9 +270,10 @@ export function localToWorld(
   let y = localY;
   let z = 0;
 
-  // 1. 旋转 X（-phi）
-  const cosX = Math.cos(-phi);
-  const sinX = Math.sin(-phi);
+  // 1. 旋转 X（π/2 - phi），与 CSS rotateX 顺序一致
+  const ax = DEFAULT_SPHERICAL_PHI - phi;
+  const cosX = Math.cos(ax);
+  const sinX = Math.sin(ax);
   const y2 = y * cosX - z * sinX;
   const z2 = y * sinX + z * cosX;
   y = y2;

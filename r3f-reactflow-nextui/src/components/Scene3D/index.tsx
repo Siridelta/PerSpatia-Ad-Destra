@@ -151,10 +151,10 @@ function CameraSync() {
     // 读取最新状态
     const { targetX, targetY, radius, theta, phi } = store.cameraState;
     
-    // 球坐标转笛卡尔（theta 取反让水平方向正确，phi 不取反让竖直方向正确）
-    camera.position.x = targetX + radius * Math.sin(-theta) * Math.cos(phi);
-    camera.position.y = targetY + radius * Math.sin(phi);
-    camera.position.z = radius * Math.cos(-theta) * Math.cos(phi);
+    // THREE.Spherical / setFromSphericalCoords，与 OrbitControls 约定一致
+    camera.position.setFromSphericalCoords(radius, phi, theta);
+    camera.position.x += targetX;
+    camera.position.y += targetY;
     
     camera.lookAt(targetX, targetY, 0);
   });

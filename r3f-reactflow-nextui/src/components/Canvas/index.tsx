@@ -11,8 +11,7 @@ import {
   ReactFlowInstance,
 } from '@xyflow/react';
 import '@xyflow/react/dist/style.css';
-import React, { useCallback, useEffect, useRef, useState } from 'react';
-import * as THREE from 'three';
+import React, { useCallback, useEffect, useRef } from 'react';
 
 import BottomToolbar from '@/components/BottomToolbar';
 import FloatingEdge from '@/components/CustomEdge';
@@ -29,6 +28,7 @@ import { useCanvasEval } from '@/hooks/useCanvasEval';
 import { useCanvasStatePersistence } from '@/hooks/useCanvasStatePersistence';
 import { useTheme } from '@/hooks/useTheme';
 import { useCameraStore } from '@/store/cameraStore';
+import { DEFAULT_SPHERICAL_PHI } from '@/utils/coordinateTransform';
 import { parseCanvasArchiveText, serializeCanvasArchive } from '@/services/canvas-archive';
 import { useSettingsStore } from '@/store/settingsStore';
 import { useToolStore } from '@/store/toolStore';
@@ -129,7 +129,7 @@ const Canvas: React.FC = () => {
         targetY: persistedViewport.y,
         radius: clampedRadius,
         theta: 0,
-        phi: 0,
+        phi: DEFAULT_SPHERICAL_PHI,
       });
     }
   }, [persistedViewport, isHydrated, setCameraState]);
