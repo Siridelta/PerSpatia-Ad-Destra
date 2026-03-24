@@ -39,10 +39,7 @@ interface InputState {
   keys: Set<string>;
   isPanning: boolean;
   isRotating: boolean;
-  lastPointer: {
-    screen: { x: number; y: number };
-    plane: { x: number; y: number } | null;
-  };
+  lastPointerScreen: { x: number; y: number } | null;
 }
 
 // 物理系统内部状态
@@ -122,10 +119,7 @@ export const useCameraStore = create<CameraStore>()(immer((set, get) => ({
     keys: new Set<string>(),
     isPanning: false,
     isRotating: false,
-    lastPointer: {
-      screen: { x: 0, y: 0 },
-      plane: { x: 0, y: 0 },
-    },
+    lastPointerScreen: null,
   },
 
   physics: {
@@ -245,15 +239,9 @@ export const useCameraStore = create<CameraStore>()(immer((set, get) => ({
   },
 
   startPan: (clientX, clientY) => {
-    const state = get();
-    const planePoint = state.screenToPlane(clientX, clientY);
-
     set(draft => {
       draft.input.isPanning = true;
-      draft.input.lastPointer = {
-        screen: { x: clientX, y: clientY },
-        plane: planePoint,
-      };
+      draft.input.lastPointerScreen = { x: clientX, y: clientY };
       draft.physics.panOffset = {
         desired: { x: 0, y: 0 },
         current: { x: 0, y: 0 },
@@ -263,14 +251,9 @@ export const useCameraStore = create<CameraStore>()(immer((set, get) => ({
   },
 
   startRotate: (clientX, clientY) => {
-    const state = get();
-    const planePoint = state.screenToPlane(clientX, clientY);   // 保留 plane point 计算以备与 pan 共同工作
     set(draft => {
       draft.input.isRotating = true;
-      draft.input.lastPointer = {
-        screen: { x: clientX, y: clientY },
-        plane: planePoint,
-      };
+      draft.input.lastPointerScreen = { x: clientX, y: clientY };
       draft.physics.rotateOffset = {
         desired: { theta: 0, phi: 0 },
         current: { theta: 0, phi: 0 },
@@ -281,30 +264,29 @@ export const useCameraStore = create<CameraStore>()(immer((set, get) => ({
 
   handlePointerMove: (clientX, clientY) => {
     const state = get();
-    const { input, physics } = state;
-    const currentPlane = state.screenToPlane(clientX, clientY);
+    const { input } = state;
+
+    if (!input.lastPointerScreen) return;
 
     if (input.isRotating) {
-      const dx = clientX - input.lastPointer.screen.x;
-      const dy = clientY - input.lastPointer.screen.y;
+      const dx = clientX - input.lastPointerScreen.x;
+      const dy = clientY - input.lastPointerScreen.y;
 
       set(draft => {
-        draft.input.lastPointer.screen = { x: clientX, y: clientY };
+        draft.input.lastPointerScreen = { x: clientX, y: clientY };
         draft.physics.rotateOffset.desired.theta += dx * 0.005;
         draft.physics.rotateOffset.desired.phi += dy * 0.005;
       });
     } else if (input.isPanning) {
-      // 如果 lastPointer 命中 plane 失败就不响应 pan 操作到 offset 系统中 
-      if (currentPlane && input.lastPointer.plane) {
-        // current - last 的相反矢量，也就是 last - current，叠加到 desired offset 上
-        const dx = input.lastPointer.plane.x - currentPlane.x;
-        const dy = input.lastPointer.plane.y - currentPlane.y;
+      const lastPlane = state.screenToPlane(input.lastPointerScreen.x, input.lastPointerScreen.y);
+      const currentPlane = state.screenToPlane(clientX, clientY);
+
+      if (currentPlane && lastPlane) {
+        const dx = lastPlane.x - currentPlane.x;
+        const dy = lastPlane.y - currentPlane.y;
 
         set(draft => {
-          draft.input.lastPointer = {
-            screen: { x: clientX, y: clientY },
-            plane: currentPlane,
-          };
+          draft.input.lastPointerScreen = { x: clientX, y: clientY };
           draft.physics.panOffset.desired.x += dx;
           draft.physics.panOffset.desired.y += dy;
         });
@@ -341,6 +323,8 @@ export const useCameraStore = create<CameraStore>()(immer((set, get) => ({
 
         draft.input.isRotating = false;
       }
+      
+      draft.input.lastPointerScreen = null;
     });
   },
 
@@ -357,7 +341,7 @@ export const useCameraStore = create<CameraStore>()(immer((set, get) => ({
   // Physics Loop
   tick: () => {
     const state = get();
-    const { input, physics, options, cameraState } = state;
+    const { input, physics, cameraState } = state;
 
     // 1. 快速检查是否需要继续动画 (基于当前状态判断)
     const hasPanOffset = Math.abs(physics.panOffset.desired.x - physics.panOffset.current.x) > 0.01

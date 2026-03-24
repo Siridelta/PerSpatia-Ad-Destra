@@ -96,7 +96,8 @@ const Canvas: React.FC = () => {
   // 统一的相机控制系统
   const cameraState = useCameraStore((state) => state.cameraState);
   const setCameraState = useCameraStore((state) => state.setCameraState);
-  const syncFromViewport = useCameraStore((state) => state.syncFromReactFlowViewport);
+  // 不在 onMoveEnd 等处调用 syncFromReactFlowViewport：RF 只有 x/y/zoom，会覆盖相机 store 中的 theta/phi（见 docs/camera-architecture.md）
+  // const syncFromViewport = useCameraStore((state) => state.syncFromReactFlowViewport);
   const setViewportSize = useCameraStore((state) => state.setViewportSize);
   
   const controlledViewport = {
@@ -461,14 +462,6 @@ const Canvas: React.FC = () => {
                   onPaneClick={handlePaneClick}
                   onNodeClick={onNodeClick}
                   onInit={handleInit}
-                  onMoveEnd={(_event, newViewport) => {
-                    if (newViewport) {
-                      // 更新 flowData（用于持久化）
-                      canvasDataApi.writeFlow.setViewport(newViewport);
-                      // 反向同步到相机控制器
-                      syncFromViewport(newViewport.x, newViewport.y, newViewport.zoom);
-                    }
-                  }}
                   nodeTypes={nodeTypes}
                   edgeTypes={edgeTypes}
                   defaultEdgeOptions={defaultEdgeOptions}
