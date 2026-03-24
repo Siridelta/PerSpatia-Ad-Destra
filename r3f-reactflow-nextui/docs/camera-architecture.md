@@ -80,7 +80,7 @@ React Flow API **只能稳定表达** `viewport: { x, y, zoom }`，**不包含**
 因此：
 
 - **旋转**只存在于我们的 **`cameraState.theta / phi`** 和 CSS / Three 里，**写不进**标准 viewport。
-- 若用 `onMoveEnd` 等回调把 **viewport 反写回相机**（例如 `syncFromReactFlowViewport`），只能恢复平移与缩放，**会丢掉或冲掉旋转**，破坏「墙与背景朝向一致」的一致性。正确做法是 **`useCameraStore` 为 SSOT**，单向把派生 viewport 推给 RF（见第二部分）。
+- 若用 `onMoveEnd` 等回调把 **viewport 反写回相机**，只能恢复平移与缩放，**会丢掉或冲掉旋转**，破坏「墙与背景朝向一致」的一致性。正确做法是 **`useCameraStore` 为 SSOT**，单向把派生 viewport 推给 RF（见第二部分）。
 
 ### 1.5 「伪 3D」到什么程度（和旧文档的关系）
 
@@ -96,17 +96,17 @@ React Flow API **只能稳定表达** `viewport: { x, y, zoom }`，**不包含**
 
 ### 2.1 一句话（SSOT）
 
-**`useCameraStore`（Zustand）是相机与视口的唯一真实来源**。DOM 指针/键盘等写入 store；R3F `useFrame` 里 `tick()` 做物理并驱动 Three.js 相机；`ReactFlow3D` 用 `subscribe` 直接改 CSS 3D 的 `transform` / `perspective`；`Canvas` 把派生出的 `controlledViewport` **单向** `setViewport` 推给 RF。**不要用 RF 的 `onMoveEnd` 去调用 `syncFromReactFlowViewport`**，否则会丢掉 `theta`/`phi`。
+**`useCameraStore`（Zustand）是相机与视口的唯一真实来源**。DOM 指针/键盘等写入 store；R3F `useFrame` 里 `tick()` 做物理并驱动 Three.js 相机；`ReactFlow3D` 用 `subscribe` 直接改 CSS 3D 的 `transform` / `perspective`；`Canvas` 把派生出的 `controlledViewport` **单向** `setViewport` 推给 RF。**不要用 RF 的 `onMoveEnd` 把 viewport 反写进相机**，否则会丢掉 `theta`/`phi`。
 
 ### 2.2 代码地图（改功能时先打开这些）
 
 | 路径 | 职责 |
 |------|------|
-| `src/store/cameraStore.ts` | 相机状态、`tick`、指针/滚轮/键盘、`screenToPlane`（射线与 z=0 平面求交） |
+| `src/store/cameraStore.ts` | `CameraState`、球坐标默认/夹紧常量、相机状态、`tick`、指针/滚轮/键盘、`screenToPlane` |
 | `src/components/ReactFlow3D/index.tsx` | 事件冒泡层、命中节点/边则放行、`subscribe` 更新 transform / perspective |
+| `src/components/ReactFlow3D/shellCssMath.ts` | 外壳 `perspective`、与 θ/φ 配套的 `transform` 字符串（纯函数） |
 | `src/components/Scene3D/index.tsx` | `useFrame` 调 `tick()`、同步 Three.js `PerspectiveCamera` |
 | `src/components/Canvas/index.tsx` | `controlledViewport` 计算、`setViewport`、持久化初始 `setCameraState` |
-| `src/utils/coordinateTransform.ts` | CSS perspective、与 RF 相关的坐标工具（若改 2.5D 对齐会用到） |
 
 ### 2.3 坐标系与相机参数（与世界 / RF 对齐）
 
@@ -190,24 +190,24 @@ viewport.zoom = 30 / radius
 
 - **必须关掉 RF 自带平移/缩放**（否则与自定义控制打架），例如：`panOnDrag={false}`、`zoomOnScroll={false}` 等（具体以 `Canvas` 里实际 props 为准）。
 - **`Canvas` 用 `controlledViewport` + `setViewport`** 把 store 推到 RF；与 store 差异小于阈值时不写，减轻循环抖动。
-- **勿在 `onMoveEnd` 调用 `syncFromReactFlowViewport`**：`syncFromReactFlowViewport` 只写 `targetX/targetY/radius`，**不写 `theta/phi`**，反复调用会把旋转状态搞乱。
+- **勿在 `onMoveEnd` 用 viewport 反写 store**：viewport 只有 `x/y/zoom`，**没有 `theta/phi`**，反复反写会把旋转状态搞乱。
 
 ### 2.7 持久化已知债：`theta` / `phi` 尚未进存档
 
-画布持久化当前走 **React Flow 的 `viewport`（x, y, zoom）**；**不包含** `theta`、`phi`。`Canvas` 在 hydration 时会把 **`targetX` / `targetY` / `radius`** 从 viewport 还原，并把角度写回 **`theta = 0`、`phi = DEFAULT_SPHERICAL_PHI（π/2）`**（与默认正视墙一致）。因此：**重载后用户曾转过的视角会丢**，**后续**再在 `flowData`（或侧车字段）里 **序列化 `theta`/`phi`** 并改加载逻辑即可。
+画布持久化当前走 **React Flow 的 `viewport`（x, y, zoom）**；**不包含** `theta`、`phi`。`Canvas` 在 hydration 时会把 **`targetX` / `targetY` / `radius`** 从 viewport 还原，并把角度写回 **`theta = DEFAULT_SPHERICAL_THETA`、`phi = DEFAULT_SPHERICAL_PHI（π/2）`**（与默认正视墙一致）。因此：**重载后用户曾转过的视角会丢**，**后续**再在 `flowData`（或侧车字段）里 **序列化 `theta`/`phi`** 并改加载逻辑即可。
 
 ### 2.8 操作直觉与 CSS 符号
 
 心智模型：**拖拽像在抓「面前的玻璃」**。向右拖希望看到更多右侧内容，对应实现里对 `theta`/`phi` 的符号与相机公式耦合；若调试时觉得「方向反了」，应对照 `updateSimulatedCamera` 与 `ReactFlow3D` 的 `rotateX`/`rotateY` 符号一起改，避免只改一侧。
 
-**CSS 与 Three 的符号**：`ReactFlow3D` 为 `rotateX((phi - π/2)rad) rotateY((-theta)rad)`，相对裸 Spherical 在 DOM 上对 θ、φ 各取反一层，使 2.5D 与 Three 画面同向；**以 `ReactFlow3D/index.tsx` 为准**。`coordinateTransform` 里 `calculateCSSTransform` / `worldToLocal` / `localToWorld` 与之一致。
+**CSS 与 Three 的符号**：`shellCssMath.ts` 中 `buildShellTransform` 生成 `rotateX((phi - π/2)rad) rotateY((-theta)rad)`，相对裸 Spherical 在 DOM 上对 θ、φ 各取反一层，使 2.5D 与 Three 画面同向；改符号时请与 `updateSimulatedCamera` 对照。
 
 ### 2.9 常见问题（排错）
 
 | 现象 | 优先查 |
 |------|--------|
 | 一转视角再平移就跳 | 是否仍缓存了「旧相机下的平面点」；应用「仅 `lastPointerScreen` + 当帧双射线」方案 |
-| 旋转突然被清零 | RF 回调里是否调用了 `syncFromReactFlowViewport` 或只根据 viewport 重设了相机；**或**刷新/重载（持久化只存 viewport，见 **§2.7**） |
+| 旋转突然被清零 | RF 回调里是否用 viewport **反写**了相机（无 θ/φ）；**或**刷新/重载（持久化只存 viewport，见 **§2.7**） |
 | 3D 与 2D 不同步 | `subscribe` 是否生效、`viewportSize` 是否与窗口一致、`controlledViewport` 公式是否改动 |
 | 节点上拖动画布 | `ReactFlow3D` 的 `closest` 选择器是否覆盖该类节点容器 |
 

@@ -2,15 +2,33 @@ import { create } from 'zustand';
 import { immer } from 'zustand/middleware/immer';
 import { enableMapSet } from 'immer';
 import * as THREE from 'three';
-import type { CameraState } from '../utils/coordinateTransform';
-import {
-  DEFAULT_SPHERICAL_PHI,
-  SPHERICAL_PHI_MAX,
-  SPHERICAL_PHI_MIN,
-} from '../utils/coordinateTransform';
 
 // 启用 Immer 对 Set 的支持
 enableMapSet();
+
+/**
+ * 相机状态（球坐标与 THREE.Spherical / OrbitControls 一致）
+ */
+export interface CameraState {
+  targetX: number;
+  targetY: number;
+  radius: number;
+  /** XZ 平面内方位角（弧度），从 +Z 起算，同 THREE.Spherical.theta */
+  theta: number;
+  /** 从 +Y 向下的极角（弧度），同 THREE.Spherical.phi；π/2 为赤道 = 正视 +Z */
+  phi: number;
+}
+
+/** 正视 +Z（墙面在 z=0）时的默认极角：赤道 */
+export const DEFAULT_SPHERICAL_PHI = Math.PI / 2;
+
+/** 默认方位：+Z 方向 */
+export const DEFAULT_SPHERICAL_THETA = 0;
+
+/** 与 Spherical.makeSafe 同量级，避免 cos(phi) 极点 */
+export const SPHERICAL_PHI_MIN = 0.01;
+
+export const SPHERICAL_PHI_MAX = Math.PI - 0.01;
 
 // 配置选项
 export interface CameraOptions {
@@ -30,7 +48,7 @@ export const DEFAULT_CAMERA_OPTIONS: CameraOptions = {
   initialTargetX: 0,
   initialTargetY: 0,
   initialRadius: 30,
-  initialTheta: 0,
+  initialTheta: DEFAULT_SPHERICAL_THETA,
   /** 与 THREE.Spherical 一致：π/2 = 赤道，相机在 +Z 侧正视 z=0 墙面 */
   initialPhi: DEFAULT_SPHERICAL_PHI,
   minRadius: 5,
@@ -90,7 +108,6 @@ export interface CameraStore {
   setViewportSize: (width: number, height: number) => void;
   setOptions: (options: Partial<CameraOptions>) => void;
   setCameraState: (state: Partial<CameraState>) => void;
-  syncFromReactFlowViewport: (x: number, y: number, zoom: number) => void;
 
   // Input Actions (Event Capturer 调用)
   handleKeyDown: (key: string) => void;
@@ -177,16 +194,6 @@ export const useCameraStore = create<CameraStore>()(immer((set, get) => ({
       if (newState.radius !== undefined) {
         draft.physics.targetRadius = newState.radius;
       }
-    });
-  },
-
-  syncFromReactFlowViewport: (x, y, zoom) => {
-    set((draft) => {
-      const radius = 30 / zoom;
-      draft.cameraState.targetX = -x;
-      draft.cameraState.targetY = y;
-      draft.cameraState.radius = radius;
-      draft.physics.targetRadius = radius;
     });
   },
 

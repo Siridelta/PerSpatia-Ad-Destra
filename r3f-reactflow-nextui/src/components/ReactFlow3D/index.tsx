@@ -2,7 +2,7 @@
  * ReactFlow3D - ReactFlow 的 3D 容器
  * 
  * 职责：
- * 1. 订阅 Zustand Store，应用 CSS 3D transform 匹配相机视角
+ * 1. 订阅 Zustand Store，经 `shellCssMath` 应用 CSS 3D transform / perspective 匹配相机视角
  * 2. 依赖 DOM 事件冒泡，拦截未被 ReactFlow 消费的 pointer 事件
  * 3. 将事件传给相机控制 Store
  */
@@ -10,7 +10,7 @@
 import React, { useRef, useEffect, useCallback } from 'react';
 import type { PointerEvent as ReactPointerEvent } from 'react';
 import { useCameraStore } from '../../store/cameraStore';
-import { calculateCSSPerspective, DEFAULT_SPHERICAL_PHI } from '../../utils/coordinateTransform';
+import { buildShellTransform, calculateCSSPerspective } from './shellCssMath';
 
 interface ReactFlow3DProps {
   children: React.ReactNode;
@@ -30,8 +30,10 @@ export function ReactFlow3D({
     // 初始状态设置
     const state = useCameraStore.getState();
     if (transformRef.current) {
-      // 相对 Spherical 取反：使 2.5D 层与 Three 相机在屏幕上的左右、俯仰一致
-      transformRef.current.style.transform = `rotateX(${state.cameraState.phi - DEFAULT_SPHERICAL_PHI}rad) rotateY(${-state.cameraState.theta}rad)`;
+      transformRef.current.style.transform = buildShellTransform(
+        state.cameraState.phi,
+        state.cameraState.theta
+      );
     }
     if (containerRef.current) {
       containerRef.current.style.perspective = `${calculateCSSPerspective(state.viewportSize.height, fov)}px`;
@@ -40,7 +42,10 @@ export function ReactFlow3D({
     // 订阅状态变化
     const unsubscribe = useCameraStore.subscribe((newState) => {
       if (transformRef.current) {
-        transformRef.current.style.transform = `rotateX(${newState.cameraState.phi - DEFAULT_SPHERICAL_PHI}rad) rotateY(${-newState.cameraState.theta}rad)`;
+        transformRef.current.style.transform = buildShellTransform(
+          newState.cameraState.phi,
+          newState.cameraState.theta
+        );
       }
       if (containerRef.current) {
         containerRef.current.style.perspective = `${calculateCSSPerspective(newState.viewportSize.height, fov)}px`;

@@ -28,7 +28,7 @@ import { useCanvasEval } from '@/hooks/useCanvasEval';
 import { useCanvasStatePersistence } from '@/hooks/useCanvasStatePersistence';
 import { useTheme } from '@/hooks/useTheme';
 import { useCameraStore } from '@/store/cameraStore';
-import { DEFAULT_SPHERICAL_PHI } from '@/utils/coordinateTransform';
+import { DEFAULT_SPHERICAL_PHI, DEFAULT_SPHERICAL_THETA } from '@/store/cameraStore';
 import { parseCanvasArchiveText, serializeCanvasArchive } from '@/services/canvas-archive';
 import { useSettingsStore } from '@/store/settingsStore';
 import { useToolStore } from '@/store/toolStore';
@@ -96,8 +96,6 @@ const Canvas: React.FC = () => {
   // 统一的相机控制系统
   const cameraState = useCameraStore((state) => state.cameraState);
   const setCameraState = useCameraStore((state) => state.setCameraState);
-  // 不在 onMoveEnd 等处调用 syncFromReactFlowViewport：RF 只有 x/y/zoom，会覆盖相机 store 中的 theta/phi（见 docs/camera-architecture.md）
-  // const syncFromViewport = useCameraStore((state) => state.syncFromReactFlowViewport);
   const setViewportSize = useCameraStore((state) => state.setViewportSize);
   
   const controlledViewport = {
@@ -128,7 +126,7 @@ const Canvas: React.FC = () => {
         targetX: -persistedViewport.x,
         targetY: persistedViewport.y,
         radius: clampedRadius,
-        theta: 0,
+        theta: DEFAULT_SPHERICAL_THETA,
         phi: DEFAULT_SPHERICAL_PHI,
       });
     }
