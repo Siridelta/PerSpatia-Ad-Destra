@@ -148,7 +148,7 @@ z = radius * sin(phi) * cos(theta)
 - **`phi`**：从 **+Y** 向下的极角；**小于 π/2** 偏向 **+Y**（更高），**大于 π/2** 偏向 **-Y**（更低）。
 - **`theta`**：在 **XZ** 平面内从 **+Z** 起算的方位角（与 `Math.atan2(x, z)` 一致）。
 
-**指针映射**：右键拖时 **`theta -= dx * sens`**（与 Spherical 正向相反），以保留迁移前大致的左右手感；**`phi += dy * sens`** 接近常见 Orbit 纵向行为。可调。
+**指针映射**：右键拖时 **`theta -= dx * sens`**（与 Spherical 正向相反），以保留迁移前大致的左右手感；**`phi -= dy * sens`**（纵向与默认 `dy→phi` 映射手感相反，若仍反可再改符号）。可调。
 
 **与 OrbitControls**：`getAzimuthalAngle()` / `getPolarAngle()`（或内部 `spherical`）可与本 store 的 **`theta` / `phi` 直接对照**（注意 Orbit 的 target 与 min/max 限制仍由自研 `tick` 负责）。
 
@@ -200,7 +200,7 @@ viewport.zoom = 30 / radius
 
 心智模型：**拖拽像在抓「面前的玻璃」**。向右拖希望看到更多右侧内容，对应实现里对 `theta`/`phi` 的符号与相机公式耦合；若调试时觉得「方向反了」，应对照 `updateSimulatedCamera` 与 `ReactFlow3D` 的 `rotateX`/`rotateY` 符号一起改，避免只改一侧。
 
-**CSS 与 Three 的符号**：`ReactFlow3D` 为 `rotateX((π/2 - phi)rad) rotateY(theta rad)`（常量 `DEFAULT_SPHERICAL_PHI - phi`），与赤道基准 `phi = π/2` 对齐；**以 `ReactFlow3D/index.tsx` 为准**。
+**CSS 与 Three 的符号**：`ReactFlow3D` 为 `rotateX((phi - π/2)rad) rotateY((-theta)rad)`，相对裸 Spherical 在 DOM 上对 θ、φ 各取反一层，使 2.5D 与 Three 画面同向；**以 `ReactFlow3D/index.tsx` 为准**。`coordinateTransform` 里 `calculateCSSTransform` / `worldToLocal` / `localToWorld` 与之一致。
 
 ### 2.9 常见问题（排错）
 

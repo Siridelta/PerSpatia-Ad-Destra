@@ -286,7 +286,8 @@ export const useCameraStore = create<CameraStore>()(immer((set, get) => ({
         draft.input.lastPointerScreen = { x: clientX, y: clientY };
         // 与旧版左右手感一致：theta 增加方向与 Spherical 正向相反
         draft.physics.rotateOffset.desired.theta -= dx * 0.005;
-        draft.physics.rotateOffset.desired.phi += dy * 0.005;
+        // 纵向：与 Spherical 默认 dy→phi 映射手感相反，故对 dy 取反（若仍反了再改符号）
+        draft.physics.rotateOffset.desired.phi -= dy * 0.005;
       });
     } else if (input.isPanning) {
       const lastPlane = state.screenToPlane(input.lastPointerScreen.x, input.lastPointerScreen.y);

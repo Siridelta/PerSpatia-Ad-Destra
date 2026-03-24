@@ -30,7 +30,8 @@ export function ReactFlow3D({
     // 初始状态设置
     const state = useCameraStore.getState();
     if (transformRef.current) {
-      transformRef.current.style.transform = `rotateX(${DEFAULT_SPHERICAL_PHI - state.cameraState.phi}rad) rotateY(${state.cameraState.theta}rad)`;
+      // 相对 Spherical 取反：使 2.5D 层与 Three 相机在屏幕上的左右、俯仰一致
+      transformRef.current.style.transform = `rotateX(${state.cameraState.phi - DEFAULT_SPHERICAL_PHI}rad) rotateY(${-state.cameraState.theta}rad)`;
     }
     if (containerRef.current) {
       containerRef.current.style.perspective = `${calculateCSSPerspective(state.viewportSize.height, fov)}px`;
@@ -39,7 +40,7 @@ export function ReactFlow3D({
     // 订阅状态变化
     const unsubscribe = useCameraStore.subscribe((newState) => {
       if (transformRef.current) {
-        transformRef.current.style.transform = `rotateX(${DEFAULT_SPHERICAL_PHI - newState.cameraState.phi}rad) rotateY(${newState.cameraState.theta}rad)`;
+        transformRef.current.style.transform = `rotateX(${newState.cameraState.phi - DEFAULT_SPHERICAL_PHI}rad) rotateY(${-newState.cameraState.theta}rad)`;
       }
       if (containerRef.current) {
         containerRef.current.style.perspective = `${calculateCSSPerspective(newState.viewportSize.height, fov)}px`;

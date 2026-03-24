@@ -207,9 +207,9 @@ export function calculateCSSTransform(
     // 2. 应用相机的逆变换
     // 先移动半径距离（相机到原点的距离）
     `translateZ(${-radius}px)`,
-    // 与 ReactFlow3D 一致：相对赤道 π/2 的倾角
-    `rotateX(${DEFAULT_SPHERICAL_PHI - phi}rad)`,
-    `rotateY(${theta}rad)`,
+    // 与 ReactFlow3D 一致
+    `rotateX(${phi - DEFAULT_SPHERICAL_PHI}rad)`,
+    `rotateY(${-theta}rad)`,
     
     // 3. 平移补偿 target
     `translate3d(${-targetX}px, ${targetY}px, 0)`
@@ -235,18 +235,18 @@ export function worldToLocal(
   let y = worldY - targetY;
   let z = 0;
 
-  // 2. 逆旋转 Y（theta）
-  const cosY = Math.cos(-theta);
-  const sinY = Math.sin(-theta);
+  // 2. 逆 CSS rotateY(-theta) → 乘 R_y(theta)
+  const cosY = Math.cos(theta);
+  const sinY = Math.sin(theta);
   const x2 = x * cosY - z * sinY;
   const z2 = x * sinY + z * cosY;
   x = x2;
   z = z2;
 
-  // 3. 逆旋转 X（赤道基准：-(π/2 - phi) = phi - π/2）
-  const ax = phi - DEFAULT_SPHERICAL_PHI;
-  const cosX = Math.cos(-ax);
-  const sinX = Math.sin(-ax);
+  // 3. 逆 CSS rotateX(phi - π/2) → 乘 R_x(π/2 - phi)
+  const ax = DEFAULT_SPHERICAL_PHI - phi;
+  const cosX = Math.cos(ax);
+  const sinX = Math.sin(ax);
   const y3 = y * cosX - z * sinX;
   z = y * sinX + z * cosX;
   y = y3;
@@ -270,8 +270,8 @@ export function localToWorld(
   let y = localY;
   let z = 0;
 
-  // 1. 旋转 X（π/2 - phi），与 CSS rotateX 顺序一致
-  const ax = DEFAULT_SPHERICAL_PHI - phi;
+  // 1. 旋转 X（phi - π/2），与 ReactFlow3D rotateX 一致
+  const ax = phi - DEFAULT_SPHERICAL_PHI;
   const cosX = Math.cos(ax);
   const sinX = Math.sin(ax);
   const y2 = y * cosX - z * sinX;
@@ -279,9 +279,9 @@ export function localToWorld(
   y = y2;
   z = z2;
 
-  // 2. 旋转 Y（theta）
-  const cosY = Math.cos(theta);
-  const sinY = Math.sin(theta);
+  // 2. 旋转 Y（-theta），与 ReactFlow3D rotateY 一致
+  const cosY = Math.cos(-theta);
+  const sinY = Math.sin(-theta);
   const x3 = x * cosY - z * sinY;
   const z3 = x * sinY + z * cosY;
   x = x3;
