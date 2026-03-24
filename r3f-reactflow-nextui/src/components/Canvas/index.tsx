@@ -28,9 +28,7 @@ import { useCanvasData } from '@/hooks/useCanvasData';
 import { useCanvasEval } from '@/hooks/useCanvasEval';
 import { useCanvasStatePersistence } from '@/hooks/useCanvasStatePersistence';
 import { useTheme } from '@/hooks/useTheme';
-import { useCameraControl } from '@/hooks/useCameraControl';
-import type { CameraState } from '@/utils/coordinateTransform';
-import { screenToWorld } from '@/utils/coordinateTransform';
+import { useCameraStore } from '@/store/cameraStore';
 import { parseCanvasArchiveText, serializeCanvasArchive } from '@/services/canvas-archive';
 import { useSettingsStore } from '@/store/settingsStore';
 import { useToolStore } from '@/store/toolStore';
@@ -95,34 +93,28 @@ const Canvas: React.FC = () => {
   // screenToFlowPosition - 用于创建节点
   const screenToFlowPosition = flowInstanceRef.current?.screenToFlowPosition ?? null;
 
-  // 视口尺寸
-  const [viewportSize, setViewportSize] = useState({ width: window.innerWidth, height: window.innerHeight });
+  // 统一的相机控制系统
+  const cameraState = useCameraStore((state) => state.cameraState);
+  const setCameraState = useCameraStore((state) => state.setCameraState);
+  const syncFromViewport = useCameraStore((state) => state.syncFromReactFlowViewport);
+  const setViewportSize = useCameraStore((state) => state.setViewportSize);
+  
+  const controlledViewport = {
+    x: -cameraState.targetX,
+    y: cameraState.targetY,
+    zoom: 30 / cameraState.radius,
+  };
+  const sceneScale = controlledViewport.zoom;
 
+  // 视口尺寸
   useEffect(() => {
     const handleResize = () => {
-      setViewportSize({ width: window.innerWidth, height: window.innerHeight });
+      setViewportSize(window.innerWidth, window.innerHeight);
     };
+    handleResize(); // 初始化
     window.addEventListener('resize', handleResize);
     return () => window.removeEventListener('resize', handleResize);
-  }, []);
-
-  // 统一的相机控制系统
-  const {
-    cameraState,
-    viewport: controlledViewport,
-    sceneScale,
-    handlers: cameraHandlers,
-    setCameraState,
-    syncFromViewport,  // 从 ReactFlow 视口反向同步
-  } = useCameraControl({
-    initialTargetX: 0,
-    initialTargetY: 0,
-    initialRadius: 30,
-    initialTheta: 0,
-    initialPhi: 0,
-  });
-  
-
+  }, [setViewportSize]);
 
   // 当持久化的 viewport 加载后，同步到控制器
   useEffect(() => {
@@ -171,7 +163,7 @@ const Canvas: React.FC = () => {
   // 应用主题设置
   useTheme();
 
-  // V/T/C 快捷键切换工具栏模式
+  // V/T/C 快捷键切换工具栏模式，以及相机键盘控制
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
       // 优先处理 Ctrl+S，确保阻止浏览器默认行为
@@ -191,6 +183,9 @@ const Canvas: React.FC = () => {
       const tag = (e.target as HTMLElement)?.tagName?.toLowerCase();
       const isEditable = (tag === 'input' || tag === 'textarea' || (e.target as HTMLElement)?.isContentEditable);
       if (isEditable) return;
+      
+      // 相机控制
+      useCameraStore.getState().handleKeyDown(e.key.toLowerCase());
 
       if (e.key === 'v' || e.key === 'V') {
         setActiveTool('select');
@@ -219,6 +214,10 @@ const Canvas: React.FC = () => {
         e.preventDefault();
       }
     };
+    
+    const handleKeyUp = (e: KeyboardEvent) => {
+      useCameraStore.getState().handleKeyUp(e.key.toLowerCase());
+    };
 
     const handleMouseDown = (e: MouseEvent) => {
       // 全局中键处理，防止浏览器默认行为
@@ -230,10 +229,12 @@ const Canvas: React.FC = () => {
 
     // 使用 bubble 模式，让其他监听器有机会捕获事件
     window.addEventListener('keydown', handleKeyDown, false);
+    window.addEventListener('keyup', handleKeyUp, false);
     document.addEventListener('mousedown', handleMouseDown);
 
     return () => {
       window.removeEventListener('keydown', handleKeyDown, false);
+      window.removeEventListener('keyup', handleKeyUp, false);
       document.removeEventListener('mousedown', handleMouseDown);
     };
   }, [setActiveTool, activeTool, setConnectionStartNode, canvasDataApi, flowNodes, flowEdges]);
@@ -435,20 +436,11 @@ const Canvas: React.FC = () => {
       {/* 3D 场景 - 最底层 */}
       <Scene3D
         ref={scene3DRef}
-        cameraState={cameraState}
       />
 
       {/* ReactFlow 3D 容器 - 中层 */}
       <ReactFlow3D
-        cameraState={cameraState}
-        viewportWidth={viewportSize.width}
-        viewportHeight={viewportSize.height}
         fov={FOV}
-        onStartPan={cameraHandlers.startPan}
-        onStartRotate={cameraHandlers.startRotate}
-        onPointerMove={cameraHandlers.handlePointerMove}
-        onPointerUp={cameraHandlers.handlePointerUp}
-        onWheel={cameraHandlers.handleWheel}
       >
         <CanvasDataProvider api={canvasDataApi}>
           <CanvasEvalProvider api={evalApi}>
@@ -474,7 +466,7 @@ const Canvas: React.FC = () => {
                       // 更新 flowData（用于持久化）
                       canvasDataApi.writeFlow.setViewport(newViewport);
                       // 反向同步到相机控制器
-                      syncFromViewport(newViewport);
+                      syncFromViewport(newViewport.x, newViewport.y, newViewport.zoom);
                     }
                   }}
                   nodeTypes={nodeTypes}

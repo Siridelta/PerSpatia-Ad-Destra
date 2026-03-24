@@ -11,14 +11,13 @@ import React, { useRef, useEffect, useImperativeHandle, forwardRef } from 'react
 import { Canvas, useFrame, useThree } from '@react-three/fiber';
 import { Stars } from '@react-three/drei';
 import * as THREE from 'three';
-import type { CameraState } from '../../utils/coordinateTransform';
+import { useCameraStore } from '../../store/cameraStore';
 
 export interface Scene3DRef {
   setScale: (scale: number) => void;
 }
 
 interface Scene3DProps {
-  cameraState?: CameraState;
   sceneScale?: number;  // 兼容旧版
 }
 
@@ -137,18 +136,20 @@ function BackgroundEffects({ scale = 1 }: { scale?: number }) {
 }
 
 // 相机同步组件
-interface CameraSyncProps {
-  cameraState: CameraState;
-}
-
-function CameraSync({ cameraState }: CameraSyncProps) {
+function CameraSync() {
   const { camera } = useThree();
   
-  // 每帧同步相机位置
+  // 每帧同步相机位置和运行物理循环
   useFrame(() => {
     if (!(camera instanceof THREE.PerspectiveCamera)) return;
     
-    const { targetX, targetY, radius, theta, phi } = cameraState;
+    const store = useCameraStore.getState();
+    
+    // 运行物理循环
+    store.tick();
+    
+    // 读取最新状态
+    const { targetX, targetY, radius, theta, phi } = store.cameraState;
     
     // 球坐标转笛卡尔（theta 取反让水平方向正确，phi 不取反让竖直方向正确）
     camera.position.x = targetX + radius * Math.sin(-theta) * Math.cos(phi);
@@ -163,19 +164,8 @@ function CameraSync({ cameraState }: CameraSyncProps) {
 
 // 主场景组件
 export const Scene3D = forwardRef<Scene3DRef, Scene3DProps>(
-  function Scene3D({ cameraState, sceneScale = 1 }, ref) {
+  function Scene3D({ sceneScale = 1 }, ref) {
     const scaleRef = useRef(sceneScale);
-    
-    // 默认相机状态
-    const defaultState: CameraState = {
-      targetX: 0,
-      targetY: 0,
-      radius: 30,
-      theta: 0,
-      phi: 0,
-    };
-    
-    const state = cameraState || defaultState;
     
     useImperativeHandle(ref, () => ({
       setScale: (scale: number) => {
@@ -198,7 +188,7 @@ export const Scene3D = forwardRef<Scene3DRef, Scene3DProps>(
           gl={{ antialias: true, alpha: true }}
           style={{ background: 'transparent' }}
         >
-          <CameraSync cameraState={state} />
+          <CameraSync />
           
           {/* 3D 背景效果（带缩放） */}
           <BackgroundEffects scale={scaleRef.current} />
