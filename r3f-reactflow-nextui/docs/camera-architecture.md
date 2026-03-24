@@ -8,7 +8,7 @@
 
 结构上就是 **两个大块叠在一起**：底层是 **R3F（Three.js）的真 3D 场景**，上层是 **React Flow 组件盖住 3D**（典型 z-index / 叠层布局）。对 **React Flow 这一层** 做 **CSS 3D 变换**（`perspective`、`rotateX` / `rotateY` 等），并配合 **React Flow 的 `viewport` API**（`x` / `y` / `zoom`），让 2D 节点图在视觉上像是 **同一场景里、贴在竖直墙面（XY）上的内容**，而原来的 React Flow zoom 的逻辑自然转变成 3D 的 **Z 纵深**。同时 **在容器层接管指针/滚轮/键盘**（节点内仍交给 RF），统一 **驱动模拟相机**，模拟相机再同步到背后 Three 相机、前面 CSS 朝向和 React Flow `viewport`。
 
-数据流上不以 React `useState` 为主轴，而是以 **`useCameraStore`（Zustand）为中心**：利用其 **同步、可在外部 `getState` / `subscribe`** 的特性，绕开「一切先回 React 再下发」的高频重渲染路径。R3F 里用 **`useFrame`** 每帧调用 `tick()`、读 store、写真实 **PerspectiveCamera**，从而 **高性能地** 把相机相关状态、3D 背景与 2.5D RF 层 **绑在同一条时间轴上**。
+数据流上不以 React `useState` 为主轴，而是以 **`<CameraControl>` 内的 Zustand store（`useCameraControl` / `useCameraControlStore`）为中心**：利用其 **同步、可在外部 `getState` / `subscribe`** 的特性，绕开「一切先回 React 再下发」的高频重渲染路径。R3F 里用 **`useFrame`** 每帧调用 `tick()`、读 store、写真实 **PerspectiveCamera**，从而 **高性能地** 把相机相关状态、3D 背景与 2.5D RF 层 **绑在同一条时间轴上**。
 
 ---
 
@@ -38,7 +38,7 @@
 
 与上节一一对应，方便 fresh reader 建立心智模型：
 
-1. **状态中心：`useCameraStore`** — 唯一 SSOT：相机参数、`input`、physics、`tick()`、`screenToPlane` 等；事件与 `useFrame` 都只跟它说话。  
+1. **状态中心：`CameraControl` 提供的 store** — 唯一 SSOT：相机参数、`input`、physics、`tick()`、`screenToPlane` 等；事件与 `useFrame` 都只跟它说话（`useCameraControl` / `getState()`）。  
 2. **事件捕获层：`ReactFlow3D` 容器（DOM 冒泡）** — 子树未消费的指针/滚轮在此入库；命中节点/边等则 **不**抬相机。  
 3. **R3F 渲染 / 物理时钟层：`Scene3D`（`useFrame`）** — 每帧 `tick()`、**读** input、**写** `cameraState`；**同帧**再 **读** `cameraState` **写** Three 相机（轮询）。  
 4. **React Flow 同步 / 2.5D 呈现层：`ReactFlow3D`（subscribe → CSS）+ `Canvas`（派生 viewport → `setViewport`）** — 把 `cameraState` 译成用户看见的 **CSS 3D + RF 视口**，共同完成 plane-on-3D 的视觉配合。
@@ -80,7 +80,7 @@ React Flow API **只能稳定表达** `viewport: { x, y, zoom }`，**不包含**
 因此：
 
 - **旋转**只存在于我们的 **`cameraState.theta / phi`** 和 CSS / Three 里，**写不进**标准 viewport。
-- 若用 `onMoveEnd` 等回调把 **viewport 反写回相机**，只能恢复平移与缩放，**会丢掉或冲掉旋转**，破坏「墙与背景朝向一致」的一致性。正确做法是 **`useCameraStore` 为 SSOT**，单向把派生 viewport 推给 RF（见第二部分）。
+- 若用 `onMoveEnd` 等回调把 **viewport 反写回相机**，只能恢复平移与缩放，**会丢掉或冲掉旋转**，破坏「墙与背景朝向一致」的一致性。正确做法是 **相机 store（`CameraControl` 内）为 SSOT**，单向把派生 viewport 推给 RF（见第二部分）。
 
 ### 1.5 「伪 3D」到什么程度（和旧文档的关系）
 
@@ -96,17 +96,18 @@ React Flow API **只能稳定表达** `viewport: { x, y, zoom }`，**不包含**
 
 ### 2.1 一句话（SSOT）
 
-**`useCameraStore`（Zustand）是相机与视口的唯一真实来源**。DOM 指针/键盘等写入 store；R3F `useFrame` 里 `tick()` 做物理并驱动 Three.js 相机；`ReactFlow3D` 用 `subscribe` 直接改 CSS 3D 的 `transform` / `perspective`；`Canvas` 把派生出的 `controlledViewport` **单向** `setViewport` 推给 RF。**不要用 RF 的 `onMoveEnd` 把 viewport 反写进相机**，否则会丢掉 `theta`/`phi`。
+**`CameraControl` 创建的 Zustand store 是相机与视口的唯一真实来源**（每块画布一份，非全局单例）。DOM 指针/键盘等写入 store；R3F `useFrame` 里 `tick()` 做物理并驱动 Three.js 相机；`ReactFlow3D` 用 `subscribe` 直接改 CSS 3D 的 `transform` / `perspective`；`Canvas` 把派生出的 `controlledViewport` **单向** `setViewport` 推给 RF。**不要用 RF 的 `onMoveEnd` 把 viewport 反写进相机**，否则会丢掉 `theta`/`phi`。父级可通过 **`Canvas` 的 ref** 调用 `getCameraState` / `setCameraState`。
 
 ### 2.2 代码地图（改功能时先打开这些）
 
 | 路径 | 职责 |
 |------|------|
-| `src/store/cameraStore.ts` | `CameraState`、球坐标默认/夹紧常量、相机状态、`tick`、指针/滚轮/键盘、`screenToPlane` |
+| `src/components/CameraControl/cameraStore.ts` | `createCameraStore`、`CameraState`、球坐标默认/夹紧常量；`tick`、`screenToPlane` 等 |
+| `src/components/CameraControl/CameraControl.tsx` | 每画布一份 store + Context；`useCameraControl`；ref：`getCameraState` / `setCameraState` |
 | `src/components/ReactFlow3D/index.tsx` | 事件冒泡层、命中节点/边则放行、`subscribe` 更新 transform / perspective |
 | `src/components/ReactFlow3D/shellCssMath.ts` | 外壳 `perspective`、与 θ/φ 配套的 `transform` 字符串（纯函数） |
-| `src/components/Scene3D/index.tsx` | `useFrame` 调 `tick()`、同步 Three.js `PerspectiveCamera` |
-| `src/components/Canvas/index.tsx` | `controlledViewport` 计算、`setViewport`、持久化初始 `setCameraState` |
+| `src/components/Scene3D/index.tsx` | `useFrame` 调 `tick()`、同步 Three.js `PerspectiveCamera`；**Canvas 外**取 store 经 props 传入 `CameraSync`（R3F 子树不继承外层 Context） |
+| `src/components/Canvas/index.tsx` | 外层 `forwardRef` → `CameraControl`；`CanvasBody`：`controlledViewport`、`setViewport`、持久化 `setCameraState` |
 
 ### 2.3 坐标系与相机参数（与世界 / RF 对齐）
 

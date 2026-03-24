@@ -4,7 +4,7 @@ import { Handle, Position, NodeProps, NodeResizeControl, useKeyPress } from '@xy
 import './styles.css';
 import '@/styles/syntax-highlighting.css';
 import { Control } from '@/services/jsExecutor';
-import { useToolStore } from '@/store/toolStore';
+import { useToolStore } from '@/global-stores/toolStore';
 import { SliderControl, ToggleControl, TextControl } from './controls';
 import { ErrorDisplay, WarningDisplay, LogDisplay, OutputDisplay } from './displays';
 import CodeEditor from '../CodeEditor';

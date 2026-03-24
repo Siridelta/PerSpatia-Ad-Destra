@@ -11,7 +11,16 @@ import {
   ReactFlowInstance,
 } from '@xyflow/react';
 import '@xyflow/react/dist/style.css';
-import React, { useCallback, useEffect, useRef } from 'react';
+import React, { forwardRef, useCallback, useEffect, useRef } from 'react';
+
+import {
+  CameraControl,
+  DEFAULT_SPHERICAL_PHI,
+  DEFAULT_SPHERICAL_THETA,
+  useCameraControl,
+  useCameraControlStore,
+  type CameraControlRef,
+} from '@/components/CameraControl';
 
 import BottomToolbar from '@/components/BottomToolbar';
 import FloatingEdge from '@/components/CustomEdge';
@@ -27,11 +36,9 @@ import { useCanvasData } from '@/hooks/useCanvasData';
 import { useCanvasEval } from '@/hooks/useCanvasEval';
 import { useCanvasStatePersistence } from '@/hooks/useCanvasStatePersistence';
 import { useTheme } from '@/hooks/useTheme';
-import { useCameraStore } from '@/store/cameraStore';
-import { DEFAULT_SPHERICAL_PHI, DEFAULT_SPHERICAL_THETA } from '@/store/cameraStore';
 import { parseCanvasArchiveText, serializeCanvasArchive } from '@/services/canvas-archive';
-import { useSettingsStore } from '@/store/settingsStore';
-import { useToolStore } from '@/store/toolStore';
+import { useSettingsStore } from '@/global-stores/settingsStore';
+import { useToolStore } from '@/global-stores/toolStore';
 import { CanvasEdgeFlowData, CanvasNodeFlowData } from '@/types/canvas';
 import CustomConnectionLine from './CustomConnectionLine';
 import './styles.css';
@@ -50,7 +57,8 @@ const edgeTypes: EdgeTypes = {
 
 const FOV = 50;
 
-const Canvas: React.FC = () => {
+/** 画布主体：必须在 `<CameraControl>` 内渲染，以便使用 `useCameraControl` */
+const CanvasBody: React.FC = () => {
 
   // 创建 API 对象（UI/Flow 共享同一个 store）
   const canvasDataApi = useCanvasData();
@@ -94,9 +102,11 @@ const Canvas: React.FC = () => {
   const screenToFlowPosition = flowInstanceRef.current?.screenToFlowPosition ?? null;
 
   // 统一的相机控制系统
-  const cameraState = useCameraStore((state) => state.cameraState);
-  const setCameraState = useCameraStore((state) => state.setCameraState);
-  const setViewportSize = useCameraStore((state) => state.setViewportSize);
+  const cameraState = useCameraControl((state) => state.cameraState);
+  const setCameraState = useCameraControl((state) => state.setCameraState);
+  const setViewportSize = useCameraControl((state) => state.setViewportSize);
+  /** 与 window 键盘监听闭包共享同一 vanilla store 引用 */
+  const cameraStore = useCameraControlStore();
   
   const controlledViewport = {
     x: -cameraState.targetX,
@@ -184,7 +194,7 @@ const Canvas: React.FC = () => {
       if (isEditable) return;
       
       // 相机控制
-      useCameraStore.getState().handleKeyDown(e.key.toLowerCase());
+      cameraStore.getState().handleKeyDown(e.key.toLowerCase());
 
       if (e.key === 'v' || e.key === 'V') {
         setActiveTool('select');
@@ -215,7 +225,7 @@ const Canvas: React.FC = () => {
     };
     
     const handleKeyUp = (e: KeyboardEvent) => {
-      useCameraStore.getState().handleKeyUp(e.key.toLowerCase());
+      cameraStore.getState().handleKeyUp(e.key.toLowerCase());
     };
 
     const handleMouseDown = (e: MouseEvent) => {
@@ -236,7 +246,7 @@ const Canvas: React.FC = () => {
       window.removeEventListener('keyup', handleKeyUp, false);
       document.removeEventListener('mousedown', handleMouseDown);
     };
-  }, [setActiveTool, activeTool, setConnectionStartNode, canvasDataApi, flowNodes, flowEdges]);
+  }, [setActiveTool, activeTool, setConnectionStartNode, canvasDataApi, flowNodes, flowEdges, cameraStore]);
 
   // 重置画布为默认状态
   const handleReset = useCallback(() => {
@@ -551,5 +561,17 @@ const Canvas: React.FC = () => {
     </>
   );
 };
+
+/**
+ * 根导出：包一层 CameraControl，使相机 store 仅作用于本画布树。
+ * ref 转发到 CameraControl，可命令式 `getCameraState` / `setCameraState`。
+ */
+const Canvas = forwardRef<CameraControlRef>(function Canvas(_props, ref) {
+  return (
+    <CameraControl ref={ref}>
+      <CanvasBody />
+    </CameraControl>
+  );
+});
 
 export default Canvas;

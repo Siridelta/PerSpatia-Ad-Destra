@@ -1,4 +1,5 @@
-import { create } from 'zustand';
+import { createStore } from 'zustand/vanilla';
+import type { StoreApi } from 'zustand/vanilla';
 import { immer } from 'zustand/middleware/immer';
 import { enableMapSet } from 'immer';
 import * as THREE from 'three';
@@ -126,7 +127,15 @@ export interface CameraStore {
   updateSimulatedCamera: () => void;
 }
 
-export const useCameraStore = create<CameraStore>()(immer((set, get) => ({
+/** 每个画布实例一份的 Zustand store（由 `CameraControl` 创建并放入 Context） */
+export type CameraStoreApi = StoreApi<CameraStore>;
+
+/**
+ * 创建新的相机 store。勿在模块顶层单例化——由 `CameraControl` 在挂载时调用一次。
+ */
+export function createCameraStore(): CameraStoreApi {
+  return createStore(
+    immer<CameraStore>((set, get) => ({
   // 初始状态
   cameraState: {
     targetX: DEFAULT_CAMERA_OPTIONS.initialTargetX,
@@ -454,5 +463,7 @@ export const useCameraStore = create<CameraStore>()(immer((set, get) => ({
     });
 
     return true;
-  }
-})));
+  },
+    }))
+  );
+}

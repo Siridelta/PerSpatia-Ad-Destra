@@ -1,6 +1,6 @@
 import React, { useCallback, useRef, useEffect } from 'react';
 import './styles.css';
-import { useSettingsStore } from '@/store/settingsStore';
+import { useSettingsStore } from '@/global-stores/settingsStore';
 
 interface SettingsPanelProps {
   isOpen: boolean;

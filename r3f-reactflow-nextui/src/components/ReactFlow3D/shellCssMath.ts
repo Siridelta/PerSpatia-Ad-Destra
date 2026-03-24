@@ -4,7 +4,7 @@
  * 与 `cameraStore` 中的 `CameraState`、默认 φ 常量配套；不依赖 React，便于单测或文档对照。
  */
 
-import { DEFAULT_SPHERICAL_PHI } from '../../store/cameraStore';
+import { DEFAULT_SPHERICAL_PHI } from '../CameraControl';
 
 /**
  * 与 Three.js 透视相机 FOV 对齐的 CSS `perspective` 长度（像素）。

@@ -11,7 +11,8 @@ import React, { useRef, useEffect, useImperativeHandle, forwardRef } from 'react
 import { Canvas, useFrame, useThree } from '@react-three/fiber';
 import { Stars } from '@react-three/drei';
 import * as THREE from 'three';
-import { useCameraStore } from '../../store/cameraStore';
+import { useCameraControlStore } from '../CameraControl';
+import type { CameraStoreApi } from '../CameraControl';
 
 export interface Scene3DRef {
   setScale: (scale: number) => void;
@@ -135,15 +136,15 @@ function BackgroundEffects({ scale = 1 }: { scale?: number }) {
   );
 }
 
-// 相机同步组件
-function CameraSync() {
+// 相机同步组件（在 R3F Canvas 内；store 由外层 Scene3D 注入，因 Canvas 子树不继承外层 React Context）
+function CameraSync({ cameraStore }: { cameraStore: CameraStoreApi }) {
   const { camera } = useThree();
   
   // 每帧同步相机位置和运行物理循环
   useFrame(() => {
     if (!(camera instanceof THREE.PerspectiveCamera)) return;
     
-    const store = useCameraStore.getState();
+    const store = cameraStore.getState();
     
     // 运行物理循环
     store.tick();
@@ -165,6 +166,8 @@ function CameraSync() {
 // 主场景组件
 export const Scene3D = forwardRef<Scene3DRef, Scene3DProps>(
   function Scene3D({ sceneScale = 1 }, ref) {
+    // 必须在 `<Canvas>` 外读取，再传入 CameraSync（见 CameraSync 注释）
+    const cameraStore = useCameraControlStore();
     const scaleRef = useRef(sceneScale);
     
     useImperativeHandle(ref, () => ({
@@ -188,7 +191,7 @@ export const Scene3D = forwardRef<Scene3DRef, Scene3DProps>(
           gl={{ antialias: true, alpha: true }}
           style={{ background: 'transparent' }}
         >
-          <CameraSync />
+          <CameraSync cameraStore={cameraStore} />
           
           {/* 3D 背景效果（带缩放） */}
           <BackgroundEffects scale={scaleRef.current} />

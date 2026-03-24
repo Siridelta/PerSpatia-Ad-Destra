@@ -9,7 +9,7 @@
 
 import React, { useRef, useEffect, useCallback } from 'react';
 import type { PointerEvent as ReactPointerEvent } from 'react';
-import { useCameraStore } from '../../store/cameraStore';
+import { useCameraControlStore } from '../CameraControl';
 import { buildShellTransform, calculateCSSPerspective } from './shellCssMath';
 
 interface ReactFlow3DProps {
@@ -23,12 +23,12 @@ export function ReactFlow3D({
 }: ReactFlow3DProps) {
   const containerRef = useRef<HTMLDivElement>(null);
   const transformRef = useRef<HTMLDivElement>(null);
-  
-  // 我们不再使用 useCameraStore(state => ...) 来触发 React 渲染
-  // 而是使用 useEffect + subscribe 直接操作 DOM，获得极致性能
+  const cameraStore = useCameraControlStore();
+
+  // 我们不用 selector 触发 React 重渲染，而用 useEffect + subscribe 直接改 DOM
   useEffect(() => {
     // 初始状态设置
-    const state = useCameraStore.getState();
+    const state = cameraStore.getState();
     if (transformRef.current) {
       transformRef.current.style.transform = buildShellTransform(
         state.cameraState.phi,
@@ -40,7 +40,7 @@ export function ReactFlow3D({
     }
 
     // 订阅状态变化
-    const unsubscribe = useCameraStore.subscribe((newState) => {
+    const unsubscribe = cameraStore.subscribe((newState) => {
       if (transformRef.current) {
         transformRef.current.style.transform = buildShellTransform(
           newState.cameraState.phi,
@@ -53,7 +53,7 @@ export function ReactFlow3D({
     });
 
     return unsubscribe;
-  }, [fov]);
+  }, [cameraStore, fov]);
   
   // Pointer Down 处理 - 依赖 DOM 事件冒泡
   const handlePointerDown = useCallback((e: ReactPointerEvent<HTMLDivElement>) => {
@@ -67,7 +67,7 @@ export function ReactFlow3D({
     
     if (e.button === 2) {
       // 右键旋转
-      useCameraStore.getState().startRotate(e.clientX, e.clientY);
+      cameraStore.getState().startRotate(e.clientX, e.clientY);
       e.preventDefault();
       return;
     }
@@ -75,22 +75,22 @@ export function ReactFlow3D({
     if (e.button === 0) {
       // 左键平移
       e.preventDefault();
-      useCameraStore.getState().startPan(e.clientX, e.clientY);
+      cameraStore.getState().startPan(e.clientX, e.clientY);
     }
-  }, []);
+  }, [cameraStore]);
   
   // Pointer Move 处理
   const handlePointerMove = useCallback((e: ReactPointerEvent<HTMLDivElement>) => {
-    const state = useCameraStore.getState();
+    const state = cameraStore.getState();
     if (state.input.isPanning || state.input.isRotating) {
       state.handlePointerMove(e.clientX, e.clientY);
     }
-  }, []);
+  }, [cameraStore]);
   
   // Pointer Up 处理
   const handlePointerUp = useCallback(() => {
-    useCameraStore.getState().handlePointerUp();
-  }, []);
+    cameraStore.getState().handlePointerUp();
+  }, [cameraStore]);
   
   // 滚轮缩放
   const handleWheel = useCallback((e: React.WheelEvent) => {
@@ -100,9 +100,9 @@ export function ReactFlow3D({
       return;
     }
     
-    useCameraStore.getState().handleWheel(e.deltaY);
+    cameraStore.getState().handleWheel(e.deltaY);
     e.preventDefault();
-  }, []);
+  }, [cameraStore]);
   
   // 禁用右键菜单
   const handleContextMenu = useCallback((e: React.MouseEvent) => {
@@ -118,7 +118,7 @@ export function ReactFlow3D({
         left: 0,
         width: '100vw',
         height: '100vh',
-        zIndex: 1,
+        zIndex: 0,
         overflow: 'visible',
         pointerEvents: 'auto',
         perspectiveOrigin: '50% 50%',
