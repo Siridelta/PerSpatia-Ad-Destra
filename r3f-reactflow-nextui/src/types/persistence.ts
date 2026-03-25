@@ -4,12 +4,12 @@ import type {
   CanvasNodeFlowData,
   CanvasNodeUIData,
 } from '@/types/canvas';
-import type { Viewport } from '@xyflow/react';
+import type { CameraState } from '@/components/CameraControl';
 
 /**
- * 画布持久化的最新结构（v9）
- * - 运行态使用 Map
- * - 持久化层使用 Record，避免 id 在 value 内重复存储
+ * 画布持久化的最新结构（v10）
+ * - `uiData` / `flowData` / `camera` 三者平级；不含 RF viewport（由 ReactFlow3D 从相机推导）
+ * - 运行态使用 Map；持久化层使用 Record，避免 id 在 value 内重复存储
  */
 export interface CanvasArchiveState {
   uiData: {
@@ -19,8 +19,8 @@ export interface CanvasArchiveState {
   flowData: {
     nodes: CanvasNodeFlowData[];
     edges: CanvasEdgeFlowData[];
-    viewport: Viewport;
   };
+  camera: CameraState;
 }
 
 /**

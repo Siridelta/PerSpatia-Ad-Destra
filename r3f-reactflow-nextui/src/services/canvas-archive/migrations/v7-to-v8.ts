@@ -34,6 +34,14 @@ export interface V8EdgeEntry {
   data: any;
 }
 
+export interface V8CanvasStateLike {
+  uiData?: {
+    nodes?: V8NodeEntry[];
+    edges?: V8EdgeEntry[];
+  };
+  flowData?: unknown;
+}
+
 const normalizeUINodes = (nodes: any[]): V8NodeEntry[] =>
   nodes.map((node) => {
     if (node?.type === CanvasNodeKind.TextNode || node?.type === 'textNode') {
@@ -129,6 +137,7 @@ export const v7ToV8 = (archive: CanvasArchiveLegacy): CanvasArchiveLegacy => {
       },
     };
     archive.version = 8;
+    archive.state satisfies V8CanvasStateLike;
   }
 
   return archive;

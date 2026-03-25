@@ -15,9 +15,8 @@ import React, { useCallback, useEffect, useRef } from 'react';
 
 import {
   CameraControl,
-  DEFAULT_SPHERICAL_PHI,
-  DEFAULT_SPHERICAL_THETA,
   type CameraControlRef,
+  type CameraState,
 } from '@/components/CameraControl';
 import { CameraDebugHud } from '@/components/CameraControl/CameraDebugHud';
 import {
@@ -70,6 +69,10 @@ const Canvas: React.FC = () => {
 
   // 创建 API 对象（UI/Flow 共享同一个 store）
   const canvasDataApi = useCanvasData();
+
+  const onPersistCamera = useCallback((camera: CameraState) => {
+    canvasDataApi.writeCamera.setCamera(camera);
+  }, [canvasDataApi]);
   const evalApi = useCanvasEval();
   const { isHydrated } = useCanvasStatePersistence(canvasDataApi);
 
@@ -89,7 +92,7 @@ const Canvas: React.FC = () => {
 
   const flowNodes = canvasDataApi.readFlow.useFlowData((data) => data.nodes);
   const flowEdges = canvasDataApi.readFlow.useFlowData((data) => data.edges);
-  const persistedViewport = canvasDataApi.readFlow.useFlowData((data) => data.viewport);
+  const persistedCamera = canvasDataApi.readCamera.useCamera((c) => c);
 
   // 当前活动工具（全局）
   const activeTool = useToolStore((state) => state.activeTool);
@@ -103,34 +106,26 @@ const Canvas: React.FC = () => {
   const closeSettingsPanel = useSettingsStore((state) => state.closeSettingsPanel);
 
   /**
-   * 与 App 层 `ReactFlowProvider` 同树即可；`screenToFlowPosition` / `setViewport` 在 RF 挂载后可用。
+   * 与 App 层 `ReactFlowProvider` 同树即可；`screenToFlowPosition` 等在 RF 挂载后可用（RF 内部 viewport 由 ReactFlow3D 同步，不进 CanvasData）。
    */
   const reactFlow = useReactFlow<CanvasNodeFlowData, CanvasEdgeFlowData>();
 
-  // 持久化 viewport → 相机：只用 ref，避免在本组件里订阅 CameraControl Context
+  /**
+   * 存档里的 camera → CameraControl：只用 ref，不订阅相机 Context。
+   * CameraControl 就绪时同步
+   */
   useEffect(() => {
-    if (!persistedViewport || !isHydrated) return;
     const api = cameraControlRef.current;
-    if (!api) return;
-
-    const calculatedRadius = 30 / persistedViewport.zoom;
-    const clampedRadius = Math.max(15, Math.min(60, calculatedRadius));
-
+    if (!isHydrated || !api) return;
     api.setCameraState({
-      targetX: -persistedViewport.x,
-      targetY: persistedViewport.y,
-      radius: clampedRadius,
-      theta: DEFAULT_SPHERICAL_THETA,
-      phi: DEFAULT_SPHERICAL_PHI,
+      targetX: persistedCamera.targetX,
+      targetY: persistedCamera.targetY,
+      radius: persistedCamera.radius,
+      theta: persistedCamera.theta,
+      phi: persistedCamera.phi,
     });
-  }, [persistedViewport, isHydrated]);
+  }, [isHydrated, persistedCamera, cameraControlRef.current]);
 
-  /** 首次挂载 RF 时应用持久化 viewport（与相机 hydrate 一致；后续由 ReactFlowViewportSync 跟随 store） */
-  const handleInit = useCallback(() => {
-    if (persistedViewport) {
-      void reactFlow.setViewport(persistedViewport);
-    }
-  }, [persistedViewport, reactFlow]);
 
   // 应用主题设置
   useTheme();
@@ -345,6 +340,7 @@ const Canvas: React.FC = () => {
               const incomingUIEdges = imported.uiData.edges;
               const incomingFlowNodes = imported.flowData.nodes;
               const incomingFlowEdges = imported.flowData.edges;
+              const incomingCamera = imported.camera;
               canvasDataApi.porting.importCanvasData({
                 uiData: {
                   // v9 持久化层使用 Record，合并时按 id 覆盖。
@@ -354,8 +350,8 @@ const Canvas: React.FC = () => {
                 flowData: {
                   nodes: [...exported.flowData.nodes, ...incomingFlowNodes],
                   edges: [...exported.flowData.edges, ...incomingFlowEdges],
-                  viewport: exported.flowData.viewport,
                 },
+                camera: incomingCamera ?? exported.camera,
               });
               console.log('节点已添加到画布');
             } catch (error) {
@@ -393,6 +389,7 @@ const Canvas: React.FC = () => {
     <CameraControl
       ref={cameraControlRef}
       shouldIgnoreCameraForTarget={shouldIgnorePointerForCameraRf}
+      onPersist={onPersistCamera}
     >
       <>
         {/* 3D 场景 - 最底层 */}
@@ -418,8 +415,7 @@ const Canvas: React.FC = () => {
                     onConnect={onConnect}
                     onPaneClick={handlePaneClick}
                     onNodeClick={onNodeClick}
-                    onInit={handleInit}
-                    nodeTypes={nodeTypes}
+                  nodeTypes={nodeTypes}
                     edgeTypes={edgeTypes}
                     defaultEdgeOptions={defaultEdgeOptions}
                     connectionLineComponent={CustomConnectionLine}
@@ -438,21 +434,6 @@ const Canvas: React.FC = () => {
                     minZoom={0.1}
                     maxZoom={3}
                   >
-                    {/*
-                    RF 子树中 DOM 顺序在节点层之后，但本层 z-index:-1 + 视口叠层，空白点击命中此层；
-                    供 pointerPolicy 识别「明确空白」而非猜类名。
-                  */}
-                    <div
-                      aria-hidden
-                      {...{ [RF_EMPTY_SURFACE_ATTR]: '' }}
-                      style={{
-                        position: 'absolute',
-                        inset: 0,
-                        zIndex: -1,
-                        pointerEvents: 'auto',
-                        background: 'transparent',
-                      }}
-                    />
                   </ReactFlow>
                 ) : (
                   <div className="flex items-center justify-center h-full">

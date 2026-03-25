@@ -166,7 +166,7 @@ const TextNode: React.FC<NodeProps<TextNodeFlowData>> = ({ id, selected }) => {
   // 折叠/展开逻辑
   const toggleCollapse = useCallback(() => {
     updateData({ isCollapsed: !isCollapsed });
-  }, [isCollapsed, updateNodeData]);
+  }, [isCollapsed, updateData]);
 
   // 区域显示/隐藏逻辑
   const toggleHideSection = useCallback((section: 'inputs' | 'outputs' | 'logs' | 'errors') => {

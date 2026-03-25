@@ -39,10 +39,15 @@ export interface CameraControlProps {
    * 传入 `pointerPolicy` 里基于 `event.target` 的实现即可，例如 `shouldIgnorePointerForCameraRf`。
    */
   shouldIgnoreCameraForTarget?: (target: EventTarget | null) => boolean;
+  /**
+   * 在 keyup / pointerup 以及切页、关页等时刻把当前相机写入画布 API（低频，非 RAF）。
+   * 由外层接入 `writeCamera.setCamera`，供 localStorage 等持久化订阅。
+   */
+  onPersist?: (camera: CameraState) => void;
 }
 
 export const CameraControl = forwardRef<CameraControlRef, CameraControlProps>(
-  function CameraControl({ children, shouldIgnoreCameraForTarget }, ref) {
+  function CameraControl({ children, shouldIgnoreCameraForTarget, onPersist }, ref) {
     const storeRef = useRef<CameraStoreApi | null>(null);
     if (!storeRef.current) {
       storeRef.current = createCameraStore();
@@ -50,6 +55,10 @@ export const CameraControl = forwardRef<CameraControlRef, CameraControlProps>(
     const store = storeRef.current;
 
     const shouldIgnore = shouldIgnoreCameraForTarget ?? (() => false);
+
+    const flushPersist = useCallback(() => {
+      onPersist?.(store.getState().cameraState);
+    }, [onPersist, store]);
 
     useImperativeHandle(
       ref,
@@ -92,6 +101,7 @@ export const CameraControl = forwardRef<CameraControlRef, CameraControlProps>(
       const onKeyUp = (e: KeyboardEvent) => {
         if (isEditableTarget(e.target)) return;
         store.getState().handleKeyUp(e.key.toLowerCase());
+        flushPersist();
       };
 
       window.addEventListener('keydown', onKeyDown, false);
@@ -100,7 +110,27 @@ export const CameraControl = forwardRef<CameraControlRef, CameraControlProps>(
         window.removeEventListener('keydown', onKeyDown, false);
         window.removeEventListener('keyup', onKeyUp, false);
       };
-    }, [store]);
+    }, [store, flushPersist]);
+
+    /** 关 tab / 刷新 / 合盖等：尽力把最后一帧相机推给持久化层 */
+    useEffect(() => {
+      if (!onPersist) return;
+
+      const onVis = () => {
+        if (document.visibilityState === 'hidden') flushPersist();
+      };
+      const onPageHide = () => flushPersist();
+      const onBeforeUnload = () => flushPersist();
+
+      document.addEventListener('visibilitychange', onVis);
+      window.addEventListener('pagehide', onPageHide);
+      window.addEventListener('beforeunload', onBeforeUnload);
+      return () => {
+        document.removeEventListener('visibilitychange', onVis);
+        window.removeEventListener('pagehide', onPageHide);
+        window.removeEventListener('beforeunload', onBeforeUnload);
+      };
+    }, [onPersist, flushPersist]);
 
     const handlePointerDown = useCallback(
       (e: ReactPointerEvent<HTMLDivElement>) => {
@@ -134,7 +164,8 @@ export const CameraControl = forwardRef<CameraControlRef, CameraControlProps>(
 
     const handlePointerUp = useCallback(() => {
       store.getState().handlePointerUp();
-    }, [store]);
+      flushPersist();
+    }, [store, flushPersist]);
 
     const handleWheel = useCallback(
       (e: React.WheelEvent<HTMLDivElement>) => {

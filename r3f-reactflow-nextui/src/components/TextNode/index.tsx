@@ -602,6 +602,7 @@ const TextNode: React.FC<NodeProps<TextNodeFlowData>> = ({ id, selected }) => {
             }}
             position="left"
             minWidth={200}
+            autoScale={false}
             onResize={(_event, data) => {
               updateData({ width: data.width, autoResizeWidth: false });
             }}
@@ -617,6 +618,7 @@ const TextNode: React.FC<NodeProps<TextNodeFlowData>> = ({ id, selected }) => {
             }}
             position="right"
             minWidth={200}
+            autoScale={false}
             onResize={(_event, data) => {
               updateData({ width: data.width, autoResizeWidth: false });
             }}

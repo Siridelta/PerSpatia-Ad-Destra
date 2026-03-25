@@ -13,28 +13,33 @@ import { DesmosPreviewNodeUIData, TextNodeUIData } from '@/types/nodeData';
 import defaultCanvas from '@/components/Canvas/defaultCanvas';
 import { immer } from 'zustand/middleware/immer';
 import { enableMapSet } from 'immer';
-import { applyEdgeChanges, applyNodeChanges, type EdgeChange, type NodeChange, type Viewport } from '@xyflow/react';
+import { applyEdgeChanges, applyNodeChanges, type EdgeChange, type NodeChange } from '@xyflow/react';
 import { CanvasEdgeFlowData, CanvasNodeFlowData } from '@/types/canvas';
 import type { CanvasArchiveState } from '@/types/persistence';
+import type { CameraState } from '@/components/CameraControl';
+import {
+  DEFAULT_CAMERA_OPTIONS,
+  DEFAULT_SPHERICAL_PHI,
+  DEFAULT_SPHERICAL_THETA,
+} from '@/components/CameraControl';
 
 // Canvas store 已使用 Map 结构，需显式启用 Immer 的 Map/Set 支持。
 enableMapSet();
 
+
+
 /**
  * 单一数据源（canvas store）：
  * - uiData: 业务层数据（code、controls、折叠状态等）
- * - flowData: React Flow 渲染层数据（position、连线、viewport）
- *
- * 使用方式仍保持拆分：
- * - 业务组件通过 useUIData/useNodeUIData 读取 uiData
- * - Canvas 通过 useFlowData 给 ReactFlow 传入最小渲染数据
+ * - flowData: React Flow 渲染层数据（仅 nodes/edges；**不含** RF viewport，视口由 ReactFlow3D + 相机 store 推导）
+ * - camera: 与持久化 `CanvasArchiveState.camera` 对齐；由 CameraControl `onPersist` 低频写入
  */
 export interface CanvasStoreState {
   nodes: Map<string, CanvasNodeUIData>;
   edges: Map<string, CanvasEdgeUIData>;
   flowNodes: CanvasNodeFlowData[];
   flowEdges: CanvasEdgeFlowData[];
-  viewport: Viewport;
+  camera: CameraState;
 }
 
 export interface CanvasUIData {
@@ -45,7 +50,6 @@ export interface CanvasUIData {
 export interface FlowData {
   nodes: CanvasNodeFlowData[];
   edges: CanvasEdgeFlowData[];
-  viewport: Viewport;
 }
 
 export interface CanvasDataApi {
@@ -57,9 +61,13 @@ export interface CanvasDataApi {
     defaultTextNodeData: TextNodeUIData;
   };
   readFlow: {
-    // ---- Flow 快照读取 ----
+    // ---- Flow 快照读取（仅图；视口不在此层）----
     getFlowSnapshot: () => FlowData;
     useFlowData: <T>(selector: (data: FlowData) => T) => T;
+  };
+  readCamera: {
+    getCameraSnapshot: () => CameraState;
+    useCamera: <T>(selector: (camera: CameraState) => T) => T;
   };
   subscribe: {
     // ---- UI 数据订阅 ----
@@ -77,10 +85,13 @@ export interface CanvasDataApi {
     updateNodeControlValue: (nodeId: string, controlName: string, value: unknown) => void;
   };
   writeFlow: {
-    // ---- Flow 非结构写入（视口/交互变更）----
-    setViewport: (viewport: Viewport) => void;
+    // ---- Flow 非结构写入（节点选中/拖拽等）----
     handleFlowNodesChange: (changes: NodeChange[]) => void;
     handleFlowEdgesChange: (changes: EdgeChange[]) => void;
+  };
+  writeCamera: {
+    /** 相机松手/切页等时机写入，供持久化订阅；与 CameraControl 真源对齐 */
+    setCamera: (camera: CameraState) => void;
   };
   graph: {
     // ---- 图结构入口（会同步更新 uiData + flowData）----
@@ -134,14 +145,6 @@ const defaultTextNodeData: TextNodeUIData = {
     errors: false,
   },
 };
-
-const defaultViewport: Viewport = { x: 0, y: 0, zoom: 1 };
-const VIEWPORT_EPSILON = 0.0001;
-const isSameViewport = (a: Viewport, b: Viewport) => (
-  Math.abs(a.x - b.x) < VIEWPORT_EPSILON &&
-  Math.abs(a.y - b.y) < VIEWPORT_EPSILON &&
-  Math.abs(a.zoom - b.zoom) < VIEWPORT_EPSILON
-);
 
 // ---- normalize helpers: 外部输入 -> 内部规范数据 ----
 type RawNodeRecord = Record<string, { type?: unknown; data?: unknown }>;
@@ -227,21 +230,42 @@ const getDefaultUIData = (): CanvasUIData => ({
 const getDefaultFlowData = (): FlowData => ({
   nodes: normalizeFlowNodes(defaultCanvas.flowData.nodes),
   edges: normalizeFlowEdges(defaultCanvas.flowData.edges),
-  viewport: defaultCanvas.flowData.viewport ?? defaultViewport,
+});
+
+/**
+ * **默认模板相机**（default canvas template）：
+ * 来自 `defaultCanvas`（迁移后的模板存档）里的 `camera` 字段；
+ */
+const getDefaultCanvasCamera = (): CameraState => defaultCanvas.camera;
+
+/**
+ * **空白画布相机**（cleared / empty graph）：
+ * 在「图上已无任何内容」时使用的相机快照，与 **默认模板 JSON** 无关。
+ * 数值取 `DEFAULT_CAMERA_OPTIONS` / 球角常量，表示引擎层面的原点视角。
+ */
+const getBlankCanvasCamera = (): CameraState => ({
+  targetX: 0,
+  targetY: 0,
+  radius: DEFAULT_CAMERA_OPTIONS.initialRadius,
+  theta: DEFAULT_SPHERICAL_THETA,
+  phi: DEFAULT_SPHERICAL_PHI,
 });
 
 const createCanvasStore = (initial?: Partial<CanvasArchiveState>) =>
   createStore<CanvasStoreState>()(
-    immer(() => ({
-      nodes: normalizeUINodes(initial?.uiData?.nodes ?? defaultCanvas.uiData.nodes),
-      edges: normalizeUIEdges(initial?.uiData?.edges ?? defaultCanvas.uiData.edges),
-      flowNodes: initial?.flowData?.nodes ?? getDefaultFlowData().nodes,
-      flowEdges: initial?.flowData?.edges ?? getDefaultFlowData().edges,
-      viewport: initial?.flowData?.viewport ?? getDefaultFlowData().viewport,
-    }))
+    immer(() => {
+      const defaultFlow = getDefaultFlowData();
+      return {
+        nodes: normalizeUINodes(initial?.uiData?.nodes ?? defaultCanvas.uiData.nodes),
+        edges: normalizeUIEdges(initial?.uiData?.edges ?? defaultCanvas.uiData.edges),
+        flowNodes: initial?.flowData?.nodes ?? defaultFlow.nodes,
+        flowEdges: initial?.flowData?.edges ?? defaultFlow.edges,
+        camera: initial?.camera ?? getDefaultCanvasCamera() ?? getBlankCanvasCamera(),
+      };
+    })
   );
 
-// 从完整 store 派生两个“只读分片快照”
+// 从完整 store 派生只读分片快照（ui / flow / camera）
 const toUIDataSlice = (state: CanvasStoreState): CanvasUIData => ({
   nodes: state.nodes,
   edges: state.edges,
@@ -250,8 +274,9 @@ const toUIDataSlice = (state: CanvasStoreState): CanvasUIData => ({
 const toFlowDataSlice = (state: CanvasStoreState): FlowData => ({
   nodes: state.flowNodes,
   edges: state.flowEdges,
-  viewport: state.viewport,
 });
+
+const toCameraSlice = (state: CanvasStoreState): CameraState => state.camera;
 
 const serializeUINodes = (nodesMap: Map<string, CanvasNodeUIData>): Record<string, CanvasNodeUIData> => {
   const serialized: Record<string, CanvasNodeUIData> = {};
@@ -479,9 +504,14 @@ export const useCanvasData = (): CanvasDataApi => {
       });
     };
 
-    const clearCanvas = () => {
-      store.setState({ nodes: new Map(), edges: new Map(), flowNodes: [], flowEdges: [], viewport: defaultViewport });
-    };
+    const clearCanvas = () => 
+      store.setState({
+        nodes: new Map(),
+        edges: new Map(),
+        flowNodes: [],
+        flowEdges: [],
+        camera: getBlankCanvasCamera(),
+      });
 
     const resetToDefault = () => {
       const defaultUI = getDefaultUIData();
@@ -490,7 +520,7 @@ export const useCanvasData = (): CanvasDataApi => {
         ...defaultUI,
         flowNodes: defaultFlow.nodes,
         flowEdges: defaultFlow.edges,
-        viewport: defaultFlow.viewport,
+        camera: getDefaultCanvasCamera(),
       });
     };
 
@@ -517,9 +547,6 @@ export const useCanvasData = (): CanvasDataApi => {
     // ----------------------------------------------------------------
     // 5) Flow 分片 - 写入 API
     // ----------------------------------------------------------------
-    const setViewport = (viewport: Viewport) => {
-      store.setState((state) => (isSameViewport(state.viewport, viewport) ? state : { viewport }));
-    };
 
     const handleFlowNodesChange = (changes: NodeChange[]) => {
       const nonStructuralChanges = changes.filter((change) => change.type !== 'add' && change.type !== 'remove' && change.type !== 'replace');
@@ -538,16 +565,49 @@ export const useCanvasData = (): CanvasDataApi => {
     const exportFlowData = (): FlowData => toFlowDataSlice(store.getState());
 
     // ----------------------------------------------------------------
+    // 6) Camera 分片 - 读取 & 写入（低频写入，写入仅用于持久化）
+    // ----------------------------------------------------------------
+    const getCameraSnapshot = (): CameraState => toCameraSlice(store.getState());
+
+    const isSameCamera = (a: CameraState, b: CameraState) => (
+      a.targetX === b.targetX &&
+      a.targetY === b.targetY &&
+      a.radius === b.radius &&
+      a.theta === b.theta &&
+      a.phi === b.phi
+    );
+
+    const useCamera = <T,>(selector: (camera: CameraState) => T): T => {
+      const prevStateRef = useRef<CanvasStoreState>(store.getState());
+      const prevCamRef = useRef<CameraState>(toCameraSlice(prevStateRef.current));
+      return useStore(store, (state): T => {
+        if (prevStateRef.current !== state) {
+          prevStateRef.current = state;
+          prevCamRef.current = toCameraSlice(state);
+        }
+        return selector(prevCamRef.current);
+      });
+    };
+
+    const setCamera = (next: CameraState) => {
+      store.setState((draft) => {
+        const prev = draft.camera;
+        if (isSameCamera(prev, next)) return;
+        draft.camera = { ...next };
+      });
+    };
+
+    // ----------------------------------------------------------------
     // 6) Canvas 原子导入/导出（UI + Flow 一起）
     // ----------------------------------------------------------------
     const importCanvasData = (state: CanvasArchiveState) => {
-      // 原子导入：一次 setState 同步更新 ui/flow，避免中间态被副作用消费
+      // 原子导入：一次 setState 同步更新 ui/flow/camera，避免中间态被副作用消费
       store.setState({
         nodes: normalizeUINodes(state.uiData.nodes ?? {}),
         edges: normalizeUIEdges(state.uiData.edges ?? {}),
         flowNodes: normalizeFlowNodes(state.flowData.nodes ?? []),
         flowEdges: normalizeFlowEdges(state.flowData.edges ?? []),
-        viewport: state.flowData.viewport ?? defaultViewport,
+        camera: state.camera ?? getBlankCanvasCamera(),
       });
     };
 
@@ -558,7 +618,11 @@ export const useCanvasData = (): CanvasDataApi => {
           nodes: serializeUINodes(state.nodes),
           edges: serializeUIEdges(state.edges),
         },
-        flowData: exportFlowData(),
+        flowData: {
+          nodes: state.flowNodes,
+          edges: state.flowEdges,
+        },
+        camera: state.camera,
       };
     };
 
@@ -754,6 +818,10 @@ export const useCanvasData = (): CanvasDataApi => {
         getFlowSnapshot,
         useFlowData,
       },
+      readCamera: {
+        getCameraSnapshot,
+        useCamera,
+      },
       subscribe: {
         onData,
       },
@@ -767,9 +835,11 @@ export const useCanvasData = (): CanvasDataApi => {
         updateNodeControlValue,
       },
       writeFlow: {
-        setViewport,
         handleFlowNodesChange,
         handleFlowEdgesChange,
+      },
+      writeCamera: {
+        setCamera,
       },
       graph: {
         createDepEdge,

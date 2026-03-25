@@ -60,7 +60,7 @@ export const DEFAULT_CAMERA_OPTIONS: CameraOptions = {
   panDamping: 0.85,
   rotateDamping: 0.85,
   zoomDamping: 0.88,
-  panKeyVelocity: 0.8,
+  panKeyVelocity: 0.5,
 };
 
 // 输入状态

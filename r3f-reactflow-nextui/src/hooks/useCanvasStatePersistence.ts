@@ -5,7 +5,7 @@ import { CanvasArchiveState } from '@/types/persistence';
 
 /**
  * 画布状态持久化层：
- * - 负责把 UIData/FlowData 与 localStorage 同步
+ * - 负责把 uiData / flowData / camera（三者平级）与 localStorage 同步
  * - 首次挂载时执行 hydration
  * - 后续在状态变化时保存快照
  */
@@ -41,6 +41,7 @@ const loadState = (): CanvasArchiveState | null => {
 export const useCanvasStatePersistence = (canvasDataApi: CanvasDataApi): { isHydrated: boolean } => {
   const uiData = canvasDataApi.readUI.useUIData((data) => data);
   const flowData = canvasDataApi.readFlow.useFlowData((data) => data);
+  const camera = canvasDataApi.readCamera.useCamera((c) => c);
   const [isHydrated, setIsHydrated] = useState(false);
 
   useEffect(() => {
@@ -56,7 +57,7 @@ export const useCanvasStatePersistence = (canvasDataApi: CanvasDataApi): { isHyd
     // 避免在未加载完成时保存状态
     if (!isHydrated) return;
     saveState(canvasDataApi.porting.exportCanvasData());
-  }, [uiData, flowData, canvasDataApi, isHydrated]);
+  }, [uiData, flowData, camera, canvasDataApi, isHydrated]);
 
   return {
     isHydrated,
