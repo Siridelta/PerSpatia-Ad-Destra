@@ -22,7 +22,7 @@ Reactfow viewport 参数 {vp.xy, vp.zoom} 的含义是让某个 Reactflow 画布
 
 （some_standard_z 可以留到最后再确定，它决定了 rf 坐标系和 three 坐标系之间的一个对应缩放因子，一个 three 坐标大致对应多少的 rf 坐标。）
 
-（一般 three 场景里事物的尺寸在 1 个单位量级，但使用标准像素的 DOM 元素尺寸一般在 100 左右的量级，因此乘以一个 100 对应，在代码里记为 SCREEN_METRIC_TO_THREE_METRIC = 100）
+（一般 three 场景里事物的尺寸在 1 个单位量级，但使用标准像素的 DOM 元素尺寸一般在 100 左右的量级，因此乘以一个 100 对应，在代码里记为 SCREEN_METRIC_TO_THREE = 100）
 
 ---
 

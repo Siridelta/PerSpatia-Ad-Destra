@@ -1,5 +1,6 @@
 import type { CameraState } from '@/components/CameraControl';
 import {
+  alpha,
   DEFAULT_CAMERA_OPTIONS,
   DEFAULT_SPHERICAL_PHI,
   DEFAULT_SPHERICAL_THETA,
@@ -7,7 +8,7 @@ import {
 } from '@/components/CameraControl/cameraStore';
 import type { CanvasArchiveLegacy } from '@/types/persistence';
 import type { V9CanvasStateLike } from './v8-to-v9';
-import { SCREEN_METRIC_TO_THREE_METRIC } from '@/components/ReactFlow3D/ReactFlowViewportSync';
+import { SCREEN_METRIC_TO_THREE } from '@/components/ReactFlow3D/ReactFlowViewportSync';
 
 /**
  * v9 -> v10:
@@ -21,10 +22,14 @@ export const v9ToV10 = (archive: CanvasArchiveLegacy): CanvasArchiveLegacy => {
   const vp = state.flowData?.viewport;
   const camera: CameraState = (() => {
     if (vp) {
-      const standardZ = window.innerHeight / 2 / Math.tan(FOV / 2 * Math.PI / 180);
-      const radius = standardZ / SCREEN_METRIC_TO_THREE_METRIC / vp.zoom;
-      const targetX = -((vp.x - window.innerWidth / 2) / vp.zoom + window.innerWidth / 2) / SCREEN_METRIC_TO_THREE_METRIC;
-      const targetY = ((vp.y - window.innerHeight / 2) / vp.zoom + window.innerHeight / 2) / SCREEN_METRIC_TO_THREE_METRIC;
+      const vw = window.innerWidth;
+      const vh = window.innerHeight;
+      // 这里我们不用 expans 扩张因子，因为在旧存档里 reactflow 是未扩张的，所以需要不除以 expans 因子才能获得相同的视觉效果。
+      const fovRad = (FOV * Math.PI) / 180;
+      const standardZ = vh / 2 / Math.tan(fovRad / 2);
+      const radius = standardZ / SCREEN_METRIC_TO_THREE / vp.zoom;
+      const targetX = -((vp.x - vw / 2) / vp.zoom + vw / 2) / SCREEN_METRIC_TO_THREE;
+      const targetY = ((vp.y - vh / 2) / vp.zoom + vh / 2) / SCREEN_METRIC_TO_THREE;
       return {
         targetX,
         targetY,

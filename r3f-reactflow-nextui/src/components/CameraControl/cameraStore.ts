@@ -33,6 +33,13 @@ export const SPHERICAL_PHI_MAX = Math.PI - 0.01;
 
 export const FOV = 50;
 
+/**
+ * RF↔墙面换算里侧视锥体扩张用的半角 **α**（弧度）。
+ * `expans = tan(fov/2 + α) / tan(fov/2)`，见 `docs/coordinates-transform.md`。
+ * 具体算式写在各调用处（`ReactFlowViewportSync`、`v9-to-v10` 等），勿在此处封装。
+ */
+export const alpha = (15 * Math.PI) / 180;
+
 // 配置选项
 export interface CameraOptions {
   initialTargetX: number;

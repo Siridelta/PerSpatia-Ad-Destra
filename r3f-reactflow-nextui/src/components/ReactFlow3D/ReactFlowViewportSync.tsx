@@ -9,10 +9,10 @@
 import { useEffect } from 'react';
 import { useReactFlow, useStore } from '@xyflow/react';
 
-import { CameraState, FOV, useCameraControlStore } from '@/components/CameraControl';
+import { alpha, CameraStore, FOV, useCameraControlStore } from '@/components/CameraControl';
 
-// 每 100px 屏幕，对应 1 个 Three.js 单位
-export const SCREEN_METRIC_TO_THREE_METRIC = 100;
+/** 每 100px 屏幕对应 1 个 Three 单位（与 `docs/coordinates-transform.md` 一致）。 */
+export const SCREEN_METRIC_TO_THREE = 100;
 
 export function ReactFlowViewportSync() {
   const { setViewport, getViewport } = useReactFlow();
@@ -28,23 +28,27 @@ export function ReactFlowViewportSync() {
   );
 
 
-  const toControlledViewport = (cameraState: CameraState) => {
-    const standardZ = window.innerHeight / 2 / Math.tan(FOV / 2 * Math.PI / 180);
-    const zoom = standardZ / SCREEN_METRIC_TO_THREE_METRIC / cameraState.radius;
-    // This is mystery. nobody know what react-flow zooming actually means. I just found this formula right.
-    const x = (-cameraState.targetX * SCREEN_METRIC_TO_THREE_METRIC - window.innerWidth / 2) * zoom + window.innerWidth / 2;
-    const y = (cameraState.targetY * SCREEN_METRIC_TO_THREE_METRIC - window.innerHeight / 2) * zoom + window.innerHeight / 2;
-    return {
-      x,
-      y,
-      zoom,
-    };
+  /**
+   * 墙面相机 → RF viewport；公式就地写全（含 `expans`），与 `v9-to-v10` 逆变换对照维护。
+   * vw/vh 优先 store，与 `CameraControl` resize 一致。
+   */
+  const toControlledViewport = (state: CameraStore) => {
+    const { cameraState, viewportSize } = state;
+    const vw = viewportSize.width > 0 ? viewportSize.width : window.innerWidth;
+    const vh = viewportSize.height > 0 ? viewportSize.height : window.innerHeight;
+
+    const fovRad = (FOV * Math.PI) / 180;
+    const standardZ = vh / 2 / SCREEN_METRIC_TO_THREE / Math.tan(fovRad / 2);
+    const expans = Math.tan(fovRad / 2 + alpha) / Math.tan(fovRad / 2);
+    const zoom = standardZ / cameraState.radius / expans;
+    const x = (-cameraState.targetX * SCREEN_METRIC_TO_THREE - vw / 2) * zoom + vw / 2;
+    const y = (cameraState.targetY * SCREEN_METRIC_TO_THREE - vh / 2) * zoom + vh / 2;
+    return { x, y, zoom };
   };
 
   useEffect(() => {
-    const sync = () => {
-      const { cameraState } = cameraStore.getState();
-      const controlledViewport = toControlledViewport(cameraState);
+    const sync = (state: CameraStore) => {
+      const controlledViewport = toControlledViewport(state);
       const current = getViewport();
       const dx = Math.abs(current.x - controlledViewport.x);
       const dy = Math.abs(current.y - controlledViewport.y);
@@ -53,8 +57,7 @@ export function ReactFlowViewportSync() {
         void setViewport(controlledViewport);
       }
     };
-
-    sync();
+    sync(cameraStore.getState());
     return cameraStore.subscribe(sync);
   }, [cameraStore, getViewport, setViewport, rfReady]);
 

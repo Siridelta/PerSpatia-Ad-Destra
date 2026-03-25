@@ -1,15 +1,24 @@
 /**
  * 调试用相机 HUD：依赖 CameraControl Context，不依赖 Canvas。
- * 缩放任显示与 RF 同步公式一致：zoom = 30 / radius（与 ReactFlowViewportSync 相同）。
+ * Zoom 与 `ReactFlowViewportSync` 同一套就地公式（含 `expans`）。
  */
 
 import React from 'react';
 
+import { alpha, FOV } from './cameraStore';
 import { useCameraControl } from './CameraControl';
+import { SCREEN_METRIC_TO_THREE } from '../ReactFlow3D/ReactFlowViewportSync';
 
 export function CameraDebugHud() {
   const cameraState = useCameraControl((s) => s.cameraState);
-  const zoom = 30 / cameraState.radius;
+  const viewportSize = useCameraControl((s) => s.viewportSize);
+  const vw = viewportSize.width > 0 ? viewportSize.width : window.innerWidth;
+  const vh = viewportSize.height > 0 ? viewportSize.height : window.innerHeight;
+
+  const fovRad = (FOV * Math.PI) / 180;
+  const standardZ = vh / 2 / SCREEN_METRIC_TO_THREE / Math.tan(fovRad / 2);
+  const expans = Math.tan(fovRad / 2 + alpha) / Math.tan(fovRad / 2);
+  const zoom = standardZ / cameraState.radius / expans;
 
   return (
     <div
