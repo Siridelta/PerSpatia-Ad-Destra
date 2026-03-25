@@ -29,7 +29,7 @@
 4. **`cameraState` 的三路消费（如何把数写回画面）**  
    - **Three.js 场景**：仍在 **`useFrame`** 里、于 `tick()` **之后** **轮询读取**最新 `cameraState`，写入 R3F 的 **`PerspectiveCamera`**（**不是**靠 Zustand `subscribe` 驱动这一支，避免与渲染循环脱节）。  
    - **ReactFlow3D（CSS 2.5D 壳）**：组件内对 store **`subscribe`**，在 `cameraState` 变化时 **直接改 DOM** 的 `transform` / `perspective`，**不**走 React `setState`。  
-   - **React Flow 的 `viewport` API**：父组件 **`Canvas`** 根据 **`cameraState` 派生** `controlledViewport`，通过 **`setViewport`** 推送平移与缩放；**旋转**仍只由 CSS + Three 表达，`viewport` 本身不带 θ/φ。  
+   - **React Flow 的 `viewport` API**：**`ReactFlowViewportSync`**（挂在 **`ReactFlow3D`** 内）根据 **`cameraState` 派生**视口，通过 **`setViewport`** 推送平移与缩放；**旋转**仍只由 CSS + Three 表达，`viewport` 本身不带 θ/φ。  
 
 5. **「假象」由谁拼**  
    **同一份 `cameraState`** 下，`ReactFlow3D`（CSS）与 **`Canvas`（viewport）** 各自计算如何把 RF 画在屏幕上，使其与背后 Three 场景在 **平移、缩放、倾斜** 上 **看起来** 像同一块空间里的两层。
@@ -96,18 +96,21 @@ React Flow API **只能稳定表达** `viewport: { x, y, zoom }`，**不包含**
 
 ### 2.1 一句话（SSOT）
 
-**`CameraControl` 创建的 Zustand store 是相机与视口的唯一真实来源**（每块画布一份，非全局单例）。DOM 指针/键盘等写入 store；R3F `useFrame` 里 `tick()` 做物理并驱动 Three.js 相机；`ReactFlow3D` 用 `subscribe` 直接改 CSS 3D 的 `transform` / `perspective`；`Canvas` 把派生出的 `controlledViewport` **单向** `setViewport` 推给 RF。**不要用 RF 的 `onMoveEnd` 把 viewport 反写进相机**，否则会丢掉 `theta`/`phi`。父级可通过 **`Canvas` 的 ref** 调用 `getCameraState` / `setCameraState`。
+**`CameraControl` 创建的 Zustand store 是相机与视口的唯一真实来源**（每块画布一份，非全局单例）。**`CameraControl`** 内全屏输入层把指针/滚轮写入 store，并由 `shouldIgnoreCameraForTarget`（如 `pointerPolicy.shouldIgnorePointerForCameraRf`）决定何时忽略；同组件内还负责 **resize → `setViewportSize`**、**WASD 等键盘相机**（非可编辑焦点时）；R3F `useFrame` 里 `tick()` 做物理并驱动 Three.js 相机；`ReactFlow3D` 用 `subscribe` 改 CSS 3D 的 `transform` / `perspective`，并由 **`ReactFlowViewportSync`**（`useReactFlow`，与 `<ReactFlow>` 兄弟即可，只要外层已有 `ReactFlowProvider`）把派生 viewport **单向** `setViewport` 推给 RF。**不要用 RF 的 `onMoveEnd` 把 viewport 反写进相机**，否则会丢掉 `theta`/`phi`。若需在 `Canvas` 内命令式读写相机，可在该文件里保留 `useRef<CameraControlRef>` 传给 `<CameraControl ref={...}>`。
 
 ### 2.2 代码地图（改功能时先打开这些）
 
 | 路径 | 职责 |
 |------|------|
 | `src/components/CameraControl/cameraStore.ts` | `createCameraStore`、`CameraState`、球坐标默认/夹紧常量；`tick`、`screenToPlane` 等 |
-| `src/components/CameraControl/CameraControl.tsx` | 每画布一份 store + Context；`useCameraControl`；ref：`getCameraState` / `setCameraState` |
-| `src/components/ReactFlow3D/index.tsx` | 事件冒泡层、命中节点/边则放行、`subscribe` 更新 transform / perspective |
+| `src/components/CameraControl/CameraControl.tsx` | `CameraControl`：store + Context + 全屏输入层 + ref + resize/键盘相机；`shouldIgnoreCameraForTarget` 由外部注入（如 `pointerPolicy`） |
+| `src/components/CameraControl/CameraDebugHud.tsx` | 调试用 HUD；由 `Canvas` 作为子组件挂载（内部 `useCameraControl`） |
+| `src/components/ReactFlow3D/pointerPolicy.ts` | `RF_EMPTY_SURFACE_ATTR`、`shouldIgnorePointerForCameraRf`（CameraControl 不写 RF 类名） |
+| `src/components/ReactFlow3D/index.tsx` | `subscribe` 更新 transform / perspective；内嵌 `ReactFlowViewportSync`（指针由 `CameraControl` 处理） |
+| `src/components/ReactFlow3D/ReactFlowViewportSync.tsx` | 订阅相机 store，`useReactFlow().setViewport` 单向同步 RF（阈值防抖） |
 | `src/components/ReactFlow3D/shellCssMath.ts` | 外壳 `perspective`、与 θ/φ 配套的 `transform` 字符串（纯函数） |
-| `src/components/Scene3D/index.tsx` | `useFrame` 调 `tick()`、同步 Three.js `PerspectiveCamera`；**Canvas 外**取 store 经 props 传入 `CameraSync`（R3F 子树不继承外层 Context） |
-| `src/components/Canvas/index.tsx` | 外层 `forwardRef` → `CameraControl`；`CanvasBody`：`controlledViewport`、`setViewport`、持久化 `setCameraState` |
+| `src/components/Scene3D/index.tsx` | `useFrame` 调 `tick()`、同步 Three.js `PerspectiveCamera`；背景组缩放每帧按 `30/radius`；**Canvas 外**取 store 经 props 传入 R3F 子树（R3F 子树不继承外层 Context） |
+| `src/components/Canvas/index.tsx` | 单一 `Canvas`：`CameraControl` + `ref` 做持久化 `setCameraState`；**不在此文件用 `useCameraControl`**；`useReactFlow` 用于 `screenToFlowPosition` / `onInit`；子组件 `CameraDebugHud` |
 
 ### 2.3 坐标系与相机参数（与世界 / RF 对齐）
 
@@ -119,7 +122,7 @@ React Flow API **只能稳定表达** `viewport: { x, y, zoom }`，**不包含**
 **Store 里的 `cameraState`（与 `updateSimulatedCamera` 一致）**
 
 - `targetX`, `targetY`：相机注视点在 XY 平面上。
-- `radius`：相机到该点的距离；与 React Flow 的 `zoom` 约定为 **`zoom = 30 / radius`**（见 `Canvas` 中 `controlledViewport`）。
+- `radius`：相机到该点的距离；与 React Flow 的 `zoom` 约定为 **`zoom = 30 / radius`**（见 `ReactFlowViewportSync` 与 `Scene3D` 背景缩放）。
 - `theta`、`phi`：**与 `THREE.Spherical` / `Vector3.setFromSphericalCoords(radius, phi, theta)` / drei OrbitControls 内部约定一致**（见 Three 文档与 `three.core.js` 中 `Spherical`）。
 - `tick` 里将 `phi` 夹在 **`(SPHERICAL_PHI_MIN, SPHERICAL_PHI_MAX)`**（约 `0.01`～`π - 0.01`），等价于 `Spherical.makeSafe` 量级，避免极点；**+Z 锥体**等产品向约束留待后续与物理一起设计。
 
@@ -185,12 +188,12 @@ viewport.zoom = 30 / radius
 |------|--------|
 | DOM | RF 子树优先消费事件；否则冒泡至 `ReactFlow3D` → 写入 store **`input`** |
 | RAF | `Scene3D` `useFrame` → `tick()` **读** input → **写** `cameraState` → **读** `cameraState` **写** Three 相机 |
-| 订阅 / React | `ReactFlow3D` **subscribe** → CSS；`Canvas` 派生 **`controlledViewport`** → **`setViewport`** |
+| 订阅 / React | `ReactFlow3D` **subscribe** → CSS；**`ReactFlowViewportSync`** 派生视口 → **`setViewport`** |
 
 ### 2.6 React Flow 集成要点
 
 - **必须关掉 RF 自带平移/缩放**（否则与自定义控制打架），例如：`panOnDrag={false}`、`zoomOnScroll={false}` 等（具体以 `Canvas` 里实际 props 为准）。
-- **`Canvas` 用 `controlledViewport` + `setViewport`** 把 store 推到 RF；与 store 差异小于阈值时不写，减轻循环抖动。
+- **`ReactFlowViewportSync` 用派生视口 + `setViewport`** 把 store 推到 RF；与当前 RF 视口差异小于阈值时不写，减轻循环抖动。
 - **勿在 `onMoveEnd` 用 viewport 反写 store**：viewport 只有 `x/y/zoom`，**没有 `theta/phi`**，反复反写会把旋转状态搞乱。
 
 ### 2.7 持久化已知债：`theta` / `phi` 尚未进存档
@@ -209,7 +212,7 @@ viewport.zoom = 30 / radius
 |------|--------|
 | 一转视角再平移就跳 | 是否仍缓存了「旧相机下的平面点」；应用「仅 `lastPointerScreen` + 当帧双射线」方案 |
 | 旋转突然被清零 | RF 回调里是否用 viewport **反写**了相机（无 θ/φ）；**或**刷新/重载（持久化只存 viewport，见 **§2.7**） |
-| 3D 与 2D 不同步 | `subscribe` 是否生效、`viewportSize` 是否与窗口一致、`controlledViewport` 公式是否改动 |
+| 3D 与 2D 不同步 | `subscribe` 是否生效、`viewportSize` 是否与窗口一致、派生视口公式（`30/radius` 等）是否改动 |
 | 节点上拖动画布 | `ReactFlow3D` 的 `closest` 选择器是否覆盖该类节点容器 |
 
 ### 2.10 归档里还有什么

@@ -1,33 +1,26 @@
 /**
  * Scene3D 组件 - 纯 3D 背景场景
- * 
+ *
  * 职责：
  * 1. 渲染 3D 背景（星星、菱形、渐变平面）
- * 2. 接收相机状态并同步 Three.js Camera
- * 3. 支持缩放（兼容旧版 sceneScale）
+ * 2. 在 R3F 内同步 Three.js 相机（store 由外层注入：R3F Canvas 子树不继承外层 React Context）
+ * 3. 背景装饰组缩放与 RF 视口一致：每帧按 `30 / radius` 更新
  */
 
-import React, { useRef, useEffect, useImperativeHandle, forwardRef } from 'react';
+import React, { useRef } from 'react';
 import { Canvas, useFrame, useThree } from '@react-three/fiber';
 import { Stars } from '@react-three/drei';
 import * as THREE from 'three';
-import { useCameraControlStore } from '../CameraControl';
+import { FOV, useCameraControlStore } from '../CameraControl';
 import type { CameraStoreApi } from '../CameraControl';
 
-export interface Scene3DRef {
-  setScale: (scale: number) => void;
-}
-
-interface Scene3DProps {
-  sceneScale?: number;  // 兼容旧版
-}
-
 // 3D 背景效果组件
-function BackgroundEffects({ scale = 1 }: { scale?: number }) {
+function BackgroundEffects({ cameraStore }: { cameraStore: CameraStoreApi }) {
   const meshRef = useRef<THREE.Mesh>(null);
   const groupRef = useRef<THREE.Group>(null);
   
   useFrame((state) => {
+
     if (meshRef.current) {
       meshRef.current.rotation.z += 0.0005;
       const material = meshRef.current.material as THREE.ShaderMaterial;
@@ -108,8 +101,8 @@ function BackgroundEffects({ scale = 1 }: { scale?: number }) {
         />
       </mesh>
       
-      {/* 可缩放的菱形组 */}
-      <group ref={groupRef} scale={scale}>
+      {/* 可缩放的菱形组（scale 在 useFrame 中按相机 radius 写入） */}
+      <group ref={groupRef}>
         {diamonds.map((d, i) => (
           <mesh key={i} position={d.position} scale={d.scale}>
             <planeGeometry args={[2, 2]} />
@@ -136,7 +129,7 @@ function BackgroundEffects({ scale = 1 }: { scale?: number }) {
   );
 }
 
-// 相机同步组件（在 R3F Canvas 内；store 由外层 Scene3D 注入，因 Canvas 子树不继承外层 React Context）
+// 相机同步组件（在 R3F Canvas 内；store 由外层 Scene3D 注入）
 function CameraSync({ cameraStore }: { cameraStore: CameraStoreApi }) {
   const { camera } = useThree();
   
@@ -163,42 +156,34 @@ function CameraSync({ cameraStore }: { cameraStore: CameraStoreApi }) {
   return null;
 }
 
-// 主场景组件
-export const Scene3D = forwardRef<Scene3DRef, Scene3DProps>(
-  function Scene3D({ sceneScale = 1 }, ref) {
-    // 必须在 `<Canvas>` 外读取，再传入 CameraSync（见 CameraSync 注释）
-    const cameraStore = useCameraControlStore();
-    const scaleRef = useRef(sceneScale);
-    
-    useImperativeHandle(ref, () => ({
-      setScale: (scale: number) => {
-        scaleRef.current = scale;
-      },
-    }));
-    
-    return (
-      <div style={{
+// 主场景组件（无 props；缩放完全由相机 store 推导）
+export function Scene3D() {
+  // 必须在 `<Canvas>` 外读取，再注入 R3F 子树（见文件头注释）
+  const cameraStore = useCameraControlStore();
+
+  return (
+    <div
+      style={{
         width: '100vw',
         height: '100vh',
         position: 'fixed',
         top: 0,
         left: 0,
         zIndex: 0,
-        overflow: 'hidden'
-      }}>
-        <Canvas
-          camera={{ position: [0, 0, 30], fov: 50 }}
-          gl={{ antialias: true, alpha: true }}
-          style={{ background: 'transparent' }}
-        >
-          <CameraSync cameraStore={cameraStore} />
-          
-          {/* 3D 背景效果（带缩放） */}
-          <BackgroundEffects scale={scaleRef.current} />
-        </Canvas>
-      </div>
-    );
-  }
-);
+        overflow: 'hidden',
+      }}
+    >
+      <Canvas
+        camera={{ position: [0, 0, 30], fov: FOV }}
+        gl={{ antialias: true, alpha: true }}
+        style={{ background: 'transparent' }}
+      >
+        <CameraSync cameraStore={cameraStore} />
+
+        <BackgroundEffects cameraStore={cameraStore} />
+      </Canvas>
+    </div>
+  );
+}
 
 export default Scene3D;

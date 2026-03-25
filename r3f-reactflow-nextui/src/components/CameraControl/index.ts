@@ -3,6 +3,7 @@ export {
   CameraControlContext,
   useCameraControl,
   useCameraControlStore,
+  type CameraControlProps,
   type CameraControlRef,
 } from './CameraControl';
 

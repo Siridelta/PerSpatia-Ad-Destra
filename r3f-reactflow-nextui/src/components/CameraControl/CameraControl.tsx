@@ -1,17 +1,21 @@
 /**
- * CameraControl — 单张画布内的相机 SSOT：创建 Zustand store、挂 Context、暴露 ref 命令式 API。
+ * CameraControl — 单张画布内的相机：Zustand store、Context、全屏输入层、ref。
  *
- * - 指针/滚轮事件仍由 ReactFlow3D 等子组件冒泡写入 store（与此前一致）。
- * - tick() 仍在 R3F useFrame 中调用（Scene3D），保证与 WebGL 渲染同一条时间轴。
+ * - 全屏 div（pointer-events: none）承接冒泡，写入 store；`shouldIgnoreCameraForTarget` 由外层注入（如 pointerPolicy），本文件不写 RF 类名。
+ * - 右键菜单：仅当「允许相机接管」的目标上才 preventDefault，避免挡工具栏等。
+ * - tick() 仍在 R3F useFrame（Scene3D）里跑。
  */
 
 import React, {
   createContext,
   forwardRef,
+  useCallback,
   useContext,
+  useEffect,
   useImperativeHandle,
   useRef,
 } from 'react';
+import type { PointerEvent as ReactPointerEvent } from 'react';
 import { useStore } from 'zustand';
 
 import {
@@ -21,7 +25,6 @@ import {
   type CameraStoreApi,
 } from './cameraStore';
 
-/** 供 `useCameraControlStore` / 可选的跨层读取使用 */
 export const CameraControlContext = createContext<CameraStoreApi | null>(null);
 
 export interface CameraControlRef {
@@ -29,13 +32,24 @@ export interface CameraControlRef {
   setCameraState: (patch: Partial<CameraState>) => void;
 }
 
-export const CameraControl = forwardRef<CameraControlRef, { children: React.ReactNode }>(
-  function CameraControl({ children }, ref) {
+export interface CameraControlProps {
+  children: React.ReactNode;
+  /**
+   * true → 本次交互不交给相机（不平移/旋转、不滚轮缩放、不拦右键菜单）。
+   * 传入 `pointerPolicy` 里基于 `event.target` 的实现即可，例如 `shouldIgnorePointerForCameraRf`。
+   */
+  shouldIgnoreCameraForTarget?: (target: EventTarget | null) => boolean;
+}
+
+export const CameraControl = forwardRef<CameraControlRef, CameraControlProps>(
+  function CameraControl({ children, shouldIgnoreCameraForTarget }, ref) {
     const storeRef = useRef<CameraStoreApi | null>(null);
     if (!storeRef.current) {
       storeRef.current = createCameraStore();
     }
     const store = storeRef.current;
+
+    const shouldIgnore = shouldIgnoreCameraForTarget ?? (() => false);
 
     useImperativeHandle(
       ref,
@@ -48,16 +62,137 @@ export const CameraControl = forwardRef<CameraControlRef, { children: React.Reac
       [store]
     );
 
+    /** 视口尺寸：供 CSS perspective 与 RF 坐标换算；与画布窗口一致 */
+    useEffect(() => {
+      const onResize = () => {
+        store.getState().setViewportSize(window.innerWidth, window.innerHeight);
+      };
+      onResize();
+      window.addEventListener('resize', onResize);
+      return () => window.removeEventListener('resize', onResize);
+    }, [store]);
+
+    /**
+     * WASD 等键盘相机：仅在非可编辑焦点时生效。
+     * 工具快捷键（V/T/C、Ctrl+S 等）仍由 Canvas 处理。
+     */
+    useEffect(() => {
+      const isEditableTarget = (target: EventTarget | null) => {
+        const el = target as HTMLElement | null;
+        if (!el) return false;
+        const tag = el.tagName?.toLowerCase();
+        return tag === 'input' || tag === 'textarea' || el.isContentEditable;
+      };
+
+      const onKeyDown = (e: KeyboardEvent) => {
+        if (isEditableTarget(e.target)) return;
+        store.getState().handleKeyDown(e.key.toLowerCase());
+      };
+
+      const onKeyUp = (e: KeyboardEvent) => {
+        if (isEditableTarget(e.target)) return;
+        store.getState().handleKeyUp(e.key.toLowerCase());
+      };
+
+      window.addEventListener('keydown', onKeyDown, false);
+      window.addEventListener('keyup', onKeyUp, false);
+      return () => {
+        window.removeEventListener('keydown', onKeyDown, false);
+        window.removeEventListener('keyup', onKeyUp, false);
+      };
+    }, [store]);
+
+    const handlePointerDown = useCallback(
+      (e: ReactPointerEvent<HTMLDivElement>) => {
+        if (shouldIgnore(e.target)) {
+          return;
+        }
+
+        if (e.button === 2) {
+          store.getState().startRotate(e.clientX, e.clientY);
+          e.preventDefault();
+          return;
+        }
+
+        if (e.button === 0) {
+          // e.preventDefault();
+          store.getState().startPan(e.clientX, e.clientY);
+        }
+      },
+      [store, shouldIgnore]
+    );
+
+    const handlePointerMove = useCallback(
+      (e: ReactPointerEvent<HTMLDivElement>) => {
+        const state = store.getState();
+        if (state.input.isPanning || state.input.isRotating) {
+          state.handlePointerMove(e.clientX, e.clientY);
+        }
+      },
+      [store]
+    );
+
+    const handlePointerUp = useCallback(() => {
+      store.getState().handlePointerUp();
+    }, [store]);
+
+    const handleWheel = useCallback(
+      (e: React.WheelEvent<HTMLDivElement>) => {
+        const target = e.target as Element;
+        // if (
+        //   target.tagName?.toLowerCase() === 'input' ||
+        //   target.tagName?.toLowerCase() === 'textarea' ||
+        //   (target as HTMLElement).isContentEditable
+        // ) {
+        //   return;
+        // }
+        // // if (shouldIgnore(e.target)) {
+        // //   return;
+        // // }
+        store.getState().handleWheel(e.deltaY);
+        e.preventDefault();
+      },
+      [store, shouldIgnore]
+    );
+
+    /** 仅「相机应接管」的区域拦系统右键；工具栏等保持默认菜单 */
+    const handleContextMenu = useCallback(
+      (e: React.MouseEvent<HTMLDivElement>) => {
+        if (shouldIgnore(e.target)) {
+          return;
+        }
+        e.preventDefault();
+      },
+      [shouldIgnore]
+    );
+
     return (
-      <CameraControlContext.Provider value={store}>{children}</CameraControlContext.Provider>
+      <CameraControlContext.Provider value={store}>
+        <div
+          style={{
+            position: 'fixed',
+            top: 0,
+            left: 0,
+            width: '100vw',
+            height: '100vh',
+            zIndex: 0,
+            overflow: 'visible',
+            pointerEvents: 'none',
+          }}
+          onPointerDown={handlePointerDown}
+          onPointerMove={handlePointerMove}
+          onPointerUp={handlePointerUp}
+          onPointerLeave={handlePointerUp}
+          onWheel={handleWheel}
+          onContextMenu={handleContextMenu}
+        >
+          {children}
+        </div>
+      </CameraControlContext.Provider>
     );
   }
 );
 
-/**
- * 当前画布对应的 vanilla Zustand API（getState / subscribe）。
- * R3F `<Canvas>` 内子树可能拿不到 React Context，需在 Canvas 外取到再 props 传入。
- */
 export function useCameraControlStore(): CameraStoreApi {
   const store = useContext(CameraControlContext);
   if (!store) {
@@ -66,7 +201,6 @@ export function useCameraControlStore(): CameraStoreApi {
   return store;
 }
 
-/** 在函数组件中按 selector 订阅相机 store（与旧版 useCameraStore 用法相同） */
 export function useCameraControl<T>(selector: (state: CameraStore) => T): T {
   const store = useCameraControlStore();
   return useStore(store, selector);

@@ -31,6 +31,8 @@ export const SPHERICAL_PHI_MIN = 0.01;
 
 export const SPHERICAL_PHI_MAX = Math.PI - 0.01;
 
+export const FOV = 50;
+
 // 配置选项
 export interface CameraOptions {
   initialTargetX: number;
@@ -43,6 +45,7 @@ export interface CameraOptions {
   panDamping: number;
   rotateDamping: number;
   zoomDamping: number;
+  panKeyVelocity: number;
 }
 
 export const DEFAULT_CAMERA_OPTIONS: CameraOptions = {
@@ -54,9 +57,10 @@ export const DEFAULT_CAMERA_OPTIONS: CameraOptions = {
   initialPhi: DEFAULT_SPHERICAL_PHI,
   minRadius: 5,
   maxRadius: 100,
-  panDamping: 0.92,
-  rotateDamping: 0.9,
+  panDamping: 0.85,
+  rotateDamping: 0.85,
   zoomDamping: 0.88,
+  panKeyVelocity: 0.8,
 };
 
 // 输入状态
@@ -422,10 +426,10 @@ export function createCameraStore(): CameraStoreApi {
 
       // ===== Pan Velocity 系统 =====
       let targetVx = 0, targetVy = 0;
-      if (dInput.keys.has('w')) targetVy += 2;
-      if (dInput.keys.has('s')) targetVy -= 2;
-      if (dInput.keys.has('a')) targetVx -= 2;
-      if (dInput.keys.has('d')) targetVx += 2;
+      if (dInput.keys.has('w')) targetVy += dOptions.panKeyVelocity;
+      if (dInput.keys.has('s')) targetVy -= dOptions.panKeyVelocity;
+      if (dInput.keys.has('a')) targetVx -= dOptions.panKeyVelocity;
+      if (dInput.keys.has('d')) targetVx += dOptions.panKeyVelocity;
 
       dPhysics.panVelocity.desired.x = targetVx;
       dPhysics.panVelocity.desired.y = targetVy;

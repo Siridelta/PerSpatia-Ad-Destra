@@ -1,15 +1,15 @@
 /**
- * ReactFlow3D - ReactFlow 的 3D 容器
- * 
+ * ReactFlow3D - ReactFlow 的 3D 外壳
+ *
  * 职责：
- * 1. 订阅 Zustand Store，经 `shellCssMath` 应用 CSS 3D transform / perspective 匹配相机视角
- * 2. 依赖 DOM 事件冒泡，拦截未被 ReactFlow 消费的 pointer 事件
- * 3. 将事件传给相机控制 Store
+ * 1. 订阅相机 store，经 shellCssMath 写 CSS transform / perspective
+ * 2. 将相机派生的 viewport 经 `ReactFlowViewportSync` 推给 React Flow（同 Provider 即可，不必挂在 RF 子树）
+ * 3. 指针/滚轮由 `CameraControl` 全屏层处理（配合 `pointerPolicy`）
  */
 
-import React, { useRef, useEffect, useCallback } from 'react';
-import type { PointerEvent as ReactPointerEvent } from 'react';
+import React, { useRef, useEffect } from 'react';
 import { useCameraControlStore } from '../CameraControl';
+import { ReactFlowViewportSync } from './ReactFlowViewportSync';
 import { buildShellTransform, calculateCSSPerspective } from './shellCssMath';
 
 interface ReactFlow3DProps {
@@ -17,17 +17,12 @@ interface ReactFlow3DProps {
   fov: number;
 }
 
-export function ReactFlow3D({
-  children,
-  fov,
-}: ReactFlow3DProps) {
+export function ReactFlow3D({ children, fov }: ReactFlow3DProps) {
   const containerRef = useRef<HTMLDivElement>(null);
   const transformRef = useRef<HTMLDivElement>(null);
   const cameraStore = useCameraControlStore();
 
-  // 我们不用 selector 触发 React 重渲染，而用 useEffect + subscribe 直接改 DOM
   useEffect(() => {
-    // 初始状态设置
     const state = cameraStore.getState();
     if (transformRef.current) {
       transformRef.current.style.transform = buildShellTransform(
@@ -39,7 +34,6 @@ export function ReactFlow3D({
       containerRef.current.style.perspective = `${calculateCSSPerspective(state.viewportSize.height, fov)}px`;
     }
 
-    // 订阅状态变化
     const unsubscribe = cameraStore.subscribe((newState) => {
       if (transformRef.current) {
         transformRef.current.style.transform = buildShellTransform(
@@ -54,61 +48,7 @@ export function ReactFlow3D({
 
     return unsubscribe;
   }, [cameraStore, fov]);
-  
-  // Pointer Down 处理 - 依赖 DOM 事件冒泡
-  const handlePointerDown = useCallback((e: ReactPointerEvent<HTMLDivElement>) => {
-    const target = e.target as Element;
-    // 如果事件源是 ReactFlow 的交互元素，让其自然处理，不拦截
-    const isInteractive = target.closest('.react-flow__node, .react-flow__edge, .react-flow__handle, .react-flow__panel, .react-flow__controls, .react-flow__minimap');
-    
-    if (isInteractive) {
-      return;
-    }
-    
-    if (e.button === 2) {
-      // 右键旋转
-      cameraStore.getState().startRotate(e.clientX, e.clientY);
-      e.preventDefault();
-      return;
-    }
-    
-    if (e.button === 0) {
-      // 左键平移
-      e.preventDefault();
-      cameraStore.getState().startPan(e.clientX, e.clientY);
-    }
-  }, [cameraStore]);
-  
-  // Pointer Move 处理
-  const handlePointerMove = useCallback((e: ReactPointerEvent<HTMLDivElement>) => {
-    const state = cameraStore.getState();
-    if (state.input.isPanning || state.input.isRotating) {
-      state.handlePointerMove(e.clientX, e.clientY);
-    }
-  }, [cameraStore]);
-  
-  // Pointer Up 处理
-  const handlePointerUp = useCallback(() => {
-    cameraStore.getState().handlePointerUp();
-  }, [cameraStore]);
-  
-  // 滚轮缩放
-  const handleWheel = useCallback((e: React.WheelEvent) => {
-    const target = e.target as Element;
-    // 如果在输入框里滚动，不拦截
-    if (target.tagName?.toLowerCase() === 'input' || target.tagName?.toLowerCase() === 'textarea' || (target as HTMLElement).isContentEditable) {
-      return;
-    }
-    
-    cameraStore.getState().handleWheel(e.deltaY);
-    e.preventDefault();
-  }, [cameraStore]);
-  
-  // 禁用右键菜单
-  const handleContextMenu = useCallback((e: React.MouseEvent) => {
-    e.preventDefault();
-  }, []);
-  
+
   return (
     <div
       ref={containerRef}
@@ -123,12 +63,7 @@ export function ReactFlow3D({
         pointerEvents: 'auto',
         perspectiveOrigin: '50% 50%',
       }}
-      onPointerDown={handlePointerDown}
-      onPointerMove={handlePointerMove}
-      onPointerUp={handlePointerUp}
-      onPointerLeave={handlePointerUp}
-      onWheel={handleWheel}
-      onContextMenu={handleContextMenu}
+      className="react-flow-3d"
     >
       <div
         ref={transformRef}
@@ -136,10 +71,11 @@ export function ReactFlow3D({
           width: '100vw',
           height: '100vh',
           transformStyle: 'preserve-3d',
-          transformOrigin: '50% 50%', // 围绕视口中心旋转
+          transformOrigin: '50% 50%',
           willChange: 'transform',
         }}
       >
+        <ReactFlowViewportSync />
         {children}
       </div>
     </div>
