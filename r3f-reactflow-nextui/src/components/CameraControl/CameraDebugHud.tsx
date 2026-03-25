@@ -17,8 +17,7 @@ export function CameraDebugHud() {
 
   const fovRad = (FOV * Math.PI) / 180;
   const standardZ = vh / 2 / SCREEN_METRIC_TO_THREE / Math.tan(fovRad / 2);
-  const expans = Math.tan(fovRad / 2 + alpha) / Math.tan(fovRad / 2);
-  const zoom = standardZ / cameraState.radius / expans;
+  const zoom = standardZ / cameraState.radius;
 
   return (
     <div

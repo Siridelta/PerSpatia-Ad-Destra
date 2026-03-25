@@ -8,46 +8,50 @@
  */
 
 import React, { useRef, useEffect } from 'react';
-import { useCameraControlStore } from '../CameraControl';
+import { alpha, CameraStore, DEFAULT_SPHERICAL_PHI, FOV, useCameraControlStore } from '../CameraControl';
 import { ReactFlowViewportSync } from './ReactFlowViewportSync';
-import { buildShellTransform, calculateCSSPerspective } from './shellCssMath';
 
 interface ReactFlow3DProps {
   children: React.ReactNode;
-  fov: number;
 }
 
-export function ReactFlow3D({ children, fov }: ReactFlow3DProps) {
+export function buildShellTransform(phi: number, theta: number): string {
+  return `rotateX(${phi - DEFAULT_SPHERICAL_PHI}rad) rotateY(${-theta}rad)`;
+}
+
+export function ReactFlow3D({ children }: ReactFlow3DProps) {
   const containerRef = useRef<HTMLDivElement>(null);
   const transformRef = useRef<HTMLDivElement>(null);
   const cameraStore = useCameraControlStore();
 
   useEffect(() => {
     const state = cameraStore.getState();
-    if (transformRef.current) {
-      transformRef.current.style.transform = buildShellTransform(
-        state.cameraState.phi,
-        state.cameraState.theta
-      );
-    }
-    if (containerRef.current) {
-      containerRef.current.style.perspective = `${calculateCSSPerspective(state.viewportSize.height, fov)}px`;
-    }
-
-    const unsubscribe = cameraStore.subscribe((newState) => {
+    const updateStyle = (state: CameraStore) => {
       if (transformRef.current) {
         transformRef.current.style.transform = buildShellTransform(
-          newState.cameraState.phi,
-          newState.cameraState.theta
+          state.cameraState.phi,
+          state.cameraState.theta
         );
       }
       if (containerRef.current) {
-        containerRef.current.style.perspective = `${calculateCSSPerspective(newState.viewportSize.height, fov)}px`;
+        const style = containerRef.current.style;
+        const fovRad = (FOV * Math.PI) / 180;
+        const expans = Math.tan(fovRad / 2 + alpha) / Math.tan(fovRad / 2);
+        const vw = state.viewportSize.width;
+        const vh = state.viewportSize.height;
+        style.perspective = `${(vh / 2) / Math.tan(fovRad / 2)}px`;
+        style.width = `${vw * expans}px`;
+        style.height = `${vh * expans}px`;
+        style.left = `${-vw / 2 * (expans - 1)}px`;
+        style.top = `${-vh / 2 * (expans - 1)}px`;
       }
-    });
+    }
+   
+    updateStyle(state);
+    const unsubscribe = cameraStore.subscribe(updateStyle);
 
     return unsubscribe;
-  }, [cameraStore, fov]);
+  }, [cameraStore]);
 
   return (
     <div
@@ -68,8 +72,8 @@ export function ReactFlow3D({ children, fov }: ReactFlow3DProps) {
       <div
         ref={transformRef}
         style={{
-          width: '100vw',
-          height: '100vh',
+          width: '100%',
+          height: '100%',
           transformStyle: 'preserve-3d',
           transformOrigin: '50% 50%',
           willChange: 'transform',

@@ -26,6 +26,10 @@ export interface V9CanvasNodeFlowData {
   id: string;
   type: string;
   data: any;
+  position: {
+    x: number;
+    y: number;
+  };
 }
 export interface V9CanvasEdgeFlowData {
   id: string;

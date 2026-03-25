@@ -59,7 +59,7 @@ function BackgroundEffects({ cameraStore }: { cameraStore: CameraStoreApi }) {
       <gridHelper 
         args={[200, 40, '#e94560', '#444444']} 
         position={[0, 0, 0]} 
-        rotation={[0, 0, 0]}
+        rotation={[Math.PI / 2, 0, 0]}
       />
       
       {/* 渐变背景平面 */}

@@ -396,14 +396,14 @@ const Canvas: React.FC = () => {
         <Scene3D />
 
         {/* ReactFlow 3D 容器 - 中层 */}
-        <ReactFlow3D fov={FOV}>
+        <ReactFlow3D>
           <CanvasDataProvider api={canvasDataApi}>
             <CanvasEvalProvider api={evalApi}>
               <div
                 className={`canvas-container ${activeTool}-mode`}
                 style={{
-                  width: '100vw',
-                  height: '100vh',
+                  width: '100%',
+                  height: '100%',
                 }}
               >
                 {isHydrated ? (

@@ -1,168 +1,170 @@
 {
-  "version": 8,
+  "version": 9,
   "state": {
-    "uiData": {
-      "nodes": [
-        {
-          "id": "1",
-          "type": "textNode",
-          "data": {
-            "code": "let speed = node_input(new Slider(50, 0, 100, 1), \"speed\");\nlet name = node_input(new InputBox(\"测试\"), \"name\");\nlet enabled = node_input(new Switch(true), \"enabled\");\n\nlet result = speed * 2;\nconsole.log(\"速度:\", speed, \"名称:\", name, \"启用:\", enabled);\n\nnode_output(result, \"result\");",
-            "controls": [
-              {
-                "name": "speed",
-                "type": "slider",
-                "defaultValue": 50,
-                "min": 0,
-                "max": 100,
-                "step": 1,
-                "value": 40
+      "uiData": {
+          "nodes": {
+              "1": {
+                  "type": "textNode",
+                  "data": {
+                      "code": "let speed = node_input(new Slider(50, 0, 100, 1), \"speed\");\nlet name = node_input(new InputBox(\"测试\"), \"name\");\nlet enabled = node_input(new Switch(true), \"enabled\");\n\nlet result = speed * 2;\nconsole.log(\"速度:\", speed, \"名称:\", name, \"启用:\", enabled);\n\nnode_output(result, \"result\");",
+                      "controls": [
+                          {
+                              "name": "speed",
+                              "type": "slider",
+                              "defaultValue": 50,
+                              "min": 0,
+                              "max": 100,
+                              "step": 1,
+                              "value": 60
+                          },
+                          {
+                              "name": "name",
+                              "type": "input",
+                              "defaultValue": "测试",
+                              "value": "测试"
+                          },
+                          {
+                              "name": "enabled",
+                              "type": "switch",
+                              "defaultValue": true,
+                              "value": true
+                          }
+                      ],
+                      "autoResizeWidth": false,
+                      "nodeName": "",
+                      "isCollapsed": false,
+                      "hiddenSections": {
+                          "inputs": false,
+                          "outputs": false,
+                          "logs": false,
+                          "errors": false
+                      },
+                      "width": 631
+                  }
               },
-              {
-                "name": "name",
-                "type": "input",
-                "defaultValue": "测试",
-                "value": "测试"
+              "2": {
+                  "type": "textNode",
+                  "data": {
+                      "code": "let result = node_input(\"result\");\n\nlet doubled = result * 2;\nconsole.log(`结果的两倍是: ${doubled}`);\n\nnode_output(doubled, \"doubled\");",
+                      "controls": [],
+                      "autoResizeWidth": false,
+                      "nodeName": "",
+                      "isCollapsed": false,
+                      "hiddenSections": {
+                          "inputs": false,
+                          "outputs": false,
+                          "logs": false,
+                          "errors": false
+                      },
+                      "width": 544
+                  }
               },
-              {
-                "name": "enabled",
-                "type": "switch",
-                "defaultValue": true,
-                "value": true
+              "3": {
+                  "type": "textNode",
+                  "data": {
+                      "code": "let message = node_input(new InputBox(\"cptbtptp棍母bcptdtptp\"), \"message\");\nconst newMessage1 = message.replace(/棍母/g, '');\n\nlet capIndex = node_input(new Slider(0, 0, newMessage1.length, 1), \"capIndex\");\nconst newMessage2 = (message => \n    message.slice(0, capIndex)\n    + '[' + message.slice(capIndex, capIndex + 1).toUpperCase() + ']'\n    + message.slice(capIndex + 1)\n)(newMessage1);\n\nnode_output(newMessage2, \"newMessage\");",
+                      "controls": [
+                          {
+                              "name": "message",
+                              "type": "input",
+                              "defaultValue": "cptbtptp棍母bcptdtptp",
+                              "value": "cptbtptp棍母bcptdtptp"
+                          },
+                          {
+                              "name": "capIndex",
+                              "type": "slider",
+                              "defaultValue": 0,
+                              "min": 0,
+                              "max": 17,
+                              "step": 1,
+                              "value": 6
+                          }
+                      ],
+                      "autoResizeWidth": false,
+                      "nodeName": "",
+                      "isCollapsed": false,
+                      "hiddenSections": {
+                          "inputs": false,
+                          "outputs": false,
+                          "logs": false,
+                          "errors": false
+                      },
+                      "width": 692
+                  }
               }
-            ],
-            "autoResizeWidth": false,
-            "nodeName": "",
-            "isCollapsed": false,
-            "hiddenSections": {
-              "inputs": false,
-              "outputs": false,
-              "logs": false,
-              "errors": false
-            },
-            "width": 631
+          },
+          "edges": {
+              "e1-2": {
+                  "source": "1",
+                  "target": "2",
+                  "type": "custom",
+                  "data": {}
+              }
           }
-        },
-        {
-          "id": "2",
-          "type": "textNode",
-          "data": {
-            "code": "let result = node_input(\"result\");\n\nlet doubled = result * 2;\nconsole.log(`结果的两倍是: ${doubled}`);\n\nnode_output(doubled, \"doubled\");",
-            "controls": [],
-            "autoResizeWidth": false,
-            "nodeName": "",
-            "isCollapsed": false,
-            "hiddenSections": {
-              "inputs": false,
-              "outputs": false,
-              "logs": false,
-              "errors": false
-            },
-            "width": 544
-          }
-        },
-        {
-          "id": "3",
-          "type": "textNode",
-          "data": {
-            "code": "let message = node_input(new InputBox(\"cptbtptp棍母bcptdtptp\"), \"message\");\nconst newMessage1 = message.replace(/棍母/g, '');\n\nlet capIndex = node_input(new Slider(0, 0, newMessage1.length, 1), \"capIndex\");\nconst newMessage2 = (message => \n    message.slice(0, capIndex)\n    + '[' + message.slice(capIndex, capIndex + 1).toUpperCase() + ']'\n    + message.slice(capIndex + 1)\n)(newMessage1);\n\nnode_output(newMessage2, \"newMessage\");",
-            "controls": [
+      },
+      "flowData": {
+          "nodes": [
               {
-                "name": "message",
-                "type": "input",
-                "defaultValue": "cptbtptp棍母bcptdtptp",
-                "value": "cptbtptp棍母bcptdtptp"
+                  "id": "1",
+                  "type": "textNode",
+                  "position": {
+                      "x": 60.85553631124816,
+                      "y": 61.151889249179476
+                  },
+                  "data": {},
+                  "selected": false,
+                  "dragging": false,
+                  "measured": {
+                      "width": 631,
+                      "height": 493
+                  }
               },
               {
-                "name": "capIndex",
-                "type": "slider",
-                "defaultValue": 0,
-                "min": 0,
-                "max": 17,
-                "step": 1,
-                "value": 9
+                  "id": "2",
+                  "type": "textNode",
+                  "position": {
+                      "x": 857.2565902611204,
+                      "y": 144.4221452449966
+                  },
+                  "data": {},
+                  "selected": false,
+                  "dragging": false,
+                  "measured": {
+                      "width": 544,
+                      "height": 327
+                  }
+              },
+              {
+                  "id": "3",
+                  "type": "textNode",
+                  "position": {
+                      "x": 376.33919270963463,
+                      "y": 598.2808446356291
+                  },
+                  "data": {},
+                  "selected": false,
+                  "dragging": false,
+                  "measured": {
+                      "width": 692,
+                      "height": 461
+                  }
               }
-            ],
-            "autoResizeWidth": true,
-            "nodeName": "",
-            "isCollapsed": false,
-            "hiddenSections": {
-              "inputs": false,
-              "outputs": false,
-              "logs": false,
-              "errors": false
-            },
-            "width": 724
+          ],
+          "edges": [
+              {
+                  "id": "e1-2",
+                  "source": "1",
+                  "target": "2",
+                  "type": "custom",
+                  "data": {},
+                  "selected": false
+              }
+          ],
+          "viewport": {
+              "x": 0,
+              "y": 0,
+              "zoom": 1
           }
-        }
-      ],
-      "edges": [
-        {
-          "id": "e1-2",
-          "source": "1",
-          "target": "2",
-          "type": "custom",
-          "data": {}
-        }
-      ]
-    },
-    "flowData": {
-      "nodes": [
-        {
-          "id": "1",
-          "type": "textNode",
-          "position": {
-            "x": 172.85553631125,
-            "y": -18.47311075082061
-          },
-          "data": {},
-          "measured": {
-            "width": 631,
-            "height": 493
-          },
-          "selected": true
-        },
-        {
-          "id": "2",
-          "type": "textNode",
-          "position": {
-            "x": -151.7434097388836,
-            "y": 691.4221452449999
-          },
-          "data": {},
-          "measured": {
-            "width": 544,
-            "height": 327
-          }
-        },
-        {
-          "id": "3",
-          "type": "textNode",
-          "position": {
-            "x": 699.3391927096372,
-            "y": 641.2808446356297
-          },
-          "data": {},
-          "measured": {
-            "width": 724,
-            "height": 461
-          }
-        }
-      ],
-      "edges": [
-        {
-          "id": "e1-2",
-          "source": "1",
-          "target": "2",
-          "type": "custom",
-          "data": {}
-        }
-      ],
-      "viewport": {
-        "x": 461.8554877575373,
-        "y": 101.54803032477412,
-        "zoom": 0.9999999999999948
       }
-    }
   }
 }
