@@ -55,7 +55,7 @@ export const FOV = 50;
 /**
  * RF↔墙面换算里侧视锥体扩张用的半角 **α**（弧度）。
  */
-export const alpha = (15 * Math.PI) / 180;
+export const alpha = (20 * Math.PI) / 180;
 
 // 配置选项
 export interface CameraOptions {
