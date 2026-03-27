@@ -10,15 +10,15 @@ enableMapSet();
 
 /**
  * 相机对外输出状态（下游 R3F 和 React Flow 看到的最终值）
- * 包含了：Base 用户值 + 物理 Offset 偏置
+ * 包含了：Base 用户值 + 物理 Drift 漂移
  */
 export interface CameraState {
   orbitCenterX: number;
   orbitCenterY: number;
   radius: number;
-  /** 最终方位角（Base Theta + Offset Theta） */
+  /** 最终方位角（Base Theta + Drift Theta） */
   theta: number;
-  /** 最终极角（Base Phi + Offset Phi） */
+  /** 最终极角（Base Phi + Drift Phi） */
   phi: number;
 }
 
@@ -108,21 +108,21 @@ interface InputState {
 // 物理系统内部状态
 interface PhysicsState {
   panOffset: {
-    desired: { x: number; y: number };
+    target: { x: number; y: number };
     current: { x: number; y: number };
     lastDelta: { x: number; y: number };
   };
   rotateOffset: {
-    desired: { theta: number; phi: number };
+    target: { theta: number; phi: number };
     current: { theta: number; phi: number };
     lastDelta: { theta: number; phi: number };
   };
   panVelocity: {
-    desired: { x: number; y: number };
+    target: { x: number; y: number };
     current: { x: number; y: number };
   };
   rotateVelocity: {
-    desired: { theta: number; phi: number };
+    target: { theta: number; phi: number };
     current: { theta: number; phi: number };
   };
 
@@ -199,21 +199,21 @@ export function createCameraStore(): CameraStoreApi {
 
       physics: {
         panOffset: {
-          desired: { x: 0, y: 0 },
+          target: { x: 0, y: 0 },
           current: { x: 0, y: 0 },
           lastDelta: { x: 0, y: 0 },
         },
         rotateOffset: {
-          desired: { theta: 0, phi: 0 },
+          target: { theta: 0, phi: 0 },
           current: { theta: 0, phi: 0 },
           lastDelta: { theta: 0, phi: 0 },
         },
         panVelocity: {
-          desired: { x: 0, y: 0 },
+          target: { x: 0, y: 0 },
           current: { x: 0, y: 0 },
         },
         rotateVelocity: {
-          desired: { theta: 0, phi: 0 },
+          target: { theta: 0, phi: 0 },
           current: { theta: 0, phi: 0 },
         },
         inner: {
@@ -326,7 +326,7 @@ export function createCameraStore(): CameraStoreApi {
           draft.input.isPanning = true;
           draft.input.lastPointerScreen = { x: clientX, y: clientY };
           draft.physics.panOffset = {
-            desired: { x: 0, y: 0 },
+            target: { x: 0, y: 0 },
             current: { x: 0, y: 0 },
             lastDelta: { x: 0, y: 0 },
           };
@@ -338,7 +338,7 @@ export function createCameraStore(): CameraStoreApi {
           draft.input.isRotating = true;
           draft.input.lastPointerScreen = { x: clientX, y: clientY };
           draft.physics.rotateOffset = {
-            desired: { theta: 0, phi: 0 },
+            target: { theta: 0, phi: 0 },
             current: { theta: 0, phi: 0 },
             lastDelta: { theta: 0, phi: 0 },
           };
@@ -359,9 +359,9 @@ export function createCameraStore(): CameraStoreApi {
           // 并行处理：旋转和平移可以同时进行
           if (input.isRotating) {
             // 恢复增量模式：直接在当前基础上累加
-            // 注意：这里我们累加到 desired 上，物理系统会追随它
-            draft.physics.rotateOffset.desired.theta -= dx * 0.005;
-            draft.physics.rotateOffset.desired.phi -= dy * 0.005;
+            // 注意：这里我们累加到 target 上，物理系统会追随它
+            draft.physics.rotateOffset.target.theta -= dx * 0.005;
+            draft.physics.rotateOffset.target.phi -= dy * 0.005;
           }
 
           if (input.isPanning) {
@@ -371,8 +371,8 @@ export function createCameraStore(): CameraStoreApi {
             if (currentPlane && lastPlane) {
               const pdx = lastPlane.x - currentPlane.x;
               const pdy = lastPlane.y - currentPlane.y;
-              draft.physics.panOffset.desired.x += pdx;
-              draft.physics.panOffset.desired.y += pdy;
+              draft.physics.panOffset.target.x += pdx;
+              draft.physics.panOffset.target.y += pdy;
             }
           }
         });
@@ -387,7 +387,7 @@ export function createCameraStore(): CameraStoreApi {
             draft.physics.panVelocity.current.y += physics.panOffset.lastDelta.y;
 
             draft.physics.panOffset = {
-              desired: { x: 0, y: 0 },
+              target: { x: 0, y: 0 },
               current: { x: 0, y: 0 },
               lastDelta: { x: 0, y: 0 },
             };
@@ -400,7 +400,7 @@ export function createCameraStore(): CameraStoreApi {
             draft.physics.rotateVelocity.current.phi += physics.rotateOffset.lastDelta.phi;
 
             draft.physics.rotateOffset = {
-              desired: { theta: 0, phi: 0 },
+              target: { theta: 0, phi: 0 },
               current: { theta: 0, phi: 0 },
               lastDelta: { theta: 0, phi: 0 },
             };
@@ -435,10 +435,10 @@ export function createCameraStore(): CameraStoreApi {
         const { inner } = physics;
 
         // 1. 快速检查是否需要继续动画
-        const hasPanOffset = Math.abs(physics.panOffset.desired.x - physics.panOffset.current.x) > 0.01
-          || Math.abs(physics.panOffset.desired.y - physics.panOffset.current.y) > 0.01;
-        const hasRotateOffset = Math.abs(physics.rotateOffset.desired.theta - physics.rotateOffset.current.theta) > 0.001
-          || Math.abs(physics.rotateOffset.desired.phi - physics.rotateOffset.current.phi) > 0.001;
+        const hasPanOffset = Math.abs(physics.panOffset.target.x - physics.panOffset.current.x) > 0.01
+          || Math.abs(physics.panOffset.target.y - physics.panOffset.current.y) > 0.01;
+        const hasRotateOffset = Math.abs(physics.rotateOffset.target.theta - physics.rotateOffset.current.theta) > 0.001
+          || Math.abs(physics.rotateOffset.target.phi - physics.rotateOffset.current.phi) > 0.001;
         const hasPanVelocity = Math.abs(physics.panVelocity.current.x) > 0.01
           || Math.abs(physics.panVelocity.current.y) > 0.01;
         const hasRotateVelocity = Math.abs(physics.rotateVelocity.current.theta) > 0.001
@@ -459,8 +459,8 @@ export function createCameraStore(): CameraStoreApi {
           let dragVelX = 0;
           let dragVelY = 0;
           if (dInput.isPanning) {
-            dragVelX = (dPhysics.panOffset.desired.x - dPhysics.panOffset.current.x) * (1 - dOptions.panDamping);
-            dragVelY = (dPhysics.panOffset.desired.y - dPhysics.panOffset.current.y) * (1 - dOptions.panDamping);
+            dragVelX = (dPhysics.panOffset.target.x - dPhysics.panOffset.current.x) * (1 - dOptions.panDamping);
+            dragVelY = (dPhysics.panOffset.target.y - dPhysics.panOffset.current.y) * (1 - dOptions.panDamping);
 
             dPhysics.panOffset.current.x += dragVelX;
             dPhysics.panOffset.current.y += dragVelY;
@@ -479,37 +479,37 @@ export function createCameraStore(): CameraStoreApi {
           if (dInput.keys.has('a')) targetVx -= dOptions.panKeyVelocity * speedScale;
           if (dInput.keys.has('d')) targetVx += dOptions.panKeyVelocity * speedScale;
 
-          dPhysics.panVelocity.desired.x = targetVx;
-          dPhysics.panVelocity.desired.y = targetVy;
+          dPhysics.panVelocity.target.x = targetVx;
+          dPhysics.panVelocity.target.y = targetVy;
 
-          dPhysics.panVelocity.current.x += (dPhysics.panVelocity.desired.x - dPhysics.panVelocity.current.x) * (1 - dOptions.panDamping);
-          dPhysics.panVelocity.current.y += (dPhysics.panVelocity.desired.y - dPhysics.panVelocity.current.y) * (1 - dOptions.panDamping);
+          dPhysics.panVelocity.current.x += (dPhysics.panVelocity.target.x - dPhysics.panVelocity.current.x) * (1 - dOptions.panDamping);
+          dPhysics.panVelocity.current.y += (dPhysics.panVelocity.target.y - dPhysics.panVelocity.current.y) * (1 - dOptions.panDamping);
 
           dCamera.orbitCenterX += dPhysics.panVelocity.current.x;
           dCamera.orbitCenterY += dPhysics.panVelocity.current.y;
 
           // ===== Rotate Offset 系统 (追踪器增量模型) =====
-          // Tracker (current) 自由追随 Desired，不受物理限制
-          const dTrackerTheta = (dPhysics.rotateOffset.desired.theta - dPhysics.rotateOffset.current.theta) * (1 - dOptions.rotateDamping);
-          const dTrackerPhi = (dPhysics.rotateOffset.desired.phi - dPhysics.rotateOffset.current.phi) * (1 - dOptions.rotateDamping);
+          // Offset (current) 自由追随 Target，不受物理限制
+          const dOffsetTheta = (dPhysics.rotateOffset.target.theta - dPhysics.rotateOffset.current.theta) * (1 - dOptions.rotateDamping);
+          const dOffsetPhi = (dPhysics.rotateOffset.target.phi - dPhysics.rotateOffset.current.phi) * (1 - dOptions.rotateDamping);
 
-          dPhysics.rotateOffset.current.theta += dTrackerTheta;
-          dPhysics.rotateOffset.current.phi += dTrackerPhi;
+          dPhysics.rotateOffset.current.theta += dOffsetTheta;
+          dPhysics.rotateOffset.current.phi += dOffsetPhi;
           // 记录增量供松手后的惯性使用
-          dPhysics.rotateOffset.lastDelta = { theta: dTrackerTheta, phi: dTrackerPhi };
+          dPhysics.rotateOffset.lastDelta = { theta: dOffsetTheta, phi: dOffsetPhi };
 
           // 1. 先根据输入状态确定这一帧的总旋转增量 (Delta)
           let dRotationTheta = 0;
           let dRotationPhi = 0;
 
           if (dInput.isRotating) {
-            // 旋转时：增量来自追踪器
-            dRotationTheta = dTrackerTheta;
-            dRotationPhi = dTrackerPhi;
+            // 旋转时：增量来自偏移追踪器
+            dRotationTheta = dOffsetTheta;
+            dRotationPhi = dOffsetPhi;
           } else {
             // 松手后：增量来自惯性速度 (Rotate Velocity 系统)
-            dPhysics.rotateVelocity.current.theta += (dPhysics.rotateVelocity.desired.theta - dPhysics.rotateVelocity.current.theta) * (1 - dOptions.rotateDamping);
-            dPhysics.rotateVelocity.current.phi += (dPhysics.rotateVelocity.desired.phi - dPhysics.rotateVelocity.current.phi) * (1 - dOptions.rotateDamping);
+            dPhysics.rotateVelocity.current.theta += (dPhysics.rotateVelocity.target.theta - dPhysics.rotateVelocity.current.theta) * (1 - dOptions.rotateDamping);
+            dPhysics.rotateVelocity.current.phi += (dPhysics.rotateVelocity.target.phi - dPhysics.rotateVelocity.current.phi) * (1 - dOptions.rotateDamping);
 
             if (Math.abs(dPhysics.rotateVelocity.current.theta) < 0.001) dPhysics.rotateVelocity.current.theta = 0;
             if (Math.abs(dPhysics.rotateVelocity.current.phi) < 0.001) dPhysics.rotateVelocity.current.phi = 0;
@@ -548,30 +548,37 @@ export function createCameraStore(): CameraStoreApi {
                 v.phi -= vNormal * ny;
               }
             }
-          }
 
+            // 同步 rotateOffset 以消除死区
+            if (dInput.isRotating) {
+              dPhysics.rotateOffset.target.theta = dInner.baseTheta;
+              dPhysics.rotateOffset.target.phi = dInner.basePhi;
+              dPhysics.rotateOffset.current.theta = dInner.baseTheta;
+              dPhysics.rotateOffset.current.phi = dInner.basePhi;
+            }
+          }
           // ===== 动态偏航 (Dynamic Yaw Drift) 计算 =====
           const totalMovingX = dragVelX + dPhysics.panVelocity.current.x;
           const totalMovingY = dragVelY + dPhysics.panVelocity.current.y;
 
           // 除以半径使不同缩放层级下的偏航感一致
-          let desiredOffsetTheta = (-totalMovingX * dOptions.yawBiasStrength) / dCamera.radius;
-          let desiredOffsetPhi = (totalMovingY * dOptions.yawBiasStrength) / dCamera.radius;
+          let targetDriftTheta = (-totalMovingX * dOptions.yawBiasStrength) / dCamera.radius;
+          let targetDriftPhi = (totalMovingY * dOptions.yawBiasStrength) / dCamera.radius;
 
           // 限制在一个圆/锥形范围内 (clamp 向量长度)，仅针对偏置
           // 自适应计算：键盘平移导致的稳态速度为 dOptions.panKeyVelocity * radius
           // 对应产生的理论最大偏置基准为 panKeyVelocity * yawBiasStrength
-          const MAX_OFFSET = dOptions.panKeyVelocity * dOptions.yawBiasStrength;
-          const offsetLength = Math.sqrt(desiredOffsetTheta * desiredOffsetTheta + desiredOffsetPhi * desiredOffsetPhi);
-          if (offsetLength > MAX_OFFSET) {
-            const scale = MAX_OFFSET / offsetLength;
-            desiredOffsetTheta *= scale;
-            desiredOffsetPhi *= scale;
+          const MAX_DRIFT = dOptions.panKeyVelocity * dOptions.yawBiasStrength;
+          const driftLength = Math.sqrt(targetDriftTheta * targetDriftTheta + targetDriftPhi * targetDriftPhi);
+          if (driftLength > MAX_DRIFT) {
+            const scale = MAX_DRIFT / driftLength;
+            targetDriftTheta *= scale;
+            targetDriftPhi *= scale;
           }
 
           // 平滑逼近物理漂移
-          dInner.driftTheta += (desiredOffsetTheta - dInner.driftTheta) * 0.15;
-          dInner.driftPhi += (desiredOffsetPhi - dInner.driftPhi) * 0.15;
+          dInner.driftTheta += (targetDriftTheta - dInner.driftTheta) * 0.15;
+          dInner.driftPhi += (targetDriftPhi - dInner.driftPhi) * 0.15;
 
           // ===== 缩放系统 (对数空间) =====
           const logDiff = dInner.targetRadiusLog - dInner.radiusLog;
