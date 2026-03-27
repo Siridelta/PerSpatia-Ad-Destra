@@ -66,10 +66,10 @@ React Flow 只原生理解 **平面画布**：节点、边、视口的 **`x, y, 
 
 | 用户操作 | 用户感知 | 实现上主要改什么 |
 |----------|----------|------------------|
-| 左键拖画布 | 在墙面上平移内容 | `targetX` / `targetY`（+ 物理阻尼）；RF `viewport.x/y` 与之对齐 |
+| 左键拖画布 | 在墙面上平移内容 | `orbitCenterX` / `orbitCenterY`（+ 物理阻尼）；RF `viewport.x/y` 与之对齐 |
 | 滚轮 | 拉近 / 拉远 | `radius` ↔ `viewport.zoom`（`zoom = 30 / radius`） |
 | 右键拖 | 微调观看角度（纵深 / 斜视感，非自由环视） | `theta` / `phi`；CSS 与 Three 相机共用同一组角；`phi` 在代码里已夹紧，产品侧还将收紧可偏转范围 |
-| WASD | 平移惯性 | 速度通道进 `tick`，同样落到 `targetX/Y` |
+| WASD | 平移惯性 | 速度通道进 `tick`，同样落到 `orbitCenterX/Y` |
 
 平移在 **墙面（Z=0）** 上的 1:1 手感，靠 **`screenToPlane` 射线打到该平面** 的差分（见第二部分），而不是只挪像素假装平移。
 
@@ -122,7 +122,7 @@ React Flow API **只能稳定表达** `viewport: { x, y, zoom }`，**不包含**
 
 **Store 里的 `cameraState`（与 `updateSimulatedCamera` 一致）**
 
-- `targetX`, `targetY`：相机注视点在 XY 平面上。
+- `orbitCenterX`, `orbitCenterY`：相机注视点在 XY 平面上。
 - `radius`：相机到该点的距离；与 React Flow 的 `zoom` 约定为 **`zoom = 30 / radius`**（见 `ReactFlowViewportSync` 与 `Scene3D` 背景缩放）。
 - `theta`、`phi`：**与 `THREE.Spherical` / `Vector3.setFromSphericalCoords(radius, phi, theta)` / drei OrbitControls 内部约定一致**（见 Three 文档与 `three.core.js` 中 `Spherical`）。
 - `tick` 里将 `phi` 夹在 **`(SPHERICAL_PHI_MIN, SPHERICAL_PHI_MAX)`**（约 `0.01`～`π - 0.01`），等价于 `Spherical.makeSafe` 量级，避免极点；**+Z 锥体**等产品向约束留待后续与物理一起设计。
@@ -131,16 +131,16 @@ React Flow API **只能稳定表达** `viewport: { x, y, zoom }`，**不包含**
 
 ```text
 position.setFromSphericalCoords(radius, phi, theta)
-position.x += targetX
-position.y += targetY
-lookAt(targetX, targetY, 0)
+position.x += orbitCenterX
+position.y += orbitCenterY
+lookAt(orbitCenterX, orbitCenterY, 0)
 ```
 
 展开后与 Three 一致：
 
 ```text
-x = targetX + radius * sin(phi) * sin(theta)
-y = targetY + radius * cos(phi)
+x = orbitCenterX + radius * sin(phi) * sin(theta)
+y = orbitCenterY + radius * cos(phi)
 z = radius * sin(phi) * cos(theta)
 ```
 
@@ -148,14 +148,14 @@ z = radius * sin(phi) * cos(theta)
 
 **零点（默认 `initialTheta = 0`、`initialPhi = π/2`，常量 `DEFAULT_SPHERICAL_PHI`）**
 
-- 注视点在 **`(targetX, targetY, 0)`**（墙面 z=0）。
+- 注视点在 **`(orbitCenterX, orbitCenterY, 0)`**（墙面 z=0）。
 - **`theta = 0` 且 `phi = π/2`（赤道）**：相对注视点偏移 **`(0, 0, +radius)`**，沿 **+Z** **正视墙**，即产品上的 **平视基准**。
 - **`phi`**：从 **+Y** 向下的极角；**小于 π/2** 偏向 **+Y**（更高），**大于 π/2** 偏向 **-Y**（更低）。
 - **`theta`**：在 **XZ** 平面内从 **+Z** 起算的方位角（与 `Math.atan2(x, z)` 一致）。
 
 **指针映射**：右键拖时 **`theta -= dx * sens`**（与 Spherical 正向相反），以保留迁移前大致的左右手感；**`phi -= dy * sens`**（纵向与默认 `dy→phi` 映射手感相反，若仍反可再改符号）。可调。
 
-**与 OrbitControls**：`getAzimuthalAngle()` / `getPolarAngle()`（或内部 `spherical`）可与本 store 的 **`theta` / `phi` 直接对照**（注意 Orbit 的 target 与 min/max 限制仍由自研 `tick` 负责）。
+**与 OrbitControls**：`getAzimuthalAngle()` / `getPolarAngle()`（或内部 `spherical`）可与本 store 的 **`theta` / `phi` 直接对照**（注意 Orbit 的 orbitCenter 与 min/max 限制仍由自研 `tick` 负责）。
 
 #### 视角约束：我们要的是「+Z 锥体」，不是 drei 那种「分角夹逼」
 
@@ -166,8 +166,8 @@ z = radius * sin(phi) * cos(theta)
 **React Flow `viewport`（仅表达平移+缩放，不含旋转）**
 
 ```text
-viewport.x = -targetX
-viewport.y = targetY
+viewport.x = -orbitCenterX
+viewport.y = orbitCenterY
 viewport.zoom = 30 / radius
 ```
 
@@ -178,7 +178,7 @@ viewport.zoom = 30 / radius
 - **左键拖拽平移**：只存 **`lastPointerScreen`**，不缓存平面上的点。每次 `pointermove` 用**当前** `cameraState` 更新后的模拟相机做两次 `screenToPlane`（上一屏点、当前屏点），取平面差分推到 `panOffset`。这样「上一帧相机」和「当前帧相机」一致，避免旧算法里「平面点存在旧相机下」导致的跳变与行程缩水。
 - **右键拖拽旋转**：用屏幕像素差分改 `rotateOffset`（与平移独立的阻尼通道）。
 - **WASD / 松手惯性**：速度型通道；具体阻尼与阈值以 `cameraStore` 内 `DEFAULT_CAMERA_OPTIONS` 与 `tick` 为准。
-- **滚轮**：改 `targetRadius`，`tick` 里阻尼逼近。
+- **滚轮**：改 `orbitCenterRadius`，`tick` 里阻尼逼近。
 - **同时按住左+右**：`handlePointerMove` 里 **`isRotating` 分支优先**（`else if`），仅旋转分支会更新 `lastPointerScreen`；若需要真正的双通道同时拖拽，要改分支策略（当前未做）。
 
 ### 2.5 数据流（提要）

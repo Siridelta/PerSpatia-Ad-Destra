@@ -3,9 +3,10 @@ import { v7ToV8 } from './migrations/v7-to-v8';
 import { v8ToV9 } from './migrations/v8-to-v9';
 import { toV7 } from './migrations/to-v7';
 import { v9ToV10 } from './migrations/v9-to-v10';
+import { v10ToV11 } from './migrations/v10-to-v11';
 
 export const STORAGE_KEY = 'desmos-canvas-flow-state';
-export const STORAGE_VERSION = 10;
+export const STORAGE_VERSION = 11;
 
 /**
  * 把当前最新状态编码为带版本信息的存档 JSON 文本。
@@ -34,6 +35,9 @@ export const migrateToLatest = (archive: CanvasArchiveLegacy): CanvasArchive => 
   }
   if (archive.version < 10) {
     archive = v9ToV10(archive);
+  }
+  if (archive.version < 11) {
+    archive = v10ToV11(archive);
   }
   return archive;
 };

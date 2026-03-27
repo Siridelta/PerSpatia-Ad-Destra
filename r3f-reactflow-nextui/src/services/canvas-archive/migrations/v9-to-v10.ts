@@ -14,6 +14,27 @@ import { SCREEN_METRIC_TO_THREE } from '@/components/ReactFlow3D/ReactFlowViewpo
  * v9 -> v10:
  * - 独立字段 `camera`；旧档 `flowData.viewport` 尽量映射到相机平移/缩放
  */
+
+export interface V10CameraState {
+  targetX: number;
+  targetY: number;
+  radius: number;
+  theta: number;
+  phi: number;
+}
+
+export interface V10CanvasStateLike {
+  uiData: {
+    nodes: Record<string, any>;
+    edges: Record<string, any>;
+  };
+  flowData: {
+    nodes: any[];
+    edges: any[];
+  };
+  camera: V10CameraState;
+}
+
 export const v9ToV10 = (archive: CanvasArchiveLegacy): CanvasArchiveLegacy => {
   if (archive.version >= 10) return archive;
 
@@ -22,7 +43,7 @@ export const v9ToV10 = (archive: CanvasArchiveLegacy): CanvasArchiveLegacy => {
   const vw = window.innerWidth;
   const vh = window.innerHeight;
   const vp = state.flowData?.viewport;
-  const camera: CameraState = (() => {
+  const camera: V10CameraState = (() => {
     if (vp) {
       // 这里我们不用 expans 扩张因子，因为在旧存档里 reactflow 是未扩张的，所以需要不除以 expans 因子才能获得相同的视觉效果。
       const fovRad = (FOV * Math.PI) / 180;

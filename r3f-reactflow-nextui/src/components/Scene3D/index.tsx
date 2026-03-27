@@ -143,14 +143,14 @@ function CameraSync({ cameraStore }: { cameraStore: CameraStoreApi }) {
     store.tick();
     
     // 读取最新状态
-    const { targetX, targetY, radius, theta, phi } = store.cameraState;
+    const { orbitCenterX, orbitCenterY, radius, theta, phi } = store.cameraState;
     
     // THREE.Spherical / setFromSphericalCoords，与 OrbitControls 约定一致
     camera.position.setFromSphericalCoords(radius, phi, theta);
-    camera.position.x += targetX;
-    camera.position.y += targetY;
+    camera.position.x += orbitCenterX;
+    camera.position.y += orbitCenterY;
     
-    camera.lookAt(targetX, targetY, 0);
+    camera.lookAt(orbitCenterX, orbitCenterY, 0);
   });
   
   return null;

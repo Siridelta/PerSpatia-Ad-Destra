@@ -41,8 +41,8 @@ export function ReactFlowViewportSync() {
     const standardZ = vh / 2 / SCREEN_METRIC_TO_THREE / Math.tan(fovRad / 2);
     const expans = Math.tan(fovRad / 2 + alpha) / Math.tan(fovRad / 2);
     const zoom = standardZ / cameraState.radius;
-    const x = -cameraState.targetX * SCREEN_METRIC_TO_THREE * zoom + vw / 2 * expans;
-    const y = cameraState.targetY * SCREEN_METRIC_TO_THREE * zoom + vh / 2 * expans;
+    const x = -cameraState.orbitCenterX * SCREEN_METRIC_TO_THREE * zoom + vw / 2 * expans;
+    const y = cameraState.orbitCenterY * SCREEN_METRIC_TO_THREE * zoom + vh / 2 * expans;
     return { x, y, zoom };
   };
 

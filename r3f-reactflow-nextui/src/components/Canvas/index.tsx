@@ -118,8 +118,8 @@ const Canvas: React.FC = () => {
     const api = cameraControlRef.current;
     if (!isHydrated || !api) return;
     api.setCameraState({
-      targetX: persistedCamera.targetX,
-      targetY: persistedCamera.targetY,
+      orbitCenterX: persistedCamera.orbitCenterX,
+      orbitCenterY: persistedCamera.orbitCenterY,
       radius: persistedCamera.radius,
       theta: persistedCamera.theta,
       phi: persistedCamera.phi,

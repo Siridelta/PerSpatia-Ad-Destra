@@ -12,8 +12,8 @@ enableMapSet();
  * 包含了：Base 用户值 + 物理 Offset 偏置
  */
 export interface CameraState {
-  targetX: number;
-  targetY: number;
+  orbitCenterX: number;
+  orbitCenterY: number;
   radius: number;
   /** 最终方位角（Base Theta + Offset Theta） */
   theta: number;
@@ -59,8 +59,8 @@ export const alpha = (15 * Math.PI) / 180;
 
 // 配置选项
 export interface CameraOptions {
-  initialTargetX: number;
-  initialTargetY: number;
+  initialOrbitCenterX: number;
+  initialOrbitCenterY: number;
   initialRadius: number;
   initialTheta: number;
   initialPhi: number;
@@ -78,8 +78,8 @@ export interface CameraOptions {
 }
 
 export const DEFAULT_CAMERA_OPTIONS: CameraOptions = {
-  initialTargetX: 0,
-  initialTargetY: 0,
+  initialOrbitCenterX: 0,
+  initialOrbitCenterY: 0,
   initialRadius: 30,
   initialTheta: DEFAULT_SPHERICAL_THETA,
   initialPhi: DEFAULT_SPHERICAL_PHI,
@@ -176,8 +176,8 @@ export function createCameraStore(): CameraStoreApi {
     immer<CameraStore>((set, get) => ({
   // 初始状态 (对外输出)
   cameraState: {
-    targetX: DEFAULT_CAMERA_OPTIONS.initialTargetX,
-    targetY: DEFAULT_CAMERA_OPTIONS.initialTargetY,
+    orbitCenterX: DEFAULT_CAMERA_OPTIONS.initialOrbitCenterX,
+    orbitCenterY: DEFAULT_CAMERA_OPTIONS.initialOrbitCenterY,
     radius: DEFAULT_CAMERA_OPTIONS.initialRadius,
     theta: DEFAULT_CAMERA_OPTIONS.initialTheta,
     phi: DEFAULT_CAMERA_OPTIONS.initialPhi,
@@ -266,12 +266,12 @@ export function createCameraStore(): CameraStoreApi {
   updateSimulatedCamera: () => {
     const state = get();
     const { cameraState, simulatedCamera } = state;
-    const { targetX, targetY, radius, theta, phi } = cameraState;
+    const { orbitCenterX, orbitCenterY, radius, theta, phi } = cameraState;
 
     simulatedCamera.position.setFromSphericalCoords(radius, phi, theta);
-    simulatedCamera.position.x += targetX;
-    simulatedCamera.position.y += targetY;
-    simulatedCamera.lookAt(targetX, targetY, 0);
+    simulatedCamera.position.x += orbitCenterX;
+    simulatedCamera.position.y += orbitCenterY;
+    simulatedCamera.lookAt(orbitCenterX, orbitCenterY, 0);
     simulatedCamera.updateMatrixWorld();
   },
 
@@ -462,8 +462,8 @@ export function createCameraStore(): CameraStoreApi {
         dPhysics.panOffset.current.y += dragVelY;
         dPhysics.panOffset.lastDelta = { x: dragVelX, y: dragVelY };
 
-        dCamera.targetX += dragVelX;
-        dCamera.targetY += dragVelY;
+        dCamera.orbitCenterX += dragVelX;
+        dCamera.orbitCenterY += dragVelY;
       }
 
       // ===== Rotate Offset 系统 (鼠标旋转) =====
@@ -494,8 +494,8 @@ export function createCameraStore(): CameraStoreApi {
       dPhysics.panVelocity.current.x += (dPhysics.panVelocity.desired.x - dPhysics.panVelocity.current.x) * (1 - dOptions.panDamping);
       dPhysics.panVelocity.current.y += (dPhysics.panVelocity.desired.y - dPhysics.panVelocity.current.y) * (1 - dOptions.panDamping);
 
-      dCamera.targetX += dPhysics.panVelocity.current.x;
-      dCamera.targetY += dPhysics.panVelocity.current.y;
+      dCamera.orbitCenterX += dPhysics.panVelocity.current.x;
+      dCamera.orbitCenterY += dPhysics.panVelocity.current.y;
 
       // ===== Rotate Velocity 系统 (惯性旋转) =====
       if (!dInput.isRotating) {

@@ -35,7 +35,7 @@ export function CameraDebugHud() {
       }}
     >
       <div>
-        Target: ({cameraState.targetX.toFixed(0)}, {cameraState.targetY.toFixed(0)})
+        Orbit Center: ({cameraState.orbitCenterX.toFixed(0)}, {cameraState.orbitCenterY.toFixed(0)})
       </div>
       <div>
         Radius: {cameraState.radius.toFixed(1)} | θ:{' '}

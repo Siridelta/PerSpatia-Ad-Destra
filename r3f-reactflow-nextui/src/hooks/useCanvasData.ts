@@ -244,8 +244,8 @@ const getDefaultCanvasCamera = (): CameraState => defaultCanvas.camera;
  * 数值取 `DEFAULT_CAMERA_OPTIONS` / 球角常量，表示引擎层面的原点视角。
  */
 const getBlankCanvasCamera = (): CameraState => ({
-  targetX: 0,
-  targetY: 0,
+  orbitCenterX: 0,
+  orbitCenterY: 0,
   radius: DEFAULT_CAMERA_OPTIONS.initialRadius,
   theta: DEFAULT_SPHERICAL_THETA,
   phi: DEFAULT_SPHERICAL_PHI,
@@ -570,8 +570,8 @@ export const useCanvasData = (): CanvasDataApi => {
     const getCameraSnapshot = (): CameraState => toCameraSlice(store.getState());
 
     const isSameCamera = (a: CameraState, b: CameraState) => (
-      a.targetX === b.targetX &&
-      a.targetY === b.targetY &&
+      a.orbitCenterX === b.orbitCenterX &&
+      a.orbitCenterY === b.orbitCenterY &&
       a.radius === b.radius &&
       a.theta === b.theta &&
       a.phi === b.phi
