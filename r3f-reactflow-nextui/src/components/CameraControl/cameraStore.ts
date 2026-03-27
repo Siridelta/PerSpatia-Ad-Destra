@@ -90,7 +90,7 @@ export const DEFAULT_CAMERA_OPTIONS: CameraOptions = {
   zoomDamping: 0.88,
   panKeyVelocity: 0.02, 
   wheelRate: 0.15,
-  yawBiasStrength: 0.5, // 归一化后的新强度
+  yawBiasStrength: 5, // 归一化后的新强度
 };
 
 // 输入状态
@@ -513,8 +513,18 @@ export function createCameraStore(): CameraStoreApi {
       const totalMovingX = dragVelX + dPhysics.panVelocity.current.x;
       const totalMovingY = dragVelY + dPhysics.panVelocity.current.y;
       
-      const targetOffsetTheta = -totalMovingX * dOptions.yawBiasStrength;
-      const targetOffsetPhi = totalMovingY * dOptions.yawBiasStrength;
+      // 除以半径使不同缩放层级下的偏航感一致
+      let targetOffsetTheta = (-totalMovingX * dOptions.yawBiasStrength) / dCamera.radius;
+      let targetOffsetPhi = (totalMovingY * dOptions.yawBiasStrength) / dCamera.radius;
+
+      // 限制在一个圆/锥形范围内 (clamp 向量长度)，仅针对偏置
+      const MAX_OFFSET = 0.8; // 可调参数：最大偏置角度 (弧度)
+      const offsetLength = Math.sqrt(targetOffsetTheta * targetOffsetTheta + targetOffsetPhi * targetOffsetPhi);
+      if (offsetLength > MAX_OFFSET) {
+        const scale = MAX_OFFSET / offsetLength;
+        targetOffsetTheta *= scale;
+        targetOffsetPhi *= scale;
+      }
 
       // 平滑逼近物理偏置
       dInner.offsetTheta += (targetOffsetTheta - dInner.offsetTheta) * 0.15;
