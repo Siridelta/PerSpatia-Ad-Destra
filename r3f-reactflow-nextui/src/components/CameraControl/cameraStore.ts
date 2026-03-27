@@ -514,22 +514,23 @@ export function createCameraStore(): CameraStoreApi {
       const totalMovingY = dragVelY + dPhysics.panVelocity.current.y;
       
       // 除以半径使不同缩放层级下的偏航感一致
-      let targetOffsetTheta = (-totalMovingX * dOptions.yawBiasStrength) / dCamera.radius;
-      let targetOffsetPhi = (totalMovingY * dOptions.yawBiasStrength) / dCamera.radius;
+      let desiredOffsetTheta = (-totalMovingX * dOptions.yawBiasStrength) / dCamera.radius;
+      let desiredOffsetPhi = (totalMovingY * dOptions.yawBiasStrength) / dCamera.radius;
 
       // 限制在一个圆/锥形范围内 (clamp 向量长度)，仅针对偏置
-      const MAX_OFFSET = 0.8; // 可调参数：最大偏置角度 (弧度)
-      const offsetLength = Math.sqrt(targetOffsetTheta * targetOffsetTheta + targetOffsetPhi * targetOffsetPhi);
+      // 自适应计算：键盘平移导致的稳态速度为 dOptions.panKeyVelocity * radius
+      // 对应产生的理论最大偏置基准为 panKeyVelocity * yawBiasStrength
+      const MAX_OFFSET = dOptions.panKeyVelocity * dOptions.yawBiasStrength;
+      const offsetLength = Math.sqrt(desiredOffsetTheta * desiredOffsetTheta + desiredOffsetPhi * desiredOffsetPhi);
       if (offsetLength > MAX_OFFSET) {
         const scale = MAX_OFFSET / offsetLength;
-        targetOffsetTheta *= scale;
-        targetOffsetPhi *= scale;
+        desiredOffsetTheta *= scale;
+        desiredOffsetPhi *= scale;
       }
 
       // 平滑逼近物理偏置
-      dInner.offsetTheta += (targetOffsetTheta - dInner.offsetTheta) * 0.15;
-      dInner.offsetPhi += (targetOffsetPhi - dInner.offsetPhi) * 0.15;
-
+      dInner.offsetTheta += (desiredOffsetTheta - dInner.offsetTheta) * 0.15;
+      dInner.offsetPhi += (desiredOffsetPhi - dInner.offsetPhi) * 0.15;
       
       // ===== 缩放系统 (对数空间) =====
       const logDiff = dInner.targetRadiusLog - dInner.radiusLog;
