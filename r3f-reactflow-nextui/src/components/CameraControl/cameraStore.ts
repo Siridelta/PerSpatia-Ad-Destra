@@ -534,10 +534,19 @@ export function createCameraStore(): CameraStoreApi {
             dInner.baseTheta = baseDevTheta * scale + DEFAULT_SPHERICAL_THETA;
             dInner.basePhi = baseDevPhi * scale + DEFAULT_SPHERICAL_PHI;
 
-            // 撞墙处理：如果是在惯性旋转中撞墙，清零速度
+            // 撞墙处理：速度投影（沿圆周滑动）
             if (!dInput.isRotating) {
-              dPhysics.rotateVelocity.current.theta = 0;
-              dPhysics.rotateVelocity.current.phi = 0;
+              const v = dPhysics.rotateVelocity.current;
+              // 法向量 (从圆心指向当前 base)
+              const nx = baseDevTheta / baseDevLen;
+              const ny = baseDevPhi / baseDevLen;
+              // 速度在法线方向的分量 (dot product)
+              const vNormal = v.theta * nx + v.phi * ny;
+              // 如果速度向外，则从总速度中减去法向分量，实现沿切线滑动
+              if (vNormal > 0) {
+                v.theta -= vNormal * nx;
+                v.phi -= vNormal * ny;
+              }
             }
           }
 
