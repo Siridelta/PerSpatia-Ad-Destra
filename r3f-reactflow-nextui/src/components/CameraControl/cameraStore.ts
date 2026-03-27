@@ -8,16 +8,35 @@ import * as THREE from 'three';
 enableMapSet();
 
 /**
- * 相机状态（球坐标与 THREE.Spherical / OrbitControls 一致）
+ * 相机对外输出状态（下游 R3F 和 React Flow 看到的最终值）
+ * 包含了：Base 用户值 + 物理 Offset 偏置
  */
 export interface CameraState {
   targetX: number;
   targetY: number;
   radius: number;
-  /** XZ 平面内方位角（弧度），从 +Z 起算，同 THREE.Spherical.theta */
+  /** 最终方位角（Base Theta + Offset Theta） */
   theta: number;
-  /** 从 +Y 向下的极角（弧度），同 THREE.Spherical.phi；π/2 为赤道 = 正视 +Z */
+  /** 最终极角（Base Phi + Offset Phi） */
   phi: number;
+}
+
+/** 物理内部计算状态 */
+interface InnerPhysicsState {
+  /** 用户控制的基础角度 */
+  baseTheta: number;
+  basePhi: number;
+  /** 
+   * 缩放的对数表示。
+   * radius = exp(radiusLog)
+   * 线性改变 radiusLog 对应于指数级改变 radius。
+   */
+  radiusLog: number;
+  targetRadiusLog: number;
+
+  /** 瞬时物理偏置（由平移速度产生） */
+  offsetTheta: number;
+  offsetPhi: number;
 }
 
 /** 正视 +Z（墙面在 z=0）时的默认极角：赤道 */
@@ -26,7 +45,7 @@ export const DEFAULT_SPHERICAL_PHI = Math.PI / 2;
 /** 默认方位：+Z 方向 */
 export const DEFAULT_SPHERICAL_THETA = 0;
 
-/** 与 Spherical.makeSafe 同量级，避免 cos(phi) 极点 */
+/** 与 Spherical.makeSafe 同量级，避免 cos(phi)极点 */
 export const SPHERICAL_PHI_MIN = 0.01;
 
 export const SPHERICAL_PHI_MAX = Math.PI - 0.01;
@@ -35,8 +54,6 @@ export const FOV = 50;
 
 /**
  * RF↔墙面换算里侧视锥体扩张用的半角 **α**（弧度）。
- * `expans = tan(fov/2 + α) / tan(fov/2)`，见 `docs/coordinates-transform.md`。
- * 具体算式写在各调用处（`ReactFlowViewportSync`、`v9-to-v10` 等），勿在此处封装。
  */
 export const alpha = (15 * Math.PI) / 180;
 
@@ -52,7 +69,12 @@ export interface CameraOptions {
   panDamping: number;
   rotateDamping: number;
   zoomDamping: number;
+  /** 基础移速系数（会乘以 radius） */
   panKeyVelocity: number;
+  /** 滚轮缩放速率（对数空间的线性步长） */
+  wheelRate: number;
+  /** 偏航偏置强度（显著加大以确保感知） */
+  yawBiasStrength: number;
 }
 
 export const DEFAULT_CAMERA_OPTIONS: CameraOptions = {
@@ -60,14 +82,15 @@ export const DEFAULT_CAMERA_OPTIONS: CameraOptions = {
   initialTargetY: 0,
   initialRadius: 30,
   initialTheta: DEFAULT_SPHERICAL_THETA,
-  /** 与 THREE.Spherical 一致：π/2 = 赤道，相机在 +Z 侧正视 z=0 墙面 */
   initialPhi: DEFAULT_SPHERICAL_PHI,
   minRadius: 5,
-  maxRadius: 100,
+  maxRadius: 150,
   panDamping: 0.85,
   rotateDamping: 0.85,
   zoomDamping: 0.88,
-  panKeyVelocity: 0.5,
+  panKeyVelocity: 0.02, 
+  wheelRate: 0.15,
+  yawBiasStrength: 0.5, // 归一化后的新强度
 };
 
 // 输入状态
@@ -98,7 +121,9 @@ interface PhysicsState {
     desired: { theta: number; phi: number };
     current: { theta: number; phi: number };
   };
-  targetRadius: number;
+
+  /** 核心物理状态 */
+  inner: InnerPhysicsState;
 }
 
 // Store 接口
@@ -145,9 +170,11 @@ export type CameraStoreApi = StoreApi<CameraStore>;
  * 创建新的相机 store。勿在模块顶层单例化——由 `CameraControl` 在挂载时调用一次。
  */
 export function createCameraStore(): CameraStoreApi {
+  const initialRadiusLog = Math.log(DEFAULT_CAMERA_OPTIONS.initialRadius);
+
   return createStore(
     immer<CameraStore>((set, get) => ({
-  // 初始状态
+  // 初始状态 (对外输出)
   cameraState: {
     targetX: DEFAULT_CAMERA_OPTIONS.initialTargetX,
     targetY: DEFAULT_CAMERA_OPTIONS.initialTargetY,
@@ -184,7 +211,14 @@ export function createCameraStore(): CameraStoreApi {
       desired: { theta: 0, phi: 0 },
       current: { theta: 0, phi: 0 },
     },
-    targetRadius: DEFAULT_CAMERA_OPTIONS.initialRadius,
+    inner: {
+      baseTheta: DEFAULT_CAMERA_OPTIONS.initialTheta,
+      basePhi: DEFAULT_CAMERA_OPTIONS.initialPhi,
+      radiusLog: initialRadiusLog,
+      targetRadiusLog: initialRadiusLog,
+      offsetTheta: 0,
+      offsetPhi: 0,
+    }
   },
 
   simulatedCamera: new THREE.PerspectiveCamera(50, window.innerWidth / window.innerHeight, 0.1, 1000),
@@ -211,9 +245,16 @@ export function createCameraStore(): CameraStoreApi {
   setCameraState: (newState) => {
     set((draft) => {
       Object.assign(draft.cameraState, newState);
+      // 同步更新物理内部状态
       if (newState.radius !== undefined) {
-        draft.physics.targetRadius = newState.radius;
+        const logV = Math.log(newState.radius);
+        draft.physics.inner.radiusLog = logV;
+        draft.physics.inner.targetRadiusLog = logV;
       }
+      if (newState.theta !== undefined) 
+        draft.physics.inner.baseTheta = newState.theta - draft.physics.inner.offsetTheta;
+      if (newState.phi !== undefined) 
+        draft.physics.inner.basePhi = newState.phi - draft.physics.inner.offsetPhi;
     });
   },
 
@@ -305,32 +346,31 @@ export function createCameraStore(): CameraStoreApi {
 
     if (!input.lastPointerScreen) return;
 
-    if (input.isRotating) {
-      const dx = clientX - input.lastPointerScreen.x;
-      const dy = clientY - input.lastPointerScreen.y;
+    set(draft => {
+      const dx = clientX - input.lastPointerScreen!.x;
+      const dy = clientY - input.lastPointerScreen!.y;
+      draft.input.lastPointerScreen = { x: clientX, y: clientY };
 
-      set(draft => {
-        draft.input.lastPointerScreen = { x: clientX, y: clientY };
+      // 并行处理：旋转和平移可以同时进行
+      if (input.isRotating) {
         // 与旧版左右手感一致：theta 增加方向与 Spherical 正向相反
         draft.physics.rotateOffset.desired.theta -= dx * 0.005;
         // 纵向：与 Spherical 默认 dy→phi 映射手感相反，故对 dy 取反（若仍反了再改符号）
         draft.physics.rotateOffset.desired.phi -= dy * 0.005;
-      });
-    } else if (input.isPanning) {
-      const lastPlane = state.screenToPlane(input.lastPointerScreen.x, input.lastPointerScreen.y);
-      const currentPlane = state.screenToPlane(clientX, clientY);
+      } 
+      
+      if (input.isPanning) {
+        const lastPlane = state.screenToPlane(input.lastPointerScreen!.x, input.lastPointerScreen!.y);
+        const currentPlane = state.screenToPlane(clientX, clientY);
 
-      if (currentPlane && lastPlane) {
-        const dx = lastPlane.x - currentPlane.x;
-        const dy = lastPlane.y - currentPlane.y;
-
-        set(draft => {
-          draft.input.lastPointerScreen = { x: clientX, y: clientY };
-          draft.physics.panOffset.desired.x += dx;
-          draft.physics.panOffset.desired.y += dy;
-        });
+        if (currentPlane && lastPlane) {
+          const pdx = lastPlane.x - currentPlane.x;
+          const pdy = lastPlane.y - currentPlane.y;
+          draft.physics.panOffset.desired.x += pdx;
+          draft.physics.panOffset.desired.y += pdy;
+        }
       }
-    }
+    });
   },
 
   handlePointerUp: () => {
@@ -369,11 +409,17 @@ export function createCameraStore(): CameraStoreApi {
 
   handleWheel: (deltaY) => {
     const state = get();
-    const delta = deltaY > 0 ? 1.1 : 0.9;
     const { options, physics } = state;
+    // 滚轮直接线性增减对数缩放值
+    const logStep = deltaY > 0 ? options.wheelRate : -options.wheelRate;
 
     set(draft => {
-      draft.physics.targetRadius = Math.max(options.minRadius, Math.min(options.maxRadius, physics.targetRadius * delta));
+      const minLog = Math.log(options.minRadius);
+      const maxLog = Math.log(options.maxRadius);
+      draft.physics.inner.targetRadiusLog = Math.max(
+        minLog, 
+        Math.min(maxLog, physics.inner.targetRadiusLog + logStep)
+      );
     });
   },
 
@@ -381,8 +427,9 @@ export function createCameraStore(): CameraStoreApi {
   tick: () => {
     const state = get();
     const { input, physics, cameraState } = state;
+    const { inner } = physics;
 
-    // 1. 快速检查是否需要继续动画 (基于当前状态判断)
+    // 1. 快速检查是否需要继续动画
     const hasPanOffset = Math.abs(physics.panOffset.desired.x - physics.panOffset.current.x) > 0.01
       || Math.abs(physics.panOffset.desired.y - physics.panOffset.current.y) > 0.01;
     const hasRotateOffset = Math.abs(physics.rotateOffset.desired.theta - physics.rotateOffset.current.theta) > 0.001
@@ -391,33 +438,35 @@ export function createCameraStore(): CameraStoreApi {
       || Math.abs(physics.panVelocity.current.y) > 0.01;
     const hasRotateVelocity = Math.abs(physics.rotateVelocity.current.theta) > 0.001
       || Math.abs(physics.rotateVelocity.current.phi) > 0.001;
-    const hasZoom = Math.abs(physics.targetRadius - cameraState.radius) > 0.01;
+    const hasZoom = Math.abs(inner.targetRadiusLog - inner.radiusLog) > 0.001;
+    // 检查偏置量回归
+    const hasOffsetRegression = Math.abs(inner.offsetTheta) > 0.0001 || Math.abs(inner.offsetPhi) > 0.0001;
 
-    const isMoving = hasPanOffset || hasRotateOffset || hasPanVelocity || hasRotateVelocity || hasZoom
+    const isMoving = hasPanOffset || hasRotateOffset || hasPanVelocity || hasRotateVelocity || hasZoom || hasOffsetRegression
       || input.isPanning || input.isRotating || input.keys.size > 0;
 
-    // 如果完全静止，直接退出，不触发任何状态更新
     if (!isMoving) return false;
 
-    // 2. 在 Immer 的 draft 中直接进行计算和赋值
-    // 现代设备的性能足以支撑每秒 60 次的 Proxy 操作，换取代码的极高可读性
     set((draft) => {
       const { input: dInput, physics: dPhysics, options: dOptions, cameraState: dCamera } = draft;
+      const { inner: dInner } = dPhysics;
 
-      // ===== Pan Offset 系统 =====
+      // ===== Pan Offset 系统 (鼠标拖拽) =====
+      let dragVelX = 0;
+      let dragVelY = 0;
       if (dInput.isPanning) {
-        const dx = (dPhysics.panOffset.desired.x - dPhysics.panOffset.current.x) * (1 - dOptions.panDamping);
-        const dy = (dPhysics.panOffset.desired.y - dPhysics.panOffset.current.y) * (1 - dOptions.panDamping);
+        dragVelX = (dPhysics.panOffset.desired.x - dPhysics.panOffset.current.x) * (1 - dOptions.panDamping);
+        dragVelY = (dPhysics.panOffset.desired.y - dPhysics.panOffset.current.y) * (1 - dOptions.panDamping);
 
-        dPhysics.panOffset.current.x += dx;
-        dPhysics.panOffset.current.y += dy;
-        dPhysics.panOffset.lastDelta = { x: dx, y: dy };
+        dPhysics.panOffset.current.x += dragVelX;
+        dPhysics.panOffset.current.y += dragVelY;
+        dPhysics.panOffset.lastDelta = { x: dragVelX, y: dragVelY };
 
-        dCamera.targetX += dx;
-        dCamera.targetY += dy;
+        dCamera.targetX += dragVelX;
+        dCamera.targetY += dragVelY;
       }
 
-      // ===== Rotate Offset 系统 =====
+      // ===== Rotate Offset 系统 (鼠标旋转) =====
       if (dInput.isRotating) {
         const dTheta = (dPhysics.rotateOffset.desired.theta - dPhysics.rotateOffset.current.theta) * (1 - dOptions.rotateDamping);
         const dPhi = (dPhysics.rotateOffset.desired.phi - dPhysics.rotateOffset.current.phi) * (1 - dOptions.rotateDamping);
@@ -426,17 +475,18 @@ export function createCameraStore(): CameraStoreApi {
         dPhysics.rotateOffset.current.phi += dPhi;
         dPhysics.rotateOffset.lastDelta = { theta: dTheta, phi: dPhi };
 
-        dCamera.theta += dTheta;
-        dCamera.phi += dPhi;
-        dCamera.phi = Math.max(SPHERICAL_PHI_MIN, Math.min(SPHERICAL_PHI_MAX, dCamera.phi));
+        dInner.baseTheta += dTheta;
+        dInner.basePhi += dPhi;
       }
 
-      // ===== Pan Velocity 系统 =====
+      // ===== Pan Velocity 系统 (WASD) =====
       let targetVx = 0, targetVy = 0;
-      if (dInput.keys.has('w')) targetVy += dOptions.panKeyVelocity;
-      if (dInput.keys.has('s')) targetVy -= dOptions.panKeyVelocity;
-      if (dInput.keys.has('a')) targetVx -= dOptions.panKeyVelocity;
-      if (dInput.keys.has('d')) targetVx += dOptions.panKeyVelocity;
+      // 移速正比于 radius
+      const speedScale = dCamera.radius;
+      if (dInput.keys.has('w')) targetVy += dOptions.panKeyVelocity * speedScale;
+      if (dInput.keys.has('s')) targetVy -= dOptions.panKeyVelocity * speedScale;
+      if (dInput.keys.has('a')) targetVx -= dOptions.panKeyVelocity * speedScale;
+      if (dInput.keys.has('d')) targetVx += dOptions.panKeyVelocity * speedScale;
 
       dPhysics.panVelocity.desired.x = targetVx;
       dPhysics.panVelocity.desired.y = targetVy;
@@ -447,10 +497,7 @@ export function createCameraStore(): CameraStoreApi {
       dCamera.targetX += dPhysics.panVelocity.current.x;
       dCamera.targetY += dPhysics.panVelocity.current.y;
 
-      if (Math.abs(dPhysics.panVelocity.current.x) < 0.01) dPhysics.panVelocity.current.x = 0;
-      if (Math.abs(dPhysics.panVelocity.current.y) < 0.01) dPhysics.panVelocity.current.y = 0;
-
-      // ===== Rotate Velocity 系统 =====
+      // ===== Rotate Velocity 系统 (惯性旋转) =====
       if (!dInput.isRotating) {
         dPhysics.rotateVelocity.current.theta += (dPhysics.rotateVelocity.desired.theta - dPhysics.rotateVelocity.current.theta) * (1 - dOptions.rotateDamping);
         dPhysics.rotateVelocity.current.phi += (dPhysics.rotateVelocity.desired.phi - dPhysics.rotateVelocity.current.phi) * (1 - dOptions.rotateDamping);
@@ -458,19 +505,36 @@ export function createCameraStore(): CameraStoreApi {
         if (Math.abs(dPhysics.rotateVelocity.current.theta) < 0.001) dPhysics.rotateVelocity.current.theta = 0;
         if (Math.abs(dPhysics.rotateVelocity.current.phi) < 0.001) dPhysics.rotateVelocity.current.phi = 0;
 
-        dCamera.theta += dPhysics.rotateVelocity.current.theta;
-        dCamera.phi += dPhysics.rotateVelocity.current.phi;
-        dCamera.phi = Math.max(SPHERICAL_PHI_MIN, Math.min(SPHERICAL_PHI_MAX, dCamera.phi));
+        dInner.baseTheta += dPhysics.rotateVelocity.current.theta;
+        dInner.basePhi += dPhysics.rotateVelocity.current.phi;
       }
 
-      // ===== 缩放系统 =====
-      const diff = dPhysics.targetRadius - dCamera.radius;
-      if (Math.abs(diff) > 0.01) {
-        dCamera.radius += diff * (1 - dOptions.zoomDamping);
+      // ===== 动态偏航 (Dynamic Yaw Offset) 计算 =====
+      const totalMovingX = dragVelX + dPhysics.panVelocity.current.x;
+      const totalMovingY = dragVelY + dPhysics.panVelocity.current.y;
+      
+      const targetOffsetTheta = -totalMovingX * dOptions.yawBiasStrength;
+      const targetOffsetPhi = totalMovingY * dOptions.yawBiasStrength;
+
+      // 平滑逼近物理偏置
+      dInner.offsetTheta += (targetOffsetTheta - dInner.offsetTheta) * 0.15;
+      dInner.offsetPhi += (targetOffsetPhi - dInner.offsetPhi) * 0.15;
+
+      
+      // ===== 缩放系统 (对数空间) =====
+      const logDiff = dInner.targetRadiusLog - dInner.radiusLog;
+      if (Math.abs(logDiff) > 0.001) {
+        dInner.radiusLog += logDiff * (1 - dOptions.zoomDamping);
       } else {
-        dCamera.radius = dPhysics.targetRadius;
+        dInner.radiusLog = dInner.targetRadiusLog;
       }
-      dCamera.radius = Math.max(dOptions.minRadius, Math.min(dOptions.maxRadius, dCamera.radius));
+
+      // ===== 最终合成与导出 (Output) =====
+      dCamera.radius = Math.exp(dInner.radiusLog);
+      
+      // 合成角度：基础值 + 物理偏置
+      dCamera.theta = dInner.baseTheta + dInner.offsetTheta;
+      dCamera.phi = Math.max(SPHERICAL_PHI_MIN, Math.min(SPHERICAL_PHI_MAX, dInner.basePhi + dInner.offsetPhi));
     });
 
     return true;
