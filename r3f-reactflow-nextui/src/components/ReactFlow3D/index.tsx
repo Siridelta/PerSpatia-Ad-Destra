@@ -7,8 +7,8 @@
  * 3. 指针/滚轮由 `CameraControl` 全屏层处理（配合 `pointerPolicy`）
  */
 
-import React, { useRef, useEffect } from 'react';
-import { alpha, CameraStore, DEFAULT_SPHERICAL_PHI, FOV, useCameraControlStore } from '../CameraControl';
+import React, { useRef, useCallback, useEffect, useState } from 'react';
+import { alpha, CameraState, DEFAULT_SPHERICAL_PHI, FOV, useCameraSubscribe } from '../CameraControl';
 import { ReactFlowViewportSync } from './ReactFlowViewportSync';
 
 interface ReactFlow3DProps {
@@ -22,36 +22,37 @@ export function buildShellTransform(phi: number, theta: number): string {
 export function ReactFlow3D({ children }: ReactFlow3DProps) {
   const containerRef = useRef<HTMLDivElement>(null);
   const transformRef = useRef<HTMLDivElement>(null);
-  const cameraStore = useCameraControlStore();
 
-  useEffect(() => {
-    const state = cameraStore.getState();
-    const updateStyle = (state: CameraStore) => {
-      if (transformRef.current) {
-        transformRef.current.style.transform = buildShellTransform(
-          state.cameraState.phi,
-          state.cameraState.theta
-        );
-      }
-      if (containerRef.current) {
-        const style = containerRef.current.style;
-        const fovRad = (FOV * Math.PI) / 180;
-        const expans = Math.tan(fovRad / 2 + alpha) / Math.tan(fovRad / 2);
-        const vw = state.viewportSize.width;
-        const vh = state.viewportSize.height;
-        style.perspective = `${(vh / 2) / Math.tan(fovRad / 2)}px`;
-        style.width = `${vw * expans}px`;
-        style.height = `${vh * expans}px`;
-        style.left = `${-vw / 2 * (expans - 1)}px`;
-        style.top = `${-vh / 2 * (expans - 1)}px`;
-      }
+  const updateStyle = useCallback((state: CameraState) => {
+    if (transformRef.current) {
+      transformRef.current.style.transform = buildShellTransform(
+        state.phi,
+        state.theta
+      );
     }
-   
-    updateStyle(state);
-    const unsubscribe = cameraStore.subscribe(updateStyle);
+    if (containerRef.current) {
+      const style = containerRef.current.style;
+      const fovRad = (FOV * Math.PI) / 180;
+      const expans = Math.tan(fovRad / 2 + alpha) / Math.tan(fovRad / 2);
+      const vw = window.innerWidth;
+      const vh = window.innerHeight;
+      style.perspective = `${(vh / 2) / Math.tan(fovRad / 2)}px`;
+      style.width = `${vw * expans}px`;
+      style.height = `${vh * expans}px`;
+      style.left = `${-vw / 2 * (expans - 1)}px`;
+      style.top = `${-vh / 2 * (expans - 1)}px`;
+    }
+  }, []);
 
-    return unsubscribe;
-  }, [cameraStore]);
+  // 使用声明式的旁路订阅钩子
+  useCameraSubscribe(updateStyle, (s) => s);
+
+  // 初次挂载时由于依赖引用的稳定性，有时需要触发一次初始更新。
+  // 通过一过性 state 和 ref 来规避复杂的 deps。
+  const [mounted, setMounted] = useState(false);
+  useEffect(() => {
+    setMounted(true);
+  }, []);
 
   return (
     <div

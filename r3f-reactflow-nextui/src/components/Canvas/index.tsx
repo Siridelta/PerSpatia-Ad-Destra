@@ -15,7 +15,6 @@ import React, { useCallback, useEffect, useRef } from 'react';
 
 import {
   CameraControl,
-  type CameraControlRef,
   type CameraState,
 } from '@/components/CameraControl';
 import { CameraDebugHud } from '@/components/CameraControl/CameraDebugHud';
@@ -65,8 +64,6 @@ const FOV = 50;
  * 需要读相机 Context 的 UI（如调试 HUD）用独立子组件挂在下面即可。
  */
 const Canvas: React.FC = () => {
-  const cameraControlRef = useRef<CameraControlRef>(null);
-
   // 创建 API 对象（UI/Flow 共享同一个 store）
   const canvasDataApi = useCanvasData();
 
@@ -109,23 +106,6 @@ const Canvas: React.FC = () => {
    * 与 App 层 `ReactFlowProvider` 同树即可；`screenToFlowPosition` 等在 RF 挂载后可用（RF 内部 viewport 由 ReactFlow3D 同步，不进 CanvasData）。
    */
   const reactFlow = useReactFlow<CanvasNodeFlowData, CanvasEdgeFlowData>();
-
-  /**
-   * 存档里的 camera → CameraControl：只用 ref，不订阅相机 Context。
-   * CameraControl 就绪时同步
-   */
-  useEffect(() => {
-    const api = cameraControlRef.current;
-    if (!isHydrated || !api) return;
-    api.setCameraState({
-      orbitCenterX: persistedCamera.orbitCenterX,
-      orbitCenterY: persistedCamera.orbitCenterY,
-      radius: persistedCamera.radius,
-      theta: persistedCamera.theta,
-      phi: persistedCamera.phi,
-    });
-  }, [isHydrated, persistedCamera, cameraControlRef.current]);
-
 
   // 应用主题设置
   useTheme();
@@ -387,8 +367,8 @@ const Canvas: React.FC = () => {
   */
   return (
     <CameraControl
-      ref={cameraControlRef}
-      shouldIgnoreCameraForTarget={shouldIgnorePointerForCameraRf}
+      persistedCamera={isHydrated ? persistedCamera : undefined}
+      pointerPolicy={shouldIgnorePointerForCameraRf}
       onPersist={onPersistCamera}
     >
       <>

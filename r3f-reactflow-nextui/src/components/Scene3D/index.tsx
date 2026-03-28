@@ -11,11 +11,11 @@ import React, { useRef } from 'react';
 import { Canvas, useFrame, useThree } from '@react-three/fiber';
 import { Stars } from '@react-three/drei';
 import * as THREE from 'three';
-import { FOV, useCameraControlStore } from '../CameraControl';
-import type { CameraStoreApi } from '../CameraControl';
+import { FOV, useCameraExternalClock, useCameraSubscribe, useCameraControl } from '../CameraControl';
+import type { CameraState, CameraControlApi } from '../CameraControl';
 
 // 3D 背景效果组件
-function BackgroundEffects({ cameraStore }: { cameraStore: CameraStoreApi }) {
+function BackgroundEffects({ cameraControlApi }: { cameraControlApi: CameraControlApi }) {
   const meshRef = useRef<THREE.Mesh>(null);
   const groupRef = useRef<THREE.Group>(null);
   
@@ -130,20 +130,20 @@ function BackgroundEffects({ cameraStore }: { cameraStore: CameraStoreApi }) {
 }
 
 // 相机同步组件（在 R3F Canvas 内；store 由外层 Scene3D 注入）
-function CameraSync({ cameraStore }: { cameraStore: CameraStoreApi }) {
+function CameraSync({ cameraControlApi }: { cameraControlApi: CameraControlApi }) {
   const { camera } = useThree();
+
+  const cameraControlTick = cameraControlApi.useCameraExternalClock();
   
   // 每帧同步相机位置和运行物理循环
   useFrame(() => {
     if (!(camera instanceof THREE.PerspectiveCamera)) return;
     
-    const store = cameraStore.getState();
-    
     // 运行物理循环
-    store.tick();
+    cameraControlTick();
     
     // 读取最新状态
-    const { orbitCenterX, orbitCenterY, radius, theta, phi } = store.cameraState;
+    const { orbitCenterX, orbitCenterY, radius, theta, phi } = cameraControlApi.getCameraSnapshot();
     
     // THREE.Spherical / setFromSphericalCoords，与 OrbitControls 约定一致
     camera.position.setFromSphericalCoords(radius, phi, theta);
@@ -159,7 +159,7 @@ function CameraSync({ cameraStore }: { cameraStore: CameraStoreApi }) {
 // 主场景组件（无 props；缩放完全由相机 store 推导）
 export function Scene3D() {
   // 必须在 `<Canvas>` 外读取，再注入 R3F 子树（见文件头注释）
-  const cameraStore = useCameraControlStore();
+  const cameraControlApi = useCameraControl();
 
   return (
     <div
@@ -178,9 +178,9 @@ export function Scene3D() {
         gl={{ antialias: true, alpha: true }}
         style={{ background: 'transparent' }}
       >
-        <CameraSync cameraStore={cameraStore} />
+        <CameraSync cameraControlApi={cameraControlApi} />
 
-        <BackgroundEffects cameraStore={cameraStore} />
+        <BackgroundEffects cameraControlApi={cameraControlApi} />
       </Canvas>
     </div>
   );

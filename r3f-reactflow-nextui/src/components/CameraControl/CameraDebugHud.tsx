@@ -6,14 +6,13 @@
 import React from 'react';
 
 import { alpha, FOV } from './cameraStore';
-import { useCameraControl } from './CameraControl';
+import { useCameraControl } from '.';
 import { SCREEN_METRIC_TO_THREE } from '../ReactFlow3D/ReactFlowViewportSync';
 
 export function CameraDebugHud() {
-  const cameraState = useCameraControl((s) => s.cameraState);
-  const viewportSize = useCameraControl((s) => s.viewportSize);
-  const vw = viewportSize.width > 0 ? viewportSize.width : window.innerWidth;
-  const vh = viewportSize.height > 0 ? viewportSize.height : window.innerHeight;
+  const cameraState = useCameraControl().useCameraState();
+  const vw = window.innerWidth;
+  const vh = window.innerHeight;
 
   const fovRad = (FOV * Math.PI) / 180;
   const standardZ = vh / 2 / SCREEN_METRIC_TO_THREE / Math.tan(fovRad / 2);
