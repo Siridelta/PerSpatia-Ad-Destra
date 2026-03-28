@@ -24,20 +24,27 @@ export interface CameraState {
 
 /** 物理内部计算状态 */
 interface InnerPhysicsState {
-  /** 用户控制的基础角度 */
-  baseTheta: number;
-  basePhi: number;
+  /** 用户控制的基础旋转角度（持久态） */
+  baseRotation: {
+    theta: number;
+    phi: number;
+  };
+  
   /** 
-   * 缩放的对数表示。
-   * radius = exp(radiusLog)
-   * 线性改变 radiusLog 对应于指数级改变 radius。
+   * 缩放系统。
+   * radius = exp(log)
+   * 线性改变 log 对应于指数级改变 radius。
    */
-  radiusLog: number;
-  targetRadiusLog: number;
+  zoom: {
+    log: number;
+    targetLog: number;
+  };
 
-  /** 瞬时物理漂移（由平移速度产生） */
-  driftTheta: number;
-  driftPhi: number;
+  /** 瞬时物理漂移（暂态，由平移速度产生） */
+  drift: {
+    theta: number;
+    phi: number;
+  };
 }
 
 /** 正视 +Z（墙面在 z=0）时的默认极角：赤道 */
@@ -217,12 +224,18 @@ export function createCameraStore(): CameraStoreApi {
           current: { theta: 0, phi: 0 },
         },
         inner: {
-          baseTheta: DEFAULT_CAMERA_OPTIONS.initialTheta,
-          basePhi: DEFAULT_CAMERA_OPTIONS.initialPhi,
-          radiusLog: initialRadiusLog,
-          targetRadiusLog: initialRadiusLog,
-          driftTheta: 0,
-          driftPhi: 0,
+          baseRotation: {
+            theta: DEFAULT_CAMERA_OPTIONS.initialTheta,
+            phi: DEFAULT_CAMERA_OPTIONS.initialPhi,
+          },
+          zoom: {
+            log: initialRadiusLog,
+            targetLog: initialRadiusLog,
+          },
+          drift: {
+            theta: 0,
+            phi: 0,
+          },
         }
       },
 
@@ -253,13 +266,13 @@ export function createCameraStore(): CameraStoreApi {
           // 同步更新物理内部状态
           if (newState.radius !== undefined) {
             const logV = Math.log(newState.radius);
-            draft.physics.inner.radiusLog = logV;
-            draft.physics.inner.targetRadiusLog = logV;
+            draft.physics.inner.zoom.log = logV;
+            draft.physics.inner.zoom.targetLog = logV;
           }
           if (newState.theta !== undefined)
-            draft.physics.inner.baseTheta = newState.theta - draft.physics.inner.driftTheta;
+            draft.physics.inner.baseRotation.theta = newState.theta - draft.physics.inner.drift.theta;
           if (newState.phi !== undefined)
-            draft.physics.inner.basePhi = newState.phi - draft.physics.inner.driftPhi;
+            draft.physics.inner.baseRotation.phi = newState.phi - draft.physics.inner.drift.phi;
         });
       },
 
@@ -421,9 +434,9 @@ export function createCameraStore(): CameraStoreApi {
         set(draft => {
           const minLog = Math.log(options.minRadius);
           const maxLog = Math.log(options.maxRadius);
-          draft.physics.inner.targetRadiusLog = Math.max(
+          draft.physics.inner.zoom.targetLog = Math.max(
             minLog,
-            Math.min(maxLog, physics.inner.targetRadiusLog + logStep)
+            Math.min(maxLog, physics.inner.zoom.targetLog + logStep)
           );
         });
       },
@@ -443,9 +456,9 @@ export function createCameraStore(): CameraStoreApi {
           || Math.abs(physics.panVelocity.current.y) > 0.01;
         const hasRotateVelocity = Math.abs(physics.rotateVelocity.current.theta) > 0.001
           || Math.abs(physics.rotateVelocity.current.phi) > 0.001;
-        const hasZoom = Math.abs(inner.targetRadiusLog - inner.radiusLog) > 0.001;
+        const hasZoom = Math.abs(inner.zoom.targetLog - inner.zoom.log) > 0.001;
         // 检查偏置量回归
-        const hasDriftRegression = Math.abs(inner.driftTheta) > 0.0001 || Math.abs(inner.driftPhi) > 0.0001;
+        const hasDriftRegression = Math.abs(inner.drift.theta) > 0.0001 || Math.abs(inner.drift.phi) > 0.0001;
 
         const isMoving = hasPanOffset || hasRotateOffset || hasPanVelocity || hasRotateVelocity || hasZoom || hasDriftRegression
           || input.isPanning || input.isRotating || input.keys.size > 0;
@@ -519,20 +532,20 @@ export function createCameraStore(): CameraStoreApi {
           }
 
           // 2. 将增量应用到 baseAngles
-          dInner.baseTheta += dRotationTheta;
-          dInner.basePhi += dRotationPhi;
+          dInner.baseRotation.theta += dRotationTheta;
+          dInner.baseRotation.phi += dRotationPhi;
 
           // 3. Clamp 到锥体范围（近似实现，Clamp 到 (theta, phi) 分量空间的圆范围内）
           // 仅针对手动旋转产生的 base 角度进行圆限制，与平移产生的偏航（drift）无关
-          const baseDevTheta = dInner.baseTheta - DEFAULT_SPHERICAL_THETA;
-          const baseDevPhi = dInner.basePhi - DEFAULT_SPHERICAL_PHI;
+          const baseDevTheta = dInner.baseRotation.theta - DEFAULT_SPHERICAL_THETA;
+          const baseDevPhi = dInner.baseRotation.phi - DEFAULT_SPHERICAL_PHI;
           const baseDevLen = Math.sqrt(baseDevTheta * baseDevTheta + baseDevPhi * baseDevPhi);
 
           if (baseDevLen > MAX_CONE_ANGLE) {
             const scale = MAX_CONE_ANGLE / baseDevLen;
             // 将 base 强制投影回圆周
-            dInner.baseTheta = baseDevTheta * scale + DEFAULT_SPHERICAL_THETA;
-            dInner.basePhi = baseDevPhi * scale + DEFAULT_SPHERICAL_PHI;
+            dInner.baseRotation.theta = baseDevTheta * scale + DEFAULT_SPHERICAL_THETA;
+            dInner.baseRotation.phi = baseDevPhi * scale + DEFAULT_SPHERICAL_PHI;
 
             // 撞墙处理：速度投影（沿圆周滑动）
             if (!dInput.isRotating) {
@@ -551,10 +564,10 @@ export function createCameraStore(): CameraStoreApi {
 
             // 同步 rotateOffset 以消除死区
             if (dInput.isRotating) {
-              dPhysics.rotateOffset.target.theta = dInner.baseTheta;
-              dPhysics.rotateOffset.target.phi = dInner.basePhi;
-              dPhysics.rotateOffset.current.theta = dInner.baseTheta;
-              dPhysics.rotateOffset.current.phi = dInner.basePhi;
+              dPhysics.rotateOffset.target.theta = dInner.baseRotation.theta;
+              dPhysics.rotateOffset.target.phi = dInner.baseRotation.phi;
+              dPhysics.rotateOffset.current.theta = dInner.baseRotation.theta;
+              dPhysics.rotateOffset.current.phi = dInner.baseRotation.phi;
             }
           }
           // ===== 动态偏航 (Dynamic Yaw Drift) 计算 =====
@@ -577,23 +590,23 @@ export function createCameraStore(): CameraStoreApi {
           }
 
           // 平滑逼近物理漂移
-          dInner.driftTheta += (targetDriftTheta - dInner.driftTheta) * 0.15;
-          dInner.driftPhi += (targetDriftPhi - dInner.driftPhi) * 0.15;
+          dInner.drift.theta += (targetDriftTheta - dInner.drift.theta) * 0.15;
+          dInner.drift.phi += (targetDriftPhi - dInner.drift.phi) * 0.15;
 
           // ===== 缩放系统 (对数空间) =====
-          const logDiff = dInner.targetRadiusLog - dInner.radiusLog;
+          const logDiff = dInner.zoom.targetLog - dInner.zoom.log;
           if (Math.abs(logDiff) > 0.001) {
-            dInner.radiusLog += logDiff * (1 - dOptions.zoomDamping);
+            dInner.zoom.log += logDiff * (1 - dOptions.zoomDamping);
           } else {
-            dInner.radiusLog = dInner.targetRadiusLog;
+            dInner.zoom.log = dInner.zoom.targetLog;
           }
 
           // ===== 最终合成与导出 (Output) =====
-          dCamera.radius = Math.exp(dInner.radiusLog);
+          dCamera.radius = Math.exp(dInner.zoom.log);
 
           // 合成角度：基础值 + 物理漂移
-          dCamera.theta = dInner.baseTheta + dInner.driftTheta;
-          dCamera.phi = Math.max(SPHERICAL_PHI_MIN, Math.min(SPHERICAL_PHI_MAX, dInner.basePhi + dInner.driftPhi));
+          dCamera.theta = dInner.baseRotation.theta + dInner.drift.theta;
+          dCamera.phi = Math.max(SPHERICAL_PHI_MIN, Math.min(SPHERICAL_PHI_MAX, dInner.baseRotation.phi + dInner.drift.phi));
         });
 
         return true;
