@@ -1,0 +1,1193 @@
+/* 节点容器 - 确保能根据内容扩展 */
+.text-node {
+  position: relative; /* 确保可以包含绝对定位的子元素 */
+  display: flex; /* 恢复为flex，但配置不同的属性 */
+  flex-direction: column;
+  min-width: 300px; /* 增加最小宽度 */
+  width: fit-content; /* 改回fit-content，让容器根据内容扩展 */
+  font-family: 'JetBrains Mono', 'AlimamaFangYuanTi', monospace;
+  font-size: 14px;
+  background: transparent;
+  border: none;
+  transition: transform 0.2s ease;
+  max-width: none; /* 移除最大宽度限制，允许充分扩展 */
+  padding-top: 20px; /* 为浮动头部留出空间 */
+}
+
+.text-node.selected,
+.text-node:focus-within {
+  transform: scale(1.01);
+}
+
+.text-node:hover:not(.selected):not(:focus-within) {
+  transform: scale(1.005);
+}
+
+/* 节点头部样式 - 改为浮动标签风格 */
+.text-node-header {
+  position: absolute;
+  top: -13px;
+  left: 0px;
+  background: transparent;
+  color: #7de1ea;
+  padding: 2px 0px;
+  font-size: 16px;
+  font-weight: 600;
+  font-family: 'JetBrains Mono', 'AlimamaFangYuanTi', monospace;
+  z-index: 10;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  width: 100%;
+  box-sizing: border-box;
+}
+
+.text-node-name-section {
+  flex: 1;
+  min-width: 0;
+}
+
+.text-node-name {
+  color: #7de1ea;
+  font-size: 16px;
+  font-weight: 600;
+  font-family: 'JetBrains Mono', 'AlimamaFangYuanTi', monospace;
+  cursor: pointer;
+  padding: 0; /* 移除内边距 */
+  border-radius: 0; /* 确保无圆角 */
+  transition: color 0.2s ease;
+}
+
+.text-node-name:hover {
+  color: #ffffff;
+}
+
+.text-node-name-input {
+  background: transparent;
+  border: none;
+  color: #7de1ea;
+  font-size: 16px;
+  font-weight: 600;
+  font-family: 'JetBrains Mono', 'AlimamaFangYuanTi', monospace;
+  padding: 0px;
+  outline: none;
+  width: 100%;
+  /* box-sizing: border-box; */
+}
+
+.text-node-name-input:focus {
+  border: none;
+  box-shadow: none;
+}
+
+/* 控制按钮区域 */
+.text-node-controls {
+  display: flex;
+  align-items: center;
+  gap: 8px; /* 一致的间距 */
+  margin-left: 0px; /* 与名称保持距离 */
+}
+
+.control-button {
+  background: transparent;
+  border: 1px solid rgba(125, 225, 234, 0.3);
+  color: #7de1ea;
+  padding: 4px; /* 减小尺寸 */
+  cursor: pointer;
+  border-radius: 0; /* 方形设计 */
+  transition: all 0.2s ease;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 24px; /* 减小尺寸 */
+  height: 24px; /* 减小尺寸 */
+}
+
+.control-button:hover {
+  background: rgba(125, 225, 234, 0.1);
+  border-color: #7de1ea;
+  color: #ffffff;
+}
+
+.control-button:active {
+  background: rgba(125, 225, 234, 0.2);
+  transform: scale(0.95);
+}
+
+.control-button svg {
+  width: 14px; /* 减小图标尺寸 */
+  height: 14px;
+}
+
+/* 折叠状态样式 */
+.text-node.collapsed {
+  min-width: 200px;
+  width: fit-content; /* 折叠状态也使用fit-content */
+}
+
+.collapsed-info {
+  padding: 15px;
+  background: rgba(9, 14, 28, 0.5);
+  border: none; /* 移除边框保持风格一致 */
+  text-align: center;
+  border-radius: 0; /* 确保无圆角 */
+}
+
+.collapsed-section {
+  margin: 10px 0;
+}
+
+.collapsed-label {
+  color: #7de1ea;
+  font-size: 14px;
+  font-weight: 600;
+  margin-bottom: 5px;
+}
+
+.collapsed-variable {
+  display: inline-block;
+  margin: 2px 8px;
+  font-size: 12px;
+}
+
+.var-name {
+  color: #ffffff;
+  font-weight: 600;
+}
+
+.var-type {
+  color: rgba(125, 225, 234, 0.7);
+  font-style: italic;
+}
+
+.copy-code-btn {
+  background: transparent;
+  border: 1px solid rgba(125, 225, 234, 0.3);
+  color: #7de1ea;
+  padding: 8px 16px;
+  cursor: pointer;
+  border-radius: 0;
+  font-family: 'JetBrains Mono', 'AlimamaFangYuanTi', monospace;
+  font-size: 12px;
+  margin-top: 10px;
+  transition: all 0.2s ease;
+}
+
+.copy-code-btn:hover {
+  background: rgba(125, 225, 234, 0.1);
+  border-color: #7de1ea;
+  color: #ffffff;
+}
+
+/* 动画效果 */
+@keyframes fadeInUp {
+  from {
+    opacity: 0;
+    transform: translateY(10px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+@keyframes fadeOutDown {
+  from {
+    opacity: 1;
+    transform: translateY(0);
+  }
+  to {
+    opacity: 0;
+    transform: translateY(-10px);
+  }
+}
+
+@keyframes fadeInLeft {
+  from {
+    opacity: 0;
+    transform: translateX(-10px);
+  }
+  to {
+    opacity: 1;
+    transform: translateX(0);
+  }
+}
+
+@keyframes fadeOutLeft {
+  from {
+    opacity: 1;
+    transform: translateX(0);
+  }
+  to {
+    opacity: 0;
+    transform: translateX(-10px);
+  }
+}
+
+@keyframes fadeInRight {
+  from {
+    opacity: 0;
+    transform: translateX(10px);
+  }
+  to {
+    opacity: 1;
+    transform: translateX(0);
+  }
+}
+
+@keyframes fadeOutRight {
+  from {
+    opacity: 1;
+    transform: translateX(0);
+  }
+  to {
+    opacity: 0;
+    transform: translateX(10px);
+  }
+}
+
+.animate-fade-in-up {
+  animation: fadeInUp 0.3s ease-out;
+}
+
+.animate-fade-out-down {
+  animation: fadeOutDown 0.3s ease-out;
+}
+
+.animate-fade-in-left {
+  animation: fadeInLeft 0.3s ease-out;
+}
+
+.animate-fade-out-left {
+  animation: fadeOutLeft 0.3s ease-out;
+}
+
+.animate-fade-in-right {
+  animation: fadeInRight 0.3s ease-out;
+}
+
+.animate-fade-out-right {
+  animation: fadeOutRight 0.3s ease-out;
+}
+
+/* 矩形区域通用样式 - 确保不限制宽度 */
+.text-node-section {
+  position: relative;
+  background: rgba(9, 14, 28, 0.5);
+  padding: 10px;
+  margin-bottom: 20px;
+  border: none; /* 移除描边 */
+  min-height: 20px;
+  box-sizing: border-box;
+  display: block; /* 确保是块级元素 */
+}
+
+.text-node-section:last-child {
+  margin-bottom: 0;
+}
+
+/* 区域标签样式 */
+.section-label {
+  position: absolute;
+  top: -13px;
+  left: 0px;
+  background: transparent;
+  color: #7de1ea;
+  padding: 2px 0px;
+  font-size: 14px;
+  font-weight: 600;
+  font-family: 'JetBrains Mono', 'AlimamaFangYuanTi', monospace;
+  z-index: 10;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+/* 重置按钮样式 */
+.reset-inputs-btn {
+  background: transparent;
+  border: 1px solid rgba(125, 225, 234, 0.3);
+  color: #7de1ea;
+  padding: 2px 8px;
+  cursor: pointer;
+  border-radius: 0;
+  font-family: 'JetBrains Mono', 'AlimamaFangYuanTi', monospace;
+  font-size: 12px;
+  transition: all 0.2s ease;
+}
+
+.reset-inputs-btn:hover {
+  background: rgba(125, 225, 234, 0.1);
+  border-color: #7de1ea;
+  color: #ffffff;
+}
+
+/* 可点击标签的样式 */
+.section-label.clickable {
+  transition: color 0.2s ease, transform 0.2s ease;
+  cursor: pointer;
+}
+
+.section-label.clickable:hover {
+  color: #ffffff;
+  transform: scale(1.05);
+}
+
+/* 代码区域 - 允许内容扩展 */
+.text-node-section.text-node-code-section {
+  display: block;
+  padding: 0;
+  box-sizing: border-box;
+  height: fit-content;
+}
+
+.text-node-content {
+  min-height: 1em;
+  color: #ffffff;
+  font-size: 14px;
+  line-height: 1.5;
+  background: transparent;
+  border: none;
+  font-family: 'JetBrains Mono', 'AlimamaFangYuanTi', monospace;
+  box-sizing: border-box;
+  display: block; /* 确保是块级元素 */
+  padding: 8px;
+  margin: 0;
+}
+
+.text-node-content pre {
+  margin: 0;
+  background: transparent;
+  color: #ffffff;
+  font-family: 'JetBrains Mono', 'AlimamaFangYuanTi', monospace;
+  font-size: 14px;
+  line-height: 1.5;
+  white-space: pre-wrap; /* 改为pre-wrap，支持自动换行 */
+  overflow: visible; /* 允许溢出，触发容器扩展 */
+  box-sizing: border-box;
+  display: inline; /* 让pre表现为内联，这样能推动容器宽度 */
+  padding: 0;
+}
+
+.text-node-editor {
+  width: 100%;
+  max-width: none; /* 移除最大宽度限制 */
+  min-height: 1em;
+  color: #ffffff;
+  font-size: 14px;
+  line-height: 1.5;
+  border: none;
+  outline: none;
+  resize: none;
+  background: transparent;
+  padding: 0;
+  margin: 0;
+  font-family: 'JetBrains Mono', 'AlimamaFangYuanTi', monospace;
+  font-variant-ligatures: none;
+  box-sizing: border-box;
+}
+
+/* 语法高亮容器样式 - 关键：不使用绝对定位 */
+.syntax-highlight-container {
+  position: relative;
+  display: block;
+  min-height: 100px;
+  background: transparent;
+  box-sizing: border-box;
+  width: auto; /* 让容器自动扩展 */
+  padding: 8px;
+}
+
+.syntax-highlight-display {
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0; /* 添加right: 0，让显示层填满容器 */
+  height: auto;
+  min-height: 100px;
+  background: transparent;
+  border: none;
+  outline: none;
+  pointer-events: none;
+  box-sizing: border-box;
+  font-family: 'JetBrains Mono', 'AlimamaFangYuanTi', monospace;
+  font-size: 14px;
+  line-height: 1.5;
+  margin: 0;
+  padding: 8px;
+  white-space: pre-wrap; /* 改为pre-wrap支持换行 */
+  overflow: visible; /* 允许溢出 */
+}
+
+.syntax-highlight-container .text-node-editor {
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0; /* 添加right: 0，让编辑器填满容器 */
+  height: auto;
+  min-height: 100px;
+  color: transparent;
+  caret-color: #7de1ea;
+  z-index: 2;
+  resize: none;
+  white-space: pre-wrap; /* 改为pre-wrap支持换行 */
+  overflow: visible; /* 允许溢出 */
+  background: transparent;
+  border: none;
+  outline: none;
+  font-family: 'JetBrains Mono', 'AlimamaFangYuanTi', monospace;
+  font-size: 14px;
+  line-height: 1.5;
+  margin: 0;
+  padding: 8px;
+  box-sizing: border-box;
+}
+
+.text-node-editor::placeholder {
+  color: rgba(125, 225, 234, 0.4);
+  font-family: 'JetBrains Mono', 'AlimamaFangYuanTi', monospace;
+  font-variant-ligatures: none;
+}
+
+/* 输入区域 */
+.text-node-inputs-section {
+  display: block;
+}
+
+/* 输出区域 */
+.text-node-outputs-section {
+  display: block;
+}
+
+/* 变量控件样式重写 */
+.variable-control {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin: 5px 0;
+  font-size: 14px;
+  font-family: 'JetBrains Mono', 'AlimamaFangYuanTi', monospace;
+  gap: 12px;
+}
+
+/* 滑动条重新设计 */
+.slider-container {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  flex: 1;
+  min-width: 120px;
+}
+
+.slider-current-value {
+  cursor: pointer;
+  color: #7de1ea;
+  margin: 0;
+}
+
+.slider-min-value {
+  cursor: pointer;
+  color: rgba(255, 255, 255, 0.8);
+  margin: 0 8px;
+}
+
+.slider-max-value {
+  cursor: pointer;
+  color: rgba(255, 255, 255, 0.8);
+  margin: 0 8px;
+}
+
+.slider-track {
+  position: relative;
+  flex: 1;
+  height: 20px;
+  background: transparent;
+  min-width: 80px;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+}
+
+.slider-track::before {
+  content: '';
+  position: absolute;
+  left: 0;
+  top: 50%;
+  transform: translateY(-50%);
+  width: 100%;
+  height: 4px;
+  background: #091c33;
+  border-radius: 0;
+  transition: background-color 0.2s ease;
+}
+
+.slider-track:hover::before {
+  background: #0a2040;
+}
+
+.slider-progress {
+  position: absolute;
+  left: 0;
+  top: 50%;
+  transform: translateY(-50%);
+  height: 4px;
+  background: #014a64;
+  border-radius: 0;
+  transition: width 0.1s ease;
+  pointer-events: none;
+}
+
+.slider-input {
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+  opacity: 0;
+  cursor: pointer;
+  -webkit-appearance: none;
+  appearance: none;
+  margin: 0;
+  background: transparent;
+  z-index: 10;
+}
+
+/* 确保滑动条可以拖动 */
+.slider-input::-webkit-slider-thumb {
+  -webkit-appearance: none;
+  appearance: none;
+  width: 12px;
+  height: 12px;
+  background: #7de1ea;
+  border-radius: 0;
+  cursor: grab;
+  border: 1px solid #014a64;
+  position: relative;
+  z-index: 11;
+  opacity: 1;
+  pointer-events: auto;
+}
+
+.slider-input:active::-webkit-slider-thumb {
+  cursor: grabbing;
+  background: #ffffff;
+}
+
+.slider-input::-moz-range-thumb {
+  width: 12px;
+  height: 12px;
+  background: #7de1ea;
+  border-radius: 0;
+  cursor: grab;
+  border: 1px solid #014a64;
+  position: relative;
+  z-index: 11;
+  -moz-appearance: none;
+  appearance: none;
+}
+
+.slider-input:active::-moz-range-thumb {
+  cursor: grabbing;
+  background: #ffffff;
+}
+
+/* 滑动条数值显示 */
+.variable-value {
+  color: #ffffff;
+  font-family: 'JetBrains Mono', 'AlimamaFangYuanTi', monospace;
+  font-size: 14px;
+  text-align: center;
+  padding: 2px 6px;
+  min-width: 30px;
+  flex-shrink: 0;
+  border: 1px solid transparent;
+  cursor: pointer;
+  transition: border-color 0.2s ease;
+}
+
+.variable-value:hover {
+  border-color: #7de1ea;
+  background: rgba(125, 225, 234, 0.1);
+}
+
+/* 输入框容器 */
+.text-input-container {
+  flex: 1;
+  min-width: 80px;
+  display: flex;
+  align-items: center;
+  position: relative;
+}
+
+/* 输入框重新设计 - 优化宽度适应 */
+.text-input {
+  background: transparent;
+  border: none;
+  color: #7de1ea;
+  font-family: 'JetBrains Mono', 'AlimamaFangYuanTi', monospace;
+  font-size: 14px;
+  padding: 0px 0px 0px 0px;
+  outline: none;
+  width: 100%; /* 改为100%以更好适应容器宽度 */
+  min-width: 80px; /* 降低最小宽度 */
+  box-sizing: border-box;
+}
+
+.text-input-underline {
+  position: absolute;
+  bottom: 0;
+  left: 0;
+  right: 0;
+  width: 100%;
+  height: 1px;
+  background: #091c33;
+}
+
+/* 当相邻的 input 获得焦点时，下划线高亮显示 */
+.text-input:focus + .text-input-underline {
+    background: #7de1ea;
+}
+
+.text-input::placeholder {
+  color: rgba(125, 225, 234, 0.5);
+}
+
+/* 开关重新设计 */
+.toggle-container {
+  display: flex;
+  flex: 1;
+  align-items: center;
+  gap: 8px;
+  justify-content: flex-start;
+  min-width: 80px;
+}
+
+.toggle-text {
+  color: #ffffff;
+  font-family: 'JetBrains Mono', 'AlimamaFangYuanTi', monospace;
+  font-size: 14px;
+  margin-right: 8px;
+  width: 40px;
+}
+
+.toggle-text-true {
+  color: #67e04b;
+}
+
+.toggle-text-false {
+  color: #ff5a5a;
+}
+
+.toggle-switch {
+  position: relative;
+  width: 58px;
+  height: 22px;
+  background: #091c33;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: #ffffff;
+  font-family: 'JetBrains Mono', 'AlimamaFangYuanTi', monospace;
+  font-size: 14px;
+  font-weight: bold;
+  overflow: hidden;
+}
+
+.toggle-switch.active {
+  background: #091c33;
+}
+
+.toggle-knob {
+  position: absolute;
+  top: 0;
+  width: 29px;
+  height: 22px;
+  background: #014a64;
+  transition: left 0.3s ease;
+  z-index: 1;
+}
+
+.toggle-switch:not(.active) .toggle-knob {
+  left: 0;
+}
+
+.toggle-switch.active .toggle-knob {
+  left: 29px;
+}
+
+/* T/F文字显示在左右半边，分别居中 */
+.toggle-switch::before {
+  content: 'F';
+  position: absolute;
+  left: 0;
+  width: 29px;
+  height: 100%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: #ffffff;
+  font-size: 14px;
+  font-weight: bold;
+  z-index: 2;
+  transition: opacity 0.3s ease;
+}
+
+.toggle-switch::after {
+  content: 'T';
+  position: absolute;
+  right: 0;
+  width: 29px;
+  height: 100%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: #ffffff;
+  font-size: 14px;
+  font-weight: bold;
+  z-index: 2;
+  transition: opacity 0.3s ease;
+}
+
+.toggle-switch:not(.active)::before {
+  opacity: 1;
+}
+
+.toggle-switch:not(.active)::after {
+  opacity: 0.3;
+}
+
+.toggle-switch.active::before {
+  opacity: 0.3;
+}
+
+.toggle-switch.active::after {
+  opacity: 1;
+}
+
+/* 输出变量样式重写 */
+.output-variable {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  margin: 5px 0;
+  font-family: 'JetBrains Mono', 'AlimamaFangYuanTi', monospace;
+  font-size: 14px;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+
+.output-variable-name {
+  color: #f6ee99;
+  font-family: 'JetBrains Mono', 'AlimamaFangYuanTi', monospace;
+  font-size: 14px;
+  min-width: 60px;
+  margin-right: 10px;
+  flex: 0 0 auto;
+}
+
+.output-variable-value {
+  color: #7de1ea;
+  font-family: 'JetBrains Mono', 'AlimamaFangYuanTi', monospace;
+  font-size: 14px;
+  text-align: left;
+  flex: 1 1 auto;
+  min-width: 0;
+}
+
+.output-variable-type {
+  font-family: 'JetBrains Mono', 'AlimamaFangYuanTi', monospace;
+  font-size: 14px;
+  color: #1e3b5e;
+  width: 70px;
+  flex-shrink: 1;
+}
+
+.output-export-button {
+  background: rgba(125, 225, 234, 0.15);
+  border: 1px solid rgba(125, 225, 234, 0.4);
+  color: #7de1ea;
+  padding: 0;
+  margin-left: auto;
+  margin-right: 6px;
+  width: 24px;
+  height: 24px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  transition: all 0.2s ease;
+}
+
+.output-export-button:hover {
+  background: rgba(125, 225, 234, 0.25);
+  color: #ffffff;
+}
+
+.output-export-button:disabled {
+  opacity: 0.4;
+  cursor: not-allowed;
+  background: rgba(125, 225, 234, 0.1);
+}
+
+/* 当变量名过长时，值换行 */
+.output-variable.wrapped {
+  flex-direction: column;
+  align-items: flex-start;
+}
+
+.output-variable.wrapped .output-variable-value {
+  text-align: right;
+  width: 100%;
+  margin-top: 2px;
+}
+
+/* 隐藏原有的分割线和动画 */
+.text-node-divider {
+  display: none;
+}
+
+.text-node-result {
+  display: none;
+}
+
+.text-node-outputs {
+  display: none;
+}
+
+.text-node-logs {
+  display: none;
+}
+
+.text-node-status-top {
+  display: none;
+}
+
+.text-node-error {
+  display: none;
+}
+
+/* 连接句柄样式 */
+.text-node-handle {
+  opacity: 0; /* 默认隐藏 */
+  transition: opacity 0.2s ease;
+  z-index: 5;
+}
+
+/* 连接模式下显示句柄 */
+.connect-mode .text-node-handle {
+  opacity: 1;
+}
+
+/* 移除hide-handle类的定义 */
+.hide-handle {
+  display: none;
+}
+
+/* 滑动条设置面板样式 */
+.slider-settings-panel {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  padding: 8px;
+  background: rgba(9, 28, 51, 0.8);
+  border: 1px solid #014a64;
+  font-family: 'JetBrains Mono', 'AlimamaFangYuanTi', monospace;
+  font-size: 14px;
+}
+
+.slider-settings-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 14px;
+}
+
+.slider-settings-input {
+  background: transparent;
+  border: none;
+  border-bottom: 1px solid #091c33;
+  color: #ffffff;
+  font-family: 'JetBrains Mono', 'AlimamaFangYuanTi', monospace;
+  font-size: 14px;
+  padding: 2px 0;
+  width: 60px;
+  text-align: center;
+}
+
+.slider-settings-input:focus {
+  border-bottom-color: #7de1ea;
+  outline: none;
+}
+
+/* 日志区域样式 */
+.text-node-logs-section {
+  display: block;
+}
+
+.log-container {
+  max-height: 120px;
+  overflow-y: auto;
+  font-family: 'JetBrains Mono', 'AlimamaFangYuanTi', monospace;
+  font-size: 14px;
+}
+
+.log-entry {
+  color: #ffffff;
+  margin: 2px 0;
+  padding: 2px 0;
+  font-family: 'JetBrains Mono', 'AlimamaFangYuanTi', monospace;
+  font-size: 14px;
+  line-height: 1.4;
+  white-space: pre-wrap;
+}
+
+.log-entry.error {
+  color: #ff6b6b;
+}
+
+.log-entry.warning {
+  color: #feca57;
+}
+
+.log-entry.info {
+  color: #7de1ea;
+}
+
+/* 错误和警告区域 */
+.text-node-errors-section {
+  margin-bottom: 2px;
+  padding: 0; /* 不需要内边距，因为每个卡片都有自己的padding */
+  background: transparent; /* 确保容器本身透明 */
+  display: flex;
+  flex-direction: column;
+}
+
+/* 错误卡片样式 - 恢复指定的背景色 */
+.error-card {
+  background: rgba(28, 9, 9, 0.5); /* #1c0909 with 0.5 opacity */
+  border: none; /* 移除边框 */
+  margin: 2px 0; /* 减少间距，与其他区域保持一致 */
+  padding: 10px;
+  position: relative; /* 为标签定位提供参考 */
+  box-sizing: border-box;
+}
+
+.error-header {
+  position: absolute;
+  top: -13px;
+  left: -4px;
+  background: transparent;
+  color: #d90000;
+  padding: 2px 8px;
+  font-size: 14px;
+  font-weight: 600;
+  font-family: 'JetBrains Mono', 'AlimamaFangYuanTi', monospace;
+  z-index: 10;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  width: calc(100% + 8px);
+  box-sizing: border-box;
+}
+
+.error-label {
+  color: #d90000;
+  font-weight: 600;
+  font-size: 14px;
+  text-transform: uppercase;
+  letter-spacing: 1px;
+}
+
+.error-location {
+  color: rgba(217, 0, 0, 0.7);
+  font-size: 12px;
+  margin-left: auto; /* 右对齐 */
+}
+
+.error-message {
+  color: #ffffff;
+  margin-bottom: 8px;
+  word-wrap: break-word;
+  font-family: 'JetBrains Mono', 'AlimamaFangYuanTi', monospace;
+  font-size: 14px;
+  padding-top: 8px; /* 为标签留出空间 */
+  line-height: 1.5;
+}
+
+.error-stack {
+  border-top: 1px solid rgba(217, 0, 0, 0.3);
+  padding-top: 8px;
+  margin-top: 8px;
+}
+
+.error-stack details {
+  color: rgba(217, 0, 0, 0.8);
+}
+
+.error-stack summary {
+  cursor: pointer;
+  font-size: 12px;
+  margin-bottom: 4px;
+}
+
+.error-stack summary:hover {
+  color: #d90000;
+}
+
+.error-stack pre {
+  background: rgba(0, 0, 0, 0.3);
+  border: 1px solid rgba(217, 0, 0, 0.2);
+  border-radius: 0;
+  padding: 8px;
+  margin: 4px 0 0 0;
+  font-size: 11px;
+  color: rgba(255, 255, 255, 0.8);
+  overflow-x: auto;
+  white-space: pre-wrap;
+}
+
+/* 警告卡片样式 - 恢复指定的背景色 */
+.warning-card {
+  background: rgba(28, 25, 9, 0.5); /* #1c1909 with 0.5 opacity */
+  border: none; /* 移除边框 */
+  margin: 2px 0; /* 减少间距，与其他区域保持一致 */
+  padding: 10px;
+  position: relative; /* 为标签定位提供参考 */
+  box-sizing: border-box;
+}
+
+.warning-header {
+  position: absolute;
+  top: -13px;
+  left: -4px;
+  background: transparent;
+  color: #d9b500;
+  padding: 2px 8px;
+  font-size: 14px;
+  font-weight: 600;
+  font-family: 'JetBrains Mono', 'AlimamaFangYuanTi', monospace;
+  z-index: 10;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  width: calc(100% + 8px);
+  box-sizing: border-box;
+}
+
+.warning-label {
+  color: #d9b500;
+  font-weight: 600;
+  font-size: 14px;
+  text-transform: uppercase;
+  letter-spacing: 1px;
+}
+
+.warning-location {
+  color: rgba(217, 181, 0, 0.7);
+  font-size: 12px;
+  margin-left: auto; /* 右对齐 */
+}
+
+.warning-message {
+  color: #ffffff;
+  margin-bottom: 8px;
+  word-wrap: break-word;
+  font-family: 'JetBrains Mono', 'AlimamaFangYuanTi', monospace;
+  font-size: 14px;
+  padding-top: 8px; /* 为标签留出空间 */
+  line-height: 1.5;
+}
+
+.warning-stack {
+  border-top: 1px solid rgba(217, 181, 0, 0.3);
+  padding-top: 8px;
+  margin-top: 8px;
+}
+
+.warning-stack details {
+  color: rgba(217, 181, 0, 0.8);
+}
+
+.warning-stack summary {
+  cursor: pointer;
+  font-size: 12px;
+  margin-bottom: 4px;
+}
+
+.warning-stack summary:hover {
+  color: #d9b500;
+}
+
+.warning-stack pre {
+  background: rgba(0, 0, 0, 0.3);
+  border: 1px solid rgba(217, 181, 0, 0.2);
+  border-radius: 0;
+  padding: 8px;
+  margin: 4px 0 0 0;
+  font-size: 11px;
+  color: rgba(255, 255, 255, 0.8);
+  overflow-x: auto;
+  white-space: pre-wrap;
+}
+
+/* 滑动条新布局样式 */
+.slider-layout {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: nowrap;
+  width: 100%; /* 确保占满宽度 */
+}
+
+.slider-variable-name {
+  font-weight: 600;
+  min-width: 60px;
+  display: none; /* 隐藏变量名，因为外层已经显示了 */
+}
+
+.slider-track-wrapper {
+  flex: 1;
+  min-width: 100px;
+  max-width: none; /* 移除最大宽度限制 */
+}
+
+.slider-min-value,
+.slider-max-value,
+.slider-current-value {
+  font-family: 'JetBrains Mono', 'AlimamaFangYuanTi', monospace;
+  font-size: 14px;
+  user-select: none;
+  transition: color 0.2s ease;
+}
+
+.slider-min-value:hover,
+.slider-max-value:hover,
+.slider-current-value:hover {
+  color: #ffffff !important;
+}
+
+/* 输出变量新布局样式 */
+.output-variable {
+  display: flex;
+  justify-content: start;
+  align-items: center;
+  gap: 12px;
+  padding: 1px 0; /* 原来是8px，减去7px变为1px */
+  border-bottom: 1px solid rgba(125, 225, 234, 0.1);
+}
+
+.output-variable:last-child {
+  border-bottom: none;
+}
+
+.output-left {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+}
+
+.output-right {
+  flex-shrink: 0;
+  text-align: left;
+}

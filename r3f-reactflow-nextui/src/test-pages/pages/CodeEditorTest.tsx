@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import CodeEditor from '../../components/CodeEditor';
+import CodeEditor from '@v0/components/CodeEditor';
 import './TestPage.css';
 
 const CodeEditorTest: React.FC = () => {

@@ -1,0 +1,102 @@
+.desmos-preview-node {
+  display: flex;
+  flex-direction: column;
+  width: 360px;
+  min-height: 260px;
+  background: rgba(9, 14, 28, 0.75);
+  border: 1px solid rgba(125, 225, 234, 0.4);
+  padding: 16px;
+  box-sizing: border-box;
+  color: #7de1ea;
+  font-family: 'JetBrains Mono', 'AlimamaFangYuanTi', monospace;
+  gap: 12px;
+}
+
+.desmos-preview-node.selected {
+  border-color: #ffffff;
+  box-shadow: 0 0 12px rgba(125, 225, 234, 0.6);
+}
+
+.desmos-preview-header {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.desmos-preview-title {
+  font-size: 16px;
+  font-weight: 600;
+  color: #ffffff;
+}
+
+.desmos-preview-source {
+  font-size: 12px;
+  color: rgba(125, 225, 234, 0.7);
+}
+
+.desmos-preview-body {
+  position: relative;
+  flex: 1;
+  min-height: 200px;
+  background: rgba(5, 10, 20, 0.9);
+  border: 1px solid rgba(125, 225, 234, 0.3);
+  overflow: hidden;
+}
+
+.desmos-preview-placeholder,
+.desmos-preview-error {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  text-align: center;
+  padding: 16px;
+  box-sizing: border-box;
+  background: rgba(9, 14, 28, 0.85);
+  font-size: 14px;
+  color: #7de1ea;
+  line-height: 1.5;
+}
+
+.desmos-preview-error {
+  color: #ff9f9f;
+}
+
+.desmos-preview-canvas {
+  position: absolute;
+  inset: 0;
+}
+
+.desmos-preview-canvas.hidden {
+  opacity: 0;
+  pointer-events: none;
+}
+
+.desmos-preview-handle {
+  width: 12px;
+  height: 12px;
+  background: #7de1ea;
+  border: 1px solid #ffffff;
+}
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+

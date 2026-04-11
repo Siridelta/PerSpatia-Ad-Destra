@@ -1,12 +1,12 @@
 import React, { useEffect, useState } from 'react';
 import { ReactFlowProvider } from '@xyflow/react';
-import TextNode from '../../components/TextNode';
+import TextNode from '@v0/components/TextNode';
 import './TestPage.css';
-import { CanvasNodeKind } from '@/types/canvas';
-import { CanvasDataProvider } from '@/contexts/CanvasDataContext';
-import { CanvasEvalProvider } from '@/contexts/CanvasEvalContext';
-import { useCanvasData } from '@/hooks/useCanvasData';
-import { useCanvasEval } from '@/hooks/useCanvasEval';
+import { CanvasNodeKind } from '@v0/types/canvas';
+import { CanvasDataProvider } from '@v0/contexts/CanvasDataContext';
+import { CanvasEvalProvider } from '@v0/contexts/CanvasEvalContext';
+import { useCanvasData } from '@v0/hooks/useCanvasData';
+import { useCanvasEval } from '@v0/hooks/useCanvasEval';
 
 const SizingBehaviorTest: React.FC = () => {
   const canvasDataApi = useCanvasData();

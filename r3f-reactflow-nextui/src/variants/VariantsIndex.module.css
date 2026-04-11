@@ -1,0 +1,68 @@
+.container {
+  padding: 4rem;
+  max-width: 800px;
+  margin: 0 auto;
+  font-family: 'Noto Sans SC', 'JetBrains Mono', sans-serif;
+  color: #fff;
+  background-color: #0a0a0a;
+  min-height: 100vh;
+}
+
+.title {
+  font-size: 2.5rem;
+  margin-bottom: 1rem;
+  font-weight: 700;
+  letter-spacing: -0.02em;
+}
+
+.subtitle {
+  color: #a1a1aa;
+  font-size: 1.1rem;
+  margin-bottom: 3rem;
+}
+
+.grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+  gap: 2rem;
+}
+
+.card {
+  background: #18181b;
+  border: 1px solid #27272a;
+  border-radius: 12px;
+  padding: 2rem;
+  transition: all 0.2s ease;
+}
+
+.card:hover {
+  border-color: #52525b;
+  transform: translateY(-2px);
+}
+
+.card h2 {
+  margin-top: 0;
+  font-size: 1.5rem;
+  margin-bottom: 1rem;
+}
+
+.card p {
+  color: #a1a1aa;
+  line-height: 1.6;
+  margin-bottom: 2rem;
+}
+
+.link {
+  display: inline-block;
+  padding: 0.5rem 1rem;
+  background: #fff;
+  color: #000;
+  text-decoration: none;
+  border-radius: 6px;
+  font-weight: 500;
+  transition: opacity 0.2s;
+}
+
+.link:hover {
+  opacity: 0.9;
+}
