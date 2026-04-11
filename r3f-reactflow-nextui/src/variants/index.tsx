@@ -14,7 +14,10 @@ const VariantsIndex: React.FC = () => {
         <div className={styles.card}>
           <h2>v0: Legacy</h2>
           <p>The original implementation before the visual refactor. Used as a baseline.</p>
-          <Link to="/v0" className={styles.link}>Open v0</Link>
+          <div style={{ display: 'flex', gap: '1rem' }}>
+            <Link to="/v0" className={styles.link}>Open v0</Link>
+            <Link to="/v0/tests" className={styles.link} style={{ background: '#3f3f46', color: '#fff' }}>Sizing Sandbox</Link>
+          </div>
         </div>
 
         <div className={styles.card}>
