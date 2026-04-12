@@ -37,7 +37,7 @@ function InfiniteBackground({ cameraControlApi }: { cameraControlApi: CameraCont
       <shaderMaterial
         uniforms={{
           uTime: { value: 0 },
-          uColor1: { value: new THREE.Color('#bf255d') },
+          uColor1: { value: new THREE.Color('#ec6f9d') },
           uColor2: { value: new THREE.Color('#1e1a5e') },
           uColor3: { value: new THREE.Color('#4c125c') },
         }}
