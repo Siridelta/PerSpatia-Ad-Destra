@@ -127,10 +127,10 @@
 
 .collapsed-info {
   padding: 15px;
-  background: rgba(9, 14, 28, 0.5);
-  border: none; /* 移除边框保持风格一致 */
+  background: transparent;
+  border: none;
   text-align: center;
-  border-radius: 0; /* 确保无圆角 */
+  border-radius: 0;
 }
 
 .collapsed-section {
@@ -273,13 +273,19 @@
 /* 矩形区域通用样式 - 确保不限制宽度 */
 .text-node-section {
   position: relative;
-  background: rgba(9, 14, 28, 0.5);
-  padding: 10px;
-  margin-bottom: 20px;
-  border: none; /* 移除描边 */
+  background: transparent; /* 完全透明，不再有厚重的实体感 */
+  padding: 5px 0; /* 减少内边距 */
+  margin-bottom: 10px;
+  border: none;
+  border-top: 1px solid rgba(0, 255, 255, 0.1); /* 极暗的霓虹分割线 */
   min-height: 20px;
   box-sizing: border-box;
   display: block; /* 确保是块级元素 */
+}
+
+/* 第一个 section 不需要顶部分割线 */
+.text-node-section:first-of-type {
+  border-top: none;
 }
 
 .text-node-section:last-child {

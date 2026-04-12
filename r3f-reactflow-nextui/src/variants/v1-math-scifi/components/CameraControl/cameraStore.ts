@@ -101,7 +101,7 @@ export const DEFAULT_CAMERA_OPTIONS: CameraOptions = {
   zoomDamping: 0.88,
   panKeyVelocity: 0.02,
   wheelRate: 0.15,
-  yawBiasStrength: 5, // 归一化后的新强度
+  yawBiasStrength: 2, // 归一化后的新强度
 };
 
 // 输入状态
