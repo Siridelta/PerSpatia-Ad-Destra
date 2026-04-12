@@ -21,8 +21,8 @@ function InfiniteBackground({ cameraControlApi, z = -2000 }: { cameraControlApi:
   // 核心修复：使用 useMemo 稳定 uniforms，防止 React 重渲染时将 uTime 重置为 0
   const uniforms = useMemo(() => ({
     uTime: { value: 0 },
-    uColor1: { value: new THREE.Color('#d13a7a') }, // 提亮后的洋红
-    uColor2: { value: new THREE.Color('#2a268a') }, // 提亮后的靛蓝
+    uColor1: { value: new THREE.Color('#d75050') }, // 提亮后的洋红
+    uColor2: { value: new THREE.Color('#462f79') }, // 提亮后的靛蓝
     uColor3: { value: new THREE.Color('#5c1a70') }, // 呼吸色
   }), []);
 
@@ -140,7 +140,7 @@ function InfiniteTriGrid({
           uniform float uOpacity;
           uniform float uLineWidth;
           uniform vec2 vGridOffset;
-          float rotateAngle = radians(45.); // 旋转角度
+          float rotateAngle = radians(55.); // 旋转角度
 
           float gridline(float x) {
             float halfLineWidth = uLineWidth * 0.5;
@@ -263,7 +263,7 @@ export function Scene3D() {
         <InfiniteBackground cameraControlApi={cameraControlApi} z={-5000} />
         
         {/* 远景网格 - Z=800, 极微弱 */}
-        <InfiniteTriGrid cameraControlApi={cameraControlApi} z={-1200} opacity={0.04} gridScale={525} lineWidth={1.2} gridOffset={[80, 80]} />
+        <InfiniteTriGrid cameraControlApi={cameraControlApi} z={-1200} opacity={0.04} gridScale={525} lineWidth={1.2} gridOffset={[80, 0]} />
         
         {/* 近景网格 - Z=200, 较清晰 */}
         <InfiniteTriGrid cameraControlApi={cameraControlApi} z={-400} opacity={0.05} gridScale={150} lineWidth={0.8} />
