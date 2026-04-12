@@ -11,18 +11,18 @@ import React, { useRef, useMemo } from 'react';
 import { Canvas, useFrame, useThree } from '@react-three/fiber';
 import { Stars } from '@react-three/drei';
 import * as THREE from 'three';
-import { FOV, useCameraExternalClock, useCameraControl } from '../CameraControl';
+import { FOV, useCameraExternalClock, useCameraControl, alpha } from '../CameraControl';
 import type { CameraControlApi } from '../CameraControl';
 
 // 1. 无限渐变背景层 - 永远锁定在相机中心，作为“天空盒”替代品
-function InfiniteBackground({ cameraControlApi }: { cameraControlApi: CameraControlApi }) {
+function InfiniteBackground({ cameraControlApi, z = -2000 }: { cameraControlApi: CameraControlApi, z?: number }) {
   const meshRef = useRef<THREE.Mesh>(null);
   
   useFrame((state) => {
     if (meshRef.current) {
       const { orbitCenterX, orbitCenterY } = cameraControlApi.getCameraSnapshot();
       // 让背景板永远跟着相机 XY 走，这样永远看不到边缘
-      meshRef.current.position.set(orbitCenterX, orbitCenterY, -201);
+      meshRef.current.position.set(orbitCenterX, orbitCenterY, z);
       
       const material = meshRef.current.material as THREE.ShaderMaterial;
       if (material.uniforms.uTime) {
@@ -31,13 +31,16 @@ function InfiniteBackground({ cameraControlApi }: { cameraControlApi: CameraCont
     }
   });
 
+  const fovRad = (FOV * Math.PI) / 180;
+  const scale = Math.abs(z) * Math.tan(fovRad / 2 + alpha) * 2 * 2; // 根据相机 FOV 和距离计算背景板大小
+
   return (
-    <mesh ref={meshRef} scale={[1500, 1500, 1]}>
+    <mesh ref={meshRef} scale={[scale, scale, 1]}>
       <planeGeometry args={[1, 1]} />
       <shaderMaterial
         uniforms={{
           uTime: { value: 0 },
-          uColor1: { value: new THREE.Color('#ec6f9d') },
+          uColor1: { value: new THREE.Color('#c2275d') },
           uColor2: { value: new THREE.Color('#1e1a5e') },
           uColor3: { value: new THREE.Color('#4c125c') },
         }}
@@ -62,9 +65,9 @@ function InfiniteBackground({ cameraControlApi }: { cameraControlApi: CameraCont
           }
 
           void main() {
-            float mixFactor = smoothstep(0.0, 1.0, vUv.x * 0.8 + (1.0 - vUv.y) * 0.2);
+            float mixFactor = smoothstep(0.0, 1.0, (1.0 - vUv.x) * 0.8 + (1.0 - vUv.y) * 0.2);
             // 横向压缩一下，让它更集中在中间
-            mixFactor = squeeze(mixFactor, 1.5);
+            mixFactor = squeeze(mixFactor, 1.0);
             // 添加一些“偏袒”：最理想的渐变出现在更偏暗部(->1)的位置上，把它拉到中心
             mixFactor = pow(mixFactor, 0.85);
             vec3 color = mix(uColor1, uColor2, mixFactor);
@@ -85,24 +88,41 @@ function InfiniteBackground({ cameraControlApi }: { cameraControlApi: CameraCont
 }
 
 // 2. 无限三角网格层 - 关键：使用世界坐标计算，实现“无限铺展”效果
-function InfiniteTriGrid({ cameraControlApi }: { cameraControlApi: CameraControlApi }) {
+function InfiniteTriGrid({ 
+  cameraControlApi, 
+  z = -200, 
+  opacity = 0.05,
+  gridScale = 50,
+  lineWidth = 0.28,
+  gridOffset = [0, 0]
+}: { 
+  cameraControlApi: CameraControlApi, 
+  z?: number, 
+  opacity?: number,
+  gridScale?: number,
+  lineWidth?: number,
+  gridOffset?: [number, number],
+}) {
   const meshRef = useRef<THREE.Mesh>(null);
   
   useFrame(() => {
     if (meshRef.current) {
       const { orbitCenterX, orbitCenterY } = cameraControlApi.getCameraSnapshot();
       // 网格板也跟着相机走，防止边缘露出
-      meshRef.current.position.set(orbitCenterX, orbitCenterY, -200);
+      meshRef.current.position.set(orbitCenterX, orbitCenterY, z);
     }
   });
 
   return (
-    <mesh ref={meshRef} scale={[2000, 2000, 1]}>
+    <mesh ref={meshRef} scale={[10000, 10000, 1]}>
       <planeGeometry args={[1, 1]} />
       <shaderMaterial
         transparent
         uniforms={{
-          uGridScale: { value: 0.02 }, // 控制网格大小
+          uGridScale: { value: gridScale }, // 控制网格大小
+          uOpacity: { value: opacity },
+          uLineWidth: { value: lineWidth },
+          vGridOffset: { value: new THREE.Vector2(...gridOffset) },
         }}
         vertexShader={`
           varying vec3 vWorldPosition;
@@ -114,18 +134,22 @@ function InfiniteTriGrid({ cameraControlApi }: { cameraControlApi: CameraControl
         fragmentShader={`
           varying vec3 vWorldPosition;
           uniform float uGridScale;
+          uniform float uOpacity;
+          uniform float uLineWidth;
+          uniform vec2 vGridOffset;
+          float rotateAngle = radians(45.); // 旋转角度
 
           float gridline(float x) {
-            float lineWidth = 0.007; // 网格线宽度
-            float halfLineWidth = lineWidth * 0.5;
-            float modPos = fract(x);
-            return step(modPos, halfLineWidth) + step(1.0 - halfLineWidth, modPos);
+            float halfLineWidth = uLineWidth * 0.5;
+            float modPos = mod(x, uGridScale);
+            return step(modPos, halfLineWidth) + step(uGridScale - halfLineWidth, modPos);
           }
           
           void main() {
             // 使用世界坐标来计算网格，这样相机移动时网格是静止的
-            vec2 pos = vWorldPosition.xy * uGridScale;
-            
+            mat2 rotationMatrix = mat2(cos(rotateAngle), -sin(rotateAngle), sin(rotateAngle), cos(rotateAngle));
+            vec2 pos = rotationMatrix * (vWorldPosition.xy - vGridOffset);
+
             float grid1 = gridline(pos.x);
             float grid2 = gridline(pos.y * 0.866 + pos.x * 0.5);
             float grid3 = gridline(pos.y * 0.866 - pos.x * 0.5);
@@ -134,7 +158,7 @@ function InfiniteTriGrid({ cameraControlApi }: { cameraControlApi: CameraControl
             
             // 极微弱的网格线颜色
             vec3 gridLineColor = vec3(1.0, 0.5, 0.7);
-            gl_FragColor = vec4(gridLineColor, grid * 0.05); // 5% 透明度
+            gl_FragColor = vec4(gridLineColor, grid * uOpacity);
           }
         `}
       />
@@ -149,9 +173,9 @@ function BackgroundDecorations() {
   const diamonds = useMemo(() => {
     return Array.from({ length: 30 }, (_, i) => ({
       position: [
+        (Math.random() - 0.5) * 200,
         (Math.random() - 0.5) * 150,
-        (Math.random() - 0.5) * 100,
-        -50 - Math.random() * 100
+        -50 - Math.random() * 200
       ] as [number, number, number],
       scale: 0.5 + Math.random() * 2,
       speed: 0.2 + Math.random() * 0.5,
@@ -221,23 +245,31 @@ export function Scene3D() {
       }}
     >
       <Canvas
-        camera={{ position: [0, 0, 30], fov: FOV }}
+        camera={{ 
+          position: [0, 0, 30], 
+          fov: FOV,
+          near: 0.1,
+          far: 10000 // 大幅提升远平面裁切距离
+        }}
         gl={{ antialias: true, alpha: true }}
         style={{ background: 'transparent' }}
       >
         <CameraSync cameraControlApi={cameraControlApi} />
         
-        {/* 背景渐变层 - 最远 */}
-        <InfiniteBackground cameraControlApi={cameraControlApi} />
+        {/* 背景渐变层 - 最远层 */}
+        <InfiniteBackground cameraControlApi={cameraControlApi} z={-5000} />
         
-        {/* 三角网格层 - 较远 */}
-        <InfiniteTriGrid cameraControlApi={cameraControlApi} />
+        {/* 远景网格 - Z=800, 极微弱 */}
+        <InfiniteTriGrid cameraControlApi={cameraControlApi} z={-1200} opacity={0.04} gridScale={525} lineWidth={1.2} gridOffset={[80, 80]} />
         
-        {/* 悬浮装饰物 - 较近 */}
+        {/* 近景网格 - Z=200, 较清晰 */}
+        <InfiniteTriGrid cameraControlApi={cameraControlApi} z={-400} opacity={0.05} gridScale={150} lineWidth={0.8} />
+        
+        {/* 悬浮装饰物 */}
         <BackgroundDecorations />
         
         {/* 星星 */}
-        <Stars radius={200} depth={50} count={3000} factor={4} saturation={0.5} fade />
+        <Stars radius={300} depth={100} count={4000} factor={4} saturation={0.5} fade />
       </Canvas>
     </div>
   );
