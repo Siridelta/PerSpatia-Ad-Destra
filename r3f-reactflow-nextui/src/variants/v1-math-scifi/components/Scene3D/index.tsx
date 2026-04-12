@@ -18,6 +18,14 @@ import type { CameraControlApi } from '../CameraControl';
 function InfiniteBackground({ cameraControlApi, z = -2000 }: { cameraControlApi: CameraControlApi, z?: number }) {
   const meshRef = useRef<THREE.Mesh>(null);
   
+  // 核心修复：使用 useMemo 稳定 uniforms，防止 React 重渲染时将 uTime 重置为 0
+  const uniforms = useMemo(() => ({
+    uTime: { value: 0 },
+    uColor1: { value: new THREE.Color('#d13a7a') }, // 提亮后的洋红
+    uColor2: { value: new THREE.Color('#2a268a') }, // 提亮后的靛蓝
+    uColor3: { value: new THREE.Color('#5c1a70') }, // 呼吸色
+  }), []);
+
   useFrame((state) => {
     if (meshRef.current) {
       const { orbitCenterX, orbitCenterY } = cameraControlApi.getCameraSnapshot();
@@ -25,9 +33,7 @@ function InfiniteBackground({ cameraControlApi, z = -2000 }: { cameraControlApi:
       meshRef.current.position.set(orbitCenterX, orbitCenterY, z);
       
       const material = meshRef.current.material as THREE.ShaderMaterial;
-      if (material.uniforms.uTime) {
-        material.uniforms.uTime.value = state.clock.elapsedTime;
-      }
+      material.uniforms.uTime.value = state.clock.elapsedTime;
     }
   });
 
@@ -38,12 +44,7 @@ function InfiniteBackground({ cameraControlApi, z = -2000 }: { cameraControlApi:
     <mesh ref={meshRef} scale={[scale, scale, 1]}>
       <planeGeometry args={[1, 1]} />
       <shaderMaterial
-        uniforms={{
-          uTime: { value: 0 },
-          uColor1: { value: new THREE.Color('#c2275d') },
-          uColor2: { value: new THREE.Color('#1e1a5e') },
-          uColor3: { value: new THREE.Color('#4c125c') },
-        }}
+        uniforms={uniforms}
         vertexShader={`
           varying vec2 vUv;
           void main() {
@@ -73,7 +74,7 @@ function InfiniteBackground({ cameraControlApi, z = -2000 }: { cameraControlApi:
             vec3 color = mix(uColor1, uColor2, mixFactor);
 
             // 动态变化 
-            color = mix(color, uColor3, (sin(uTime * 2.) * 0.5 + 0.5) * 0.2);
+            color = mix(color, uColor3, (sin(uTime * 1.) * 0.5 + 0.5) * 0.3);
 
             // 圆形暗角，增加一些空间感
             float dist = distance(vUv, vec2(0.5));
@@ -105,6 +106,13 @@ function InfiniteTriGrid({
 }) {
   const meshRef = useRef<THREE.Mesh>(null);
   
+  const uniforms = useMemo(() => ({
+    uGridScale: { value: gridScale },
+    uOpacity: { value: opacity },
+    uLineWidth: { value: lineWidth },
+    vGridOffset: { value: new THREE.Vector2(...gridOffset) },
+  }), [gridScale, opacity, lineWidth, gridOffset]);
+
   useFrame(() => {
     if (meshRef.current) {
       const { orbitCenterX, orbitCenterY } = cameraControlApi.getCameraSnapshot();
@@ -118,12 +126,7 @@ function InfiniteTriGrid({
       <planeGeometry args={[1, 1]} />
       <shaderMaterial
         transparent
-        uniforms={{
-          uGridScale: { value: gridScale }, // 控制网格大小
-          uOpacity: { value: opacity },
-          uLineWidth: { value: lineWidth },
-          vGridOffset: { value: new THREE.Vector2(...gridOffset) },
-        }}
+        uniforms={uniforms}
         vertexShader={`
           varying vec3 vWorldPosition;
           void main() {
