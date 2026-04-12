@@ -81,13 +81,13 @@ export const DualLayerCodeEditor: CodeEditorComponent = ({
         style={{
           margin: 0,
           padding: '10px',
-          fontFamily: 'JetBrains Mono, AlimamaFangYuanTi, monospace',
-          fontSize: '14px',
-          lineHeight: '1.5',
+          fontFamily: 'inherit',
+          fontSize: 'inherit',
+          lineHeight: 'inherit',
           whiteSpace: 'pre-wrap',
           border: 'none',
-          background: 'rgba(12, 74, 110, 0.06)',
-          color: 'rgba(255, 255, 255, 0.8)',
+          background: 'transparent',
+          color: 'rgba(255, 255, 255, 0.9)',
           pointerEvents: 'none',
         }}
       />

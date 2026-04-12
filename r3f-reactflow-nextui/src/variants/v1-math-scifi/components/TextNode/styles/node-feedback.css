@@ -1,0 +1,57 @@
+/* 
+ * TextNode Feedback - 日志、错误与警告的全息场
+ */
+
+.log-container {
+  max-height: 120px;
+  overflow-y: auto;
+  font-family: inherit;
+}
+
+.log-entry {
+  color: #ffffff;
+  margin: 2px 0;
+  padding: 2px 8px;
+  font-size: 13px;
+  line-height: 1.4;
+  border-left: 2px solid transparent;
+}
+
+.log-entry.error { color: #ff6b6b; border-left-color: #ff6b6b; }
+.log-entry.warning { color: #feca57; border-left-color: #feca57; }
+.log-entry.info { color: #7de1ea; border-left-color: #7de1ea; }
+
+/* 错误/警告卡片 - 全息线框风格 */
+.error-card, .warning-card {
+  background: rgba(255, 255, 255, 0.02);
+  border: 1px solid rgba(217, 0, 0, 0.3);
+  box-shadow: 0 0 10px rgba(217, 0, 0, 0.1);
+  margin: 12px 0;
+  padding: 10px;
+  position: relative;
+}
+
+.warning-card {
+  border-color: rgba(217, 181, 0, 0.3);
+  box-shadow: 0 0 10px rgba(217, 181, 0, 0.1);
+}
+
+.error-header, .warning-header {
+  position: absolute;
+  top: -12px;
+  left: 0;
+  font-size: 12px;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 1px;
+}
+
+.error-header { color: #ff4d4d; }
+.warning-header { color: #ffcc00; }
+
+.error-message, .warning-message {
+  color: #ffffff;
+  margin-top: 8px;
+  font-size: 13px;
+  line-height: 1.5;
+}

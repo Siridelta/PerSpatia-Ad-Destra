@@ -1,0 +1,98 @@
+/* 
+ * TextNode Editor - 代码编辑器与语法高亮覆盖
+ */
+
+.text-node-section.text-node-code-section {
+  display: block;
+  padding: 0;
+  box-sizing: border-box;
+  height: fit-content;
+}
+
+.text-node-content {
+  min-height: 1em;
+  color: #ffffff;
+  font-size: 14px;
+  line-height: 1.5;
+  background: transparent;
+  border: none;
+  font-family: inherit;
+  box-sizing: border-box;
+  display: block;
+  padding: 8px;
+  margin: 0;
+}
+
+.text-node-editor {
+  width: 100%;
+  max-width: none;
+  min-height: 1em;
+  color: #ffffff;
+  font-size: 14px;
+  line-height: 1.5;
+  border: none;
+  outline: none;
+  resize: none;
+  background: transparent;
+  padding: 0;
+  margin: 0;
+  font-family: inherit;
+  font-variant-ligatures: none;
+  box-sizing: border-box;
+}
+
+/* 语法高亮容器 */
+.syntax-highlight-container {
+  position: relative;
+  display: block;
+  min-height: 100px;
+  background: transparent;
+  box-sizing: border-box;
+  width: auto;
+  padding: 8px;
+}
+
+.syntax-highlight-display {
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  height: auto;
+  min-height: 100px;
+  background: transparent;
+  border: none;
+  outline: none;
+  pointer-events: none;
+  box-sizing: border-box;
+  font-family: inherit;
+  font-size: 14px;
+  line-height: 1.5;
+  margin: 0;
+  padding: 8px;
+  white-space: pre-wrap;
+  overflow: visible;
+}
+
+.syntax-highlight-container .text-node-editor {
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  height: auto;
+  min-height: 100px;
+  color: transparent;
+  caret-color: #7de1ea;
+  z-index: 2;
+  resize: none;
+  white-space: pre-wrap;
+  overflow: visible;
+  background: transparent;
+  border: none;
+  outline: none;
+  font-family: inherit;
+  padding: 8px;
+}
+
+.text-node-editor::placeholder {
+  color: rgba(125, 225, 234, 0.4);
+}

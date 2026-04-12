@@ -77,7 +77,6 @@ export function ReactFlow3D({ children }: ReactFlow3DProps) {
           height: '100%',
           transformStyle: 'preserve-3d',
           transformOrigin: '50% 50%',
-          willChange: 'transform',
         }}
       >
         <ReactFlowViewportSync />

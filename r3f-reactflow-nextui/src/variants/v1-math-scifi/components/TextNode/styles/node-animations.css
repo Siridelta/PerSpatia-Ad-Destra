@@ -1,0 +1,21 @@
+/* 
+ * TextNode Animations - 全息微动效
+ */
+
+@keyframes fadeInUp {
+  from { opacity: 0; }
+  to { opacity: 1; }
+}
+
+@keyframes fadeOutDown {
+  from { opacity: 1; }
+  to { opacity: 0; }
+}
+
+.animate-fade-in-up { animation: fadeInUp 0.3s ease-out; }
+.animate-fade-out-down { animation: fadeOutDown 0.3s ease-out; }
+
+/* 禁用所有可能导致节点整体缩放的 transition */
+* {
+  /* transform 不应该在节点上随意 transition，除非是微小的 UI 元素 */
+}

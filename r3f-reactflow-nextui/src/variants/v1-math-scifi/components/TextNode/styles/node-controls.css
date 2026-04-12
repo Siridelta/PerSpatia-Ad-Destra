@@ -1,0 +1,111 @@
+/* 
+ * TextNode Controls - 极简能量交互组件
+ */
+
+.variable-control {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin: 5px 0;
+  font-family: inherit;
+  gap: 12px;
+}
+
+/* 滑动条 - 能量线风格 */
+.slider-container {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  flex: 1;
+}
+
+.slider-track {
+  position: relative;
+  flex: 1;
+  height: 20px;
+  background: transparent;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+}
+
+.slider-track::before {
+  content: '';
+  position: absolute;
+  left: 0;
+  top: 50%;
+  transform: translateY(-50%);
+  width: 100%;
+  height: 1px;
+  background: rgba(125, 225, 234, 0.15);
+}
+
+.slider-progress {
+  position: absolute;
+  left: 0;
+  top: 50%;
+  transform: translateY(-50%);
+  height: 2px;
+  background: #7de1ea;
+  box-shadow: 0 0 10px rgba(125, 225, 234, 0.6);
+}
+
+.slider-input::-webkit-slider-thumb {
+  -webkit-appearance: none;
+  width: 10px;
+  height: 10px;
+  background: #ffffff;
+  box-shadow: 0 0 10px #ffffff;
+  border-radius: 50%;
+  cursor: grab;
+}
+
+/* 开关 - 全息风格 */
+.toggle-switch {
+  position: relative;
+  width: 50px;
+  height: 18px;
+  background: rgba(125, 225, 234, 0.1);
+  border: 1px solid rgba(125, 225, 234, 0.3);
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: rgba(255, 255, 255, 0.5);
+  font-size: 12px;
+  font-weight: bold;
+}
+
+.toggle-switch.active {
+  border-color: #7de1ea;
+  box-shadow: 0 0 10px rgba(125, 225, 234, 0.2);
+}
+
+.toggle-knob {
+  position: absolute;
+  top: 0;
+  width: 25px;
+  height: 100%;
+  background: rgba(125, 225, 234, 0.4);
+  transition: left 0.3s cubic-bezier(0.23, 1, 0.32, 1);
+}
+
+/* 按钮 */
+.control-button {
+  background: transparent;
+  border: 1px solid rgba(125, 225, 234, 0.3);
+  color: #7de1ea;
+  cursor: pointer;
+  width: 24px;
+  height: 24px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: all 0.2s ease;
+}
+
+.control-button:hover {
+  background: rgba(125, 225, 234, 0.1);
+  border-color: #7de1ea;
+  color: #ffffff;
+}

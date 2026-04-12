@@ -1,0 +1,117 @@
+/* 
+ * TextNode Frame - 节点骨架与全息力场
+ */
+
+.text-node {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  min-width: 300px;
+  width: fit-content;
+  font-family: 'JetBrains Mono', 'AlimamaFangYuanTi', monospace;
+  font-size: 14px;
+  background: transparent;
+  border: 1px solid rgba(125, 225, 234, 0.3);
+  box-shadow: 
+    0 0 10px rgba(125, 225, 234, 0.1),
+    inset 0 0 15px rgba(125, 225, 234, 0.05);
+  /* 移除可能会导致模糊的属性，增加渲染提示 */
+  max-width: none;
+  padding: 12px;
+  padding-top: 32px;
+  
+  /* 渲染优化 */
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+  backface-visibility: hidden;
+  transform-style: preserve-3d;
+  
+  /* 核心修复：彻底钉死缩放动画 */
+  transform: none !important; 
+  transition: border-color 0.3s ease, box-shadow 0.3s ease;
+}
+
+.text-node.selected,
+.text-node:focus-within {
+  border-color: rgba(125, 225, 234, 0.8);
+  box-shadow: 
+    0 0 20px rgba(125, 225, 234, 0.3),
+    inset 0 0 25px rgba(125, 225, 234, 0.1);
+}
+
+.text-node:hover:not(.selected):not(:focus-within) {
+  border-color: rgba(125, 225, 234, 0.5);
+  box-shadow: 0 0 15px rgba(125, 225, 234, 0.2);
+}
+
+/* 节点头部 */
+.text-node-header {
+  position: absolute;
+  top: -13px;
+  left: 0px;
+  background: transparent;
+  color: #7de1ea;
+  padding: 2px 0px;
+  font-size: 16px;
+  font-weight: 600;
+  font-family: inherit;
+  z-index: 10;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  width: 100%;
+  box-sizing: border-box;
+}
+
+.text-node-name {
+  color: #7de1ea;
+  font-size: 16px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: color 0.2s ease;
+}
+
+.text-node-name:hover {
+  color: #ffffff;
+}
+
+/* 区域通用容器 */
+.text-node-section {
+  position: relative;
+  background: transparent;
+  padding: 5px 0;
+  margin-bottom: 10px;
+  border: none;
+  border-top: 1px solid rgba(0, 255, 255, 0.1);
+  min-height: 20px;
+  box-sizing: border-box;
+  display: block;
+}
+
+.text-node-section:first-of-type {
+  border-top: none;
+}
+
+.section-label {
+  position: absolute;
+  top: -13px;
+  left: 0px;
+  color: #7de1ea;
+  font-size: 14px;
+  font-weight: 600;
+  z-index: 10;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+/* 连接句柄 (ReactFlow Handles) */
+.text-node-handle {
+  opacity: 0;
+  transition: opacity 0.2s ease;
+  z-index: 5;
+}
+
+.connect-mode .text-node-handle {
+  opacity: 1;
+}

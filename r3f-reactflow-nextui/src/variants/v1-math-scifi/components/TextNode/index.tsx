@@ -1,7 +1,11 @@
 import React, { useState, useCallback, useEffect, useRef } from 'react';
 import { Handle, Position, NodeProps, NodeResizeControl, useKeyPress } from '@xyflow/react';
-// import './styles-future.css';
-import './styles.css';
+// 引入模块化样式
+import './styles/node-frame.css';
+import './styles/node-editor.css';
+import './styles/node-controls.css';
+import './styles/node-feedback.css';
+import './styles/node-animations.css';
 import '@v1/styles/syntax-highlighting.css';
 import { Control } from '@v1/services/jsExecutor';
 import { useToolStore } from '@v1/global-stores/toolStore';
