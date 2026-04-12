@@ -22,7 +22,7 @@ function InfiniteBackground({ cameraControlApi }: { cameraControlApi: CameraCont
     if (meshRef.current) {
       const { orbitCenterX, orbitCenterY } = cameraControlApi.getCameraSnapshot();
       // 让背景板永远跟着相机 XY 走，这样永远看不到边缘
-      meshRef.current.position.set(orbitCenterX, orbitCenterY, -200);
+      meshRef.current.position.set(orbitCenterX, orbitCenterY, -201);
       
       const material = meshRef.current.material as THREE.ShaderMaterial;
       if (material.uniforms.uTime) {
@@ -64,13 +64,13 @@ function InfiniteBackground({ cameraControlApi }: { cameraControlApi: CameraCont
           void main() {
             float mixFactor = smoothstep(0.0, 1.0, vUv.x * 0.8 + (1.0 - vUv.y) * 0.2);
             // 横向压缩一下，让它更集中在中间
-            mixFactor = squeeze(mixFactor, 2.5);
+            mixFactor = squeeze(mixFactor, 1.5);
             // 添加一些“偏袒”：最理想的渐变出现在更偏暗部(->1)的位置上，把它拉到中心
             mixFactor = pow(mixFactor, 0.85);
             vec3 color = mix(uColor1, uColor2, mixFactor);
 
             // 动态变化 
-            color = mix(color, uColor3, (sin(uTime * 2.) * 0.5 + 0.5) * 0.);
+            color = mix(color, uColor3, (sin(uTime * 2.) * 0.5 + 0.5) * 0.2);
 
             // 圆形暗角，增加一些空间感
             float dist = distance(vUv, vec2(0.5));
@@ -92,7 +92,7 @@ function InfiniteTriGrid({ cameraControlApi }: { cameraControlApi: CameraControl
     if (meshRef.current) {
       const { orbitCenterX, orbitCenterY } = cameraControlApi.getCameraSnapshot();
       // 网格板也跟着相机走，防止边缘露出
-      meshRef.current.position.set(orbitCenterX, orbitCenterY, -100);
+      meshRef.current.position.set(orbitCenterX, orbitCenterY, -200);
     }
   });
 
@@ -102,7 +102,7 @@ function InfiniteTriGrid({ cameraControlApi }: { cameraControlApi: CameraControl
       <shaderMaterial
         transparent
         uniforms={{
-          uGridScale: { value: 0.04 }, // 控制网格大小
+          uGridScale: { value: 0.02 }, // 控制网格大小
         }}
         vertexShader={`
           varying vec3 vWorldPosition;
