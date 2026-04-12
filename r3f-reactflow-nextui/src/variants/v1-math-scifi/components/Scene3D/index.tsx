@@ -116,7 +116,7 @@ function InfiniteTriGrid({ cameraControlApi }: { cameraControlApi: CameraControl
           uniform float uGridScale;
 
           float gridline(float x) {
-            float lineWidth = 0.010; // 网格线宽度
+            float lineWidth = 0.007; // 网格线宽度
             float halfLineWidth = lineWidth * 0.5;
             float modPos = fract(x);
             return step(modPos, halfLineWidth) + step(1.0 - halfLineWidth, modPos);
