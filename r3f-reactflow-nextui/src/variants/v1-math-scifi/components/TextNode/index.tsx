@@ -499,7 +499,11 @@ const TextNode: React.FC<NodeProps<TextNodeFlowData>> = ({ id, selected }) => {
 
       {/* 代码区域 */}
       {!isCollapsed && (
-        <div className="text-node-section text-node-code-section animate-fade-in-up">
+        <div className="text-node-section text-node-code-section animate-fade-in-up" style={{ position: 'relative' }}>
+          {/* 视觉上的调节线（装饰用），仅在代码区左右 */}
+          <div className="node-decor-line left" />
+          <div className="node-decor-line right" />
+          
           <CodeEditor
             className={isCtrlPressed ? 'drag' : 'nodrag'}
             initialText={code || ''}
@@ -594,18 +598,11 @@ const TextNode: React.FC<NodeProps<TextNodeFlowData>> = ({ id, selected }) => {
         }}
       />
 
-      {/* 节点宽度调整控制 */}
+      {/* 节点宽度调整控制 (全高度响应，但视觉上是透明的，靠 decor-line 展示) */}
       {!isCollapsed && (
         <>
           <NodeResizeControl
-            style={{
-              background: 'transparent',
-              border: 'none',
-              width: '8px',
-              height: '100%',
-              borderRadius: 0,
-              cursor: 'ew-resize'
-            }}
+            className="node-resizer-handle"
             position="left"
             minWidth={200}
             autoScale={false}
@@ -619,14 +616,7 @@ const TextNode: React.FC<NodeProps<TextNodeFlowData>> = ({ id, selected }) => {
             }}
           />
           <NodeResizeControl
-            style={{
-              background: 'transparent',
-              border: 'none',
-              width: '8px',
-              height: '100%',
-              borderRadius: 0,
-              cursor: 'ew-resize'
-            }}
+            className="node-resizer-handle"
             position="right"
             minWidth={200}
             autoScale={false}

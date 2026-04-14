@@ -1,5 +1,5 @@
 /* 
- * TextNode Frame - 节点骨架与全息力场
+ * TextNode Frame - 节点基础样式
  */
 
 .text-node {
@@ -8,43 +8,75 @@
   flex-direction: column;
   min-width: 300px;
   width: fit-content;
-  font-family: 'JetBrains Mono', 'AlimamaFangYuanTi', monospace;
+  font-family: var(--spatial-font-family, 'Cascadia Code Variable', 'Cascadia Code', 'JetBrains Mono', 'AlimamaFangYuanTi', monospace);
+  font-weight: var(--spatial-font-weight, 300);
+  /* 为可变字体开启轴控制 */
+  font-variation-settings: "wght" var(--spatial-font-weight, 300);
   font-size: 14px;
   background: transparent;
-  border: 1px solid rgba(125, 225, 234, 0.3);
-  box-shadow: 
-    0 0 10px rgba(125, 225, 234, 0.1),
-    inset 0 0 15px rgba(125, 225, 234, 0.05);
-  /* 移除可能会导致模糊的属性，增加渲染提示 */
+  border: none;
+  box-shadow: none;
   max-width: none;
   padding: 12px;
   padding-top: 32px;
   
-  /* 渲染优化 */
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
   backface-visibility: hidden;
   transform-style: preserve-3d;
   
-  /* 核心修复：彻底钉死缩放动画 */
   transform: none !important; 
-  transition: border-color 0.3s ease, box-shadow 0.3s ease;
+  transition: none;
 }
 
 .text-node.selected,
 .text-node:focus-within {
-  border-color: rgba(125, 225, 234, 0.8);
-  box-shadow: 
-    0 0 20px rgba(125, 225, 234, 0.3),
-    inset 0 0 25px rgba(125, 225, 234, 0.1);
+  border-color: transparent;
+  box-shadow: none;
 }
 
 .text-node:hover:not(.selected):not(:focus-within) {
-  border-color: rgba(125, 225, 234, 0.5);
-  box-shadow: 0 0 15px rgba(125, 225, 234, 0.2);
+  border-color: transparent;
+  box-shadow: none;
 }
 
-/* 节点头部 */
+.node-resizer-handle {
+  background: transparent !important;
+  border: none !important;
+  width: 16px !important;
+  height: 100% !important;
+  border-radius: 0 !important;
+  cursor: ew-resize !important;
+  z-index: 10;
+}
+
+/* 装饰性调节线 */
+.node-decor-line {
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  width: 2px;
+  background: rgba(125, 225, 234, 0.2);
+  box-shadow: 0 0 5px rgba(125, 225, 234, 0.4);
+  transition: background 0.2s, box-shadow 0.2s;
+  pointer-events: none;
+  z-index: 5;
+}
+
+.node-decor-line.left {
+  left: 0;
+}
+
+.node-decor-line.right {
+  right: 0;
+}
+
+.text-node:hover .node-decor-line,
+.text-node.selected .node-decor-line {
+  background: rgba(125, 225, 234, 0.8);
+  box-shadow: 0 0 10px rgba(125, 225, 234, 0.8);
+}
+
 .text-node-header {
   position: absolute;
   top: -13px;
@@ -75,7 +107,6 @@
   color: #ffffff;
 }
 
-/* 区域通用容器 */
 .text-node-section {
   position: relative;
   background: transparent;
@@ -105,17 +136,11 @@
   gap: 10px;
 }
 
-/* 连接句柄 (ReactFlow Handles) */
 .text-node-handle {
   opacity: 0;
   transition: opacity 0.2s ease;
   z-index: 5;
 }
-
-.connect-mode .text-node-handle {
-  opacity: 1;
-}
-
 
 .connect-mode .text-node-handle {
   opacity: 1;

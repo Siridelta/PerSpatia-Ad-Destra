@@ -1,5 +1,5 @@
 import React from 'react';
-import { BrowserRouter as Router, Routes, Route } from 'react-router-dom';
+import { HashRouter as Router, Routes, Route } from 'react-router-dom';
 import { ReactFlowProvider } from '@xyflow/react';
 import CanvasV0 from './variants/v0-legacy/components/Canvas';
 import CanvasV1 from './variants/v1-math-scifi/components/Canvas';

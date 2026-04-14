@@ -85,6 +85,27 @@ export const CameraControl = ({ children, persistedCamera, pointerPolicy, onPers
     },
   }));
 
+  useLevaControls('Visual Settings', () => ({
+    fontFamily: {
+      options: {
+        'JetBrains Mono': "'JetBrains Mono', 'AlimamaFangYuanTi', monospace",
+        'Cascadia Code': "'Cascadia Code Variable', 'Cascadia Code', 'AlimamaFangYuanTi', monospace",
+        'Maple Mono': "'Maple Mono', 'AlimamaFangYuanTi', monospace",
+      },
+      value: "'Cascadia Code Variable', 'Cascadia Code', 'AlimamaFangYuanTi', monospace",
+      onChange: (v: string) => {
+        document.documentElement.style.setProperty('--spatial-font-family', v);
+      }
+    },
+    fontWeight: {
+      value: 300,
+      min: 100, max: 800, step: 10,
+      onChange: (v: number) => {
+        document.documentElement.style.setProperty('--spatial-font-weight', String(v));
+      }
+    }
+  }));
+
   // persist state down
   useEffect(() => {
     if (persistedCamera) {
@@ -210,7 +231,6 @@ export const CameraControl = ({ children, persistedCamera, pointerPolicy, onPers
   const handlePointerDownCapture = useCallback(
     (e: ReactPointerEvent<HTMLDivElement>) => {
       const ignored = shouldIgnore(e.target);
-      console.log(`[Camera] downCapture pointerId=${e.pointerId} type=${e.pointerType} ignored=${ignored} target=`, e.target);
 
       // 1. 处理鼠标：鼠标没有多点触控问题，沿用原来的逻辑
       if (e.pointerType === 'mouse') {
@@ -231,7 +251,6 @@ export const CameraControl = ({ children, persistedCamera, pointerPolicy, onPers
       activePointers.current.set(e.pointerId, { x: e.clientX, y: e.clientY, target: e.target });
 
       if (activePointers.current.size >= 2) {
-        console.log(`[Camera] TAKE OVER (size=${activePointers.current.size})`);
         e.stopPropagation();
         e.nativeEvent.stopPropagation();
         
@@ -247,10 +266,8 @@ export const CameraControl = ({ children, persistedCamera, pointerPolicy, onPers
       } else {
         // 单指模式
         if (ignored) {
-          console.log(`[Camera] Ignored touch on target, let it pass to ReactFlow`);
           return;
         } else {
-          console.log(`[Camera] Capture single touch on empty space`);
           try {
             (e.target as HTMLElement).setPointerCapture(e.pointerId);
           } catch (err) {}
