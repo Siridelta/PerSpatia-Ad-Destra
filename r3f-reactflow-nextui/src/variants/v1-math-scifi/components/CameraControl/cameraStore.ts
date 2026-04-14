@@ -86,6 +86,10 @@ export interface CameraOptions {
   wheelRate: number;
   /** 偏航偏置强度（显著加大以确保感知） */
   yawBiasStrength: number;
+  /** 移动端：是否使用双指旋转 (否则双指平移+缩放，三指旋转) */
+  twoFingerRotate: boolean;
+  /** 移动端缩放灵敏度 */
+  touchZoomRate: number;
 }
 
 export const DEFAULT_CAMERA_OPTIONS: CameraOptions = {
@@ -102,6 +106,8 @@ export const DEFAULT_CAMERA_OPTIONS: CameraOptions = {
   panKeyVelocity: 0.02,
   wheelRate: 0.15,
   yawBiasStrength: 2, // 归一化后的新强度
+  twoFingerRotate: false,
+  touchZoomRate: 0.005,
 };
 
 // 输入状态
@@ -165,6 +171,7 @@ export interface CameraStore {
   handlePointerMove: (clientX: number, clientY: number) => void;
   handlePointerUp: () => void;
   handleWheel: (deltaY: number) => void;
+  handleZoomDelta: (deltaLog: number) => void;
 
   // Physics Loop (useFrame 调用)
   tick: () => boolean; // 返回 true 表示需要继续动画，false 表示静止
@@ -437,6 +444,19 @@ export function createCameraStore(): CameraStoreApi {
           draft.physics.inner.zoom.targetLog = Math.max(
             minLog,
             Math.min(maxLog, physics.inner.zoom.targetLog + logStep)
+          );
+        });
+      },
+
+      handleZoomDelta: (deltaLog) => {
+        const state = get();
+        const { options, physics } = state;
+        set(draft => {
+          const minLog = Math.log(options.minRadius);
+          const maxLog = Math.log(options.maxRadius);
+          draft.physics.inner.zoom.targetLog = Math.max(
+            minLog,
+            Math.min(maxLog, physics.inner.zoom.targetLog + deltaLog)
           );
         });
       },

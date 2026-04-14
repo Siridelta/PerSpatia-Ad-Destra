@@ -17,6 +17,7 @@ import React, {
 } from 'react';
 import type { PointerEvent as ReactPointerEvent } from 'react';
 import { useStore } from 'zustand';
+import { useControls as useLevaControls } from 'leva';
 
 import {
   createCameraStore,
@@ -57,6 +58,32 @@ export const CameraControl = ({ children, persistedCamera, pointerPolicy, onPers
     storeRef.current = createCameraStore();
   }
   const store = storeRef.current;
+
+  const activePointers = useRef(new Map<number, { x: number; y: number; target?: EventTarget }>());
+  const touchStartDistance = useRef<number | null>(null);
+
+  // Leva controls
+  useLevaControls('Mobile Touch & Camera', () => ({
+    twoFingerRotate: {
+      value: store.getState().options.twoFingerRotate,
+      onChange: (v: boolean) => store.getState().setOptions({ twoFingerRotate: v }),
+    },
+    panDamping: {
+      value: store.getState().options.panDamping,
+      min: 0, max: 0.99,
+      onChange: (v: number) => store.getState().setOptions({ panDamping: v }),
+    },
+    rotateDamping: {
+      value: store.getState().options.rotateDamping,
+      min: 0, max: 0.99,
+      onChange: (v: number) => store.getState().setOptions({ rotateDamping: v }),
+    },
+    zoomDamping: {
+      value: store.getState().options.zoomDamping,
+      min: 0, max: 0.99,
+      onChange: (v: number) => store.getState().setOptions({ zoomDamping: v }),
+    },
+  }));
 
   // persist state down
   useEffect(() => {
@@ -132,40 +159,183 @@ export const CameraControl = ({ children, persistedCamera, pointerPolicy, onPers
     };
   }, [onPersist, flushPersist]);
 
-  const handlePointerDown = useCallback(
+  const resetPointersBase = useCallback(() => {
+    // 清除上一个手势的状态（触发惯性并关闭 isPanning / isRotating）
+    store.getState().handlePointerUp();
+
+    if (activePointers.current.size === 0) {
+      touchStartDistance.current = null;
+      return;
+    }
+    
+    let sumX = 0, sumY = 0;
+    activePointers.current.forEach((p) => {
+      sumX += p.x;
+      sumY += p.y;
+    });
+    const centroidX = sumX / activePointers.current.size;
+    const centroidY = sumY / activePointers.current.size;
+
+    if (activePointers.current.size === 1) {
+      store.getState().startPan(centroidX, centroidY);
+    } else if (activePointers.current.size === 2) {
+      const pts = Array.from(activePointers.current.values());
+      const dist = Math.hypot(pts[0].x - pts[1].x, pts[0].y - pts[1].y);
+      touchStartDistance.current = dist;
+
+      if (store.getState().options.twoFingerRotate) {
+        store.getState().startRotate(centroidX, centroidY);
+      } else {
+        store.getState().startPan(centroidX, centroidY);
+      }
+    } else if (activePointers.current.size >= 3) {
+      if (store.getState().options.twoFingerRotate) {
+        store.getState().startPan(centroidX, centroidY);
+      } else {
+        store.getState().startRotate(centroidX, centroidY);
+      }
+    }
+  }, [store]);
+
+  const handlePointerDownCapture = useCallback(
     (e: ReactPointerEvent<HTMLDivElement>) => {
-      if (shouldIgnore(e.target)) {
+      if (e.pointerType === 'mouse') {
+        if (shouldIgnore(e.target)) return;
+
+        if (e.button === 2) {
+          store.getState().startRotate(e.clientX, e.clientY);
+          e.preventDefault();
+          return;
+        }
+        if (e.button === 0) {
+          store.getState().startPan(e.clientX, e.clientY);
+        }
         return;
       }
 
-      if (e.button === 2) {
-        store.getState().startRotate(e.clientX, e.clientY);
-        e.preventDefault();
-        return;
-      }
+      // Touch
+      activePointers.current.set(e.pointerId, { x: e.clientX, y: e.clientY, target: e.target });
 
-      if (e.button === 0) {
-        // e.preventDefault();
-        store.getState().startPan(e.clientX, e.clientY);
+      if (activePointers.current.size >= 2) {
+        e.stopPropagation();
+        e.nativeEvent.stopPropagation();
+        
+        activePointers.current.forEach((data, id) => {
+          try {
+            if (data.target && (data.target as HTMLElement).setPointerCapture) {
+              (data.target as HTMLElement).setPointerCapture(id);
+            }
+          } catch (err) {}
+        });
+        resetPointersBase();
+      } else {
+        // 单指
+        if (shouldIgnore(e.target)) {
+          // 不接管
+          return;
+        } else {
+          // 接管
+          try {
+            (e.target as HTMLElement).setPointerCapture(e.pointerId);
+          } catch (err) {}
+          resetPointersBase();
+        }
       }
     },
-    [store, shouldIgnore]
+    [store, shouldIgnore, resetPointersBase]
   );
 
-  const handlePointerMove = useCallback(
+  const handlePointerMoveCapture = useCallback(
     (e: ReactPointerEvent<HTMLDivElement>) => {
-      const state = store.getState();
-      if (state.input.isPanning || state.input.isRotating) {
-        state.handlePointerMove(e.clientX, e.clientY);
+      if (e.pointerType === 'mouse') {
+        const state = store.getState();
+        if (state.input.isPanning || state.input.isRotating) {
+          state.handlePointerMove(e.clientX, e.clientY);
+          e.stopPropagation();
+        }
+        return;
+      }
+
+      if (!activePointers.current.has(e.pointerId)) return;
+
+      const prevData = activePointers.current.get(e.pointerId)!;
+      activePointers.current.set(e.pointerId, { ...prevData, x: e.clientX, y: e.clientY });
+
+      const size = activePointers.current.size;
+      const isCaptured = (e.target as HTMLElement).hasPointerCapture?.(e.pointerId);
+
+      if (size >= 2 || isCaptured) {
+        if (size >= 2) {
+          e.stopPropagation();
+          e.nativeEvent.stopPropagation();
+        }
+
+        let sumX = 0, sumY = 0;
+        activePointers.current.forEach((p) => {
+          sumX += p.x;
+          sumY += p.y;
+        });
+        const centroidX = sumX / size;
+        const centroidY = sumY / size;
+
+        if (size === 1) {
+          store.getState().handlePointerMove(centroidX, centroidY);
+        } else if (size === 2) {
+          const pts = Array.from(activePointers.current.values());
+          const dist = Math.hypot(pts[0].x - pts[1].x, pts[0].y - pts[1].y);
+          
+          if (!store.getState().options.twoFingerRotate) {
+            if (touchStartDistance.current !== null && touchStartDistance.current > 0) {
+              const deltaLog = Math.log(touchStartDistance.current / dist);
+              store.getState().handleZoomDelta(deltaLog);
+              touchStartDistance.current = dist;
+            }
+          }
+          store.getState().handlePointerMove(centroidX, centroidY);
+        } else if (size >= 3) {
+          store.getState().handlePointerMove(centroidX, centroidY);
+        }
       }
     },
     [store]
   );
 
-  const handlePointerUp = useCallback(() => {
-    store.getState().handlePointerUp();
-    flushPersist();
-  }, [store, flushPersist]);
+  const handlePointerUpCapture = useCallback(
+    (e: ReactPointerEvent<HTMLDivElement>) => {
+      if (e.pointerType === 'mouse') {
+        store.getState().handlePointerUp();
+        flushPersist();
+        return;
+      }
+
+      if (activePointers.current.has(e.pointerId)) {
+        const sizeBefore = activePointers.current.size;
+        const isCaptured = sizeBefore >= 2 || (e.target as HTMLElement).hasPointerCapture?.(e.pointerId);
+        
+        if (isCaptured) {
+          e.stopPropagation();
+          e.nativeEvent.stopPropagation();
+        }
+
+        activePointers.current.delete(e.pointerId);
+        
+        try {
+          if ((e.target as HTMLElement).hasPointerCapture?.(e.pointerId)) {
+            (e.target as HTMLElement).releasePointerCapture(e.pointerId);
+          }
+        } catch (err) {}
+
+        if (activePointers.current.size === 0) {
+          store.getState().handlePointerUp();
+          touchStartDistance.current = null;
+        } else {
+          resetPointersBase();
+        }
+        flushPersist();
+      }
+    },
+    [store, flushPersist, resetPointersBase]
+  );
 
   const handleWheel = useCallback(
     (e: React.WheelEvent<HTMLDivElement>) => {
@@ -210,12 +380,13 @@ export const CameraControl = ({ children, persistedCamera, pointerPolicy, onPers
           overflow: 'visible',
           pointerEvents: 'none',
         }}
-        onPointerDown={handlePointerDown}
-        onPointerMove={handlePointerMove}
-        onPointerUp={handlePointerUp}
-        onPointerLeave={handlePointerUp}
-        onWheel={handleWheel}
-        onContextMenu={handleContextMenu}
+        onPointerDownCapture={handlePointerDownCapture}
+        onPointerMoveCapture={handlePointerMoveCapture}
+        onPointerUpCapture={handlePointerUpCapture}
+        onPointerLeave={handlePointerUpCapture}
+        onPointerCancelCapture={handlePointerUpCapture}
+        onWheelCapture={handleWheel}
+        onContextMenuCapture={handleContextMenu}
       >
         {children}
       </div>
