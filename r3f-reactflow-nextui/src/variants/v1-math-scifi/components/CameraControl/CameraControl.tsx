@@ -197,10 +197,24 @@ export const CameraControl = ({ children, persistedCamera, pointerPolicy, onPers
     }
   }, [store]);
 
+  // ============================================================================
+  // 【核心交互模型：全局捕获 (Capture Phase) 与 强制接管 (Takeover)】
+  // ============================================================================
+  // 为什么用 Capture 阶段 (onPointerDownCapture 等) 而不是普通的冒泡阶段？
+  // 答：为了解决“多指误触节点”的问题。如果在普通冒泡阶段，只要你一根手指按在节点上，
+  // 节点可能会自己处理事件（比如拖拽节点）并阻止冒泡，导致相机控制器永远不知道屏幕上出现了第二根手指。
+  // 用 Capture 阶段，我们可以在事件到达节点 *之前*，先在这个全屏的父容器里审视所有的触摸点。
+  // 一旦发现屏幕上有 >=2 根手指，我们立刻用 `stopPropagation` 掐断事件流，把节点变成“瞎子”，
+  // 并强制把焦点交回给相机控制器。
+  
   const handlePointerDownCapture = useCallback(
     (e: ReactPointerEvent<HTMLDivElement>) => {
+      const ignored = shouldIgnore(e.target);
+      console.log(`[Camera] downCapture pointerId=${e.pointerId} type=${e.pointerType} ignored=${ignored} target=`, e.target);
+
+      // 1. 处理鼠标：鼠标没有多点触控问题，沿用原来的逻辑
       if (e.pointerType === 'mouse') {
-        if (shouldIgnore(e.target)) return;
+        if (ignored) return;
 
         if (e.button === 2) {
           store.getState().startRotate(e.clientX, e.clientY);
@@ -213,10 +227,11 @@ export const CameraControl = ({ children, persistedCamera, pointerPolicy, onPers
         return;
       }
 
-      // Touch
+      // 2. 处理触摸屏
       activePointers.current.set(e.pointerId, { x: e.clientX, y: e.clientY, target: e.target });
 
       if (activePointers.current.size >= 2) {
+        console.log(`[Camera] TAKE OVER (size=${activePointers.current.size})`);
         e.stopPropagation();
         e.nativeEvent.stopPropagation();
         
@@ -227,14 +242,15 @@ export const CameraControl = ({ children, persistedCamera, pointerPolicy, onPers
             }
           } catch (err) {}
         });
+        
         resetPointersBase();
       } else {
-        // 单指
-        if (shouldIgnore(e.target)) {
-          // 不接管
+        // 单指模式
+        if (ignored) {
+          console.log(`[Camera] Ignored touch on target, let it pass to ReactFlow`);
           return;
         } else {
-          // 接管
+          console.log(`[Camera] Capture single touch on empty space`);
           try {
             (e.target as HTMLElement).setPointerCapture(e.pointerId);
           } catch (err) {}
@@ -247,9 +263,11 @@ export const CameraControl = ({ children, persistedCamera, pointerPolicy, onPers
 
   const handlePointerMoveCapture = useCallback(
     (e: ReactPointerEvent<HTMLDivElement>) => {
+      const state = store.getState();
+      const isCameraControlling = state.input.isPanning || state.input.isRotating;
+
       if (e.pointerType === 'mouse') {
-        const state = store.getState();
-        if (state.input.isPanning || state.input.isRotating) {
+        if (isCameraControlling) {
           state.handlePointerMove(e.clientX, e.clientY);
           e.stopPropagation();
         }
@@ -262,13 +280,10 @@ export const CameraControl = ({ children, persistedCamera, pointerPolicy, onPers
       activePointers.current.set(e.pointerId, { ...prevData, x: e.clientX, y: e.clientY });
 
       const size = activePointers.current.size;
-      const isCaptured = (e.target as HTMLElement).hasPointerCapture?.(e.pointerId);
 
-      if (size >= 2 || isCaptured) {
-        if (size >= 2) {
-          e.stopPropagation();
-          e.nativeEvent.stopPropagation();
-        }
+      if (size >= 2 || isCameraControlling) {
+        e.stopPropagation();
+        e.nativeEvent.stopPropagation();
 
         let sumX = 0, sumY = 0;
         activePointers.current.forEach((p) => {
@@ -279,21 +294,21 @@ export const CameraControl = ({ children, persistedCamera, pointerPolicy, onPers
         const centroidY = sumY / size;
 
         if (size === 1) {
-          store.getState().handlePointerMove(centroidX, centroidY);
+          state.handlePointerMove(centroidX, centroidY);
         } else if (size === 2) {
           const pts = Array.from(activePointers.current.values());
           const dist = Math.hypot(pts[0].x - pts[1].x, pts[0].y - pts[1].y);
           
-          if (!store.getState().options.twoFingerRotate) {
+          if (!state.options.twoFingerRotate) {
             if (touchStartDistance.current !== null && touchStartDistance.current > 0) {
               const deltaLog = Math.log(touchStartDistance.current / dist);
-              store.getState().handleZoomDelta(deltaLog);
+              state.handleZoomDelta(deltaLog);
               touchStartDistance.current = dist;
             }
           }
-          store.getState().handlePointerMove(centroidX, centroidY);
+          state.handlePointerMove(centroidX, centroidY);
         } else if (size >= 3) {
-          store.getState().handlePointerMove(centroidX, centroidY);
+          state.handlePointerMove(centroidX, centroidY);
         }
       }
     },
@@ -302,17 +317,22 @@ export const CameraControl = ({ children, persistedCamera, pointerPolicy, onPers
 
   const handlePointerUpCapture = useCallback(
     (e: ReactPointerEvent<HTMLDivElement>) => {
+      const state = store.getState();
+      const isCameraControlling = state.input.isPanning || state.input.isRotating;
+
       if (e.pointerType === 'mouse') {
-        store.getState().handlePointerUp();
+        if (isCameraControlling) {
+          e.stopPropagation();
+        }
+        state.handlePointerUp();
         flushPersist();
         return;
       }
 
       if (activePointers.current.has(e.pointerId)) {
         const sizeBefore = activePointers.current.size;
-        const isCaptured = sizeBefore >= 2 || (e.target as HTMLElement).hasPointerCapture?.(e.pointerId);
         
-        if (isCaptured) {
+        if (sizeBefore >= 2 || isCameraControlling) {
           e.stopPropagation();
           e.nativeEvent.stopPropagation();
         }
@@ -326,7 +346,7 @@ export const CameraControl = ({ children, persistedCamera, pointerPolicy, onPers
         } catch (err) {}
 
         if (activePointers.current.size === 0) {
-          store.getState().handlePointerUp();
+          state.handlePointerUp();
           touchStartDistance.current = null;
         } else {
           resetPointersBase();

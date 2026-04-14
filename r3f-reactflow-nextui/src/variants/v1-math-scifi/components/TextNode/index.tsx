@@ -607,7 +607,18 @@ const TextNode: React.FC<NodeProps<TextNodeFlowData>> = ({ id, selected }) => {
             position="left"
             minWidth={200}
             autoScale={false}
+            onResizeStart={(_event) => {
+              console.log('[TextNode] LEFT onResizeStart');
+            }}
             onResize={(_event, data) => {
+              console.log('[TextNode] LEFT onResize width=', data.width);
+              const nodeContainer = document.querySelector(`[data-id="${id}"] .text-node`) as HTMLElement;
+              if (nodeContainer) {
+                nodeContainer.style.width = `${data.width}px`;
+              }
+            }}
+            onResizeEnd={(_event, data) => {
+              console.log('[TextNode] LEFT onResizeEnd width=', data.width);
               updateData({ width: data.width, autoResizeWidth: false });
             }}
           />
@@ -623,7 +634,18 @@ const TextNode: React.FC<NodeProps<TextNodeFlowData>> = ({ id, selected }) => {
             position="right"
             minWidth={200}
             autoScale={false}
+            onResizeStart={(_event) => {
+              console.log('[TextNode] RIGHT onResizeStart');
+            }}
             onResize={(_event, data) => {
+              console.log('[TextNode] RIGHT onResize width=', data.width);
+              const nodeContainer = document.querySelector(`[data-id="${id}"] .text-node`) as HTMLElement;
+              if (nodeContainer) {
+                nodeContainer.style.width = `${data.width}px`;
+              }
+            }}
+            onResizeEnd={(_event, data) => {
+              console.log('[TextNode] RIGHT onResizeEnd width=', data.width);
               updateData({ width: data.width, autoResizeWidth: false });
             }}
           />
