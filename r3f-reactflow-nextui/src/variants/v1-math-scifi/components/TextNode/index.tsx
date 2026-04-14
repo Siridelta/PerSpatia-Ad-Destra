@@ -114,6 +114,7 @@ const TextNode: React.FC<NodeProps<TextNodeFlowData>> = ({ id, selected }) => {
 
   const activeTool = useToolStore((state) => state.activeTool);
   const nameInputRef = useRef<HTMLInputElement>(null);
+  const nodeContainerRef = useRef<HTMLDivElement>(null);
 
   // // 同步 nodeName 到 editingName
   // useEffect(() => {
@@ -341,6 +342,7 @@ const TextNode: React.FC<NodeProps<TextNodeFlowData>> = ({ id, selected }) => {
 
   return (
     <div
+      ref={nodeContainerRef}
       className={`text-node${selected ? ' selected' : ''}${isCollapsed ? ' collapsed' : ''}`}
       style={{
         ...(widthStyle !== 'auto' && { width: widthStyle }),
@@ -607,18 +609,12 @@ const TextNode: React.FC<NodeProps<TextNodeFlowData>> = ({ id, selected }) => {
             position="left"
             minWidth={200}
             autoScale={false}
-            onResizeStart={(_event) => {
-              console.log('[TextNode] LEFT onResizeStart');
-            }}
             onResize={(_event, data) => {
-              console.log('[TextNode] LEFT onResize width=', data.width);
-              const nodeContainer = document.querySelector(`[data-id="${id}"] .text-node`) as HTMLElement;
-              if (nodeContainer) {
-                nodeContainer.style.width = `${data.width}px`;
+              if (nodeContainerRef.current) {
+                nodeContainerRef.current.style.width = `${data.width}px`;
               }
             }}
             onResizeEnd={(_event, data) => {
-              console.log('[TextNode] LEFT onResizeEnd width=', data.width);
               updateData({ width: data.width, autoResizeWidth: false });
             }}
           />
@@ -634,18 +630,12 @@ const TextNode: React.FC<NodeProps<TextNodeFlowData>> = ({ id, selected }) => {
             position="right"
             minWidth={200}
             autoScale={false}
-            onResizeStart={(_event) => {
-              console.log('[TextNode] RIGHT onResizeStart');
-            }}
             onResize={(_event, data) => {
-              console.log('[TextNode] RIGHT onResize width=', data.width);
-              const nodeContainer = document.querySelector(`[data-id="${id}"] .text-node`) as HTMLElement;
-              if (nodeContainer) {
-                nodeContainer.style.width = `${data.width}px`;
+              if (nodeContainerRef.current) {
+                nodeContainerRef.current.style.width = `${data.width}px`;
               }
             }}
             onResizeEnd={(_event, data) => {
-              console.log('[TextNode] RIGHT onResizeEnd width=', data.width);
               updateData({ width: data.width, autoResizeWidth: false });
             }}
           />
