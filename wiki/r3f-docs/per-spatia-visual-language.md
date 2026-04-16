@@ -46,9 +46,9 @@
 
 ---
 
-## 5. 美学基调：理科科幻 (Theoretical / Math Sci-Fi)
+## 5. 美学基调：理科科幻 / Future's Theorist Sci-Fi
 
-在 UI 材质与元素的表达上，PerSpatia 严格遵循 **“理科科幻”**（Math Sci-Fi）取向，彻底摒弃“工科科幻”（Engineering Sci-Fi）的拟物遗留：
+在 UI 材质与元素的表达上，PerSpatia 严格遵循 **“理科科幻” / Future's Theorist Sci-Fi** 取向，彻底摒弃“工科科幻”（Engineering Sci-Fi）的拟物遗留：
 
 - **拒绝工科拟物**：UI 绝不是现实物理面板的投影。拒绝生硬的厚度、铆钉、机械感滑块、或是带有现实划痕与油污的材质。
 - **拥抱绝对几何与能量流**：视觉构成应是极简的（甚至可以是简单的矩形等基础几何体），但质感必须是“非实体”的。例如发光的霓虹矢量线（Neon Vectors）、纯粹的光晕（Bloom）、无重量感的玻璃/力场、以及完全由物理和数学法则驱动的流畅动效。

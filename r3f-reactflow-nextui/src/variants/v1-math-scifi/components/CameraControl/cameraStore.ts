@@ -103,8 +103,8 @@ export const DEFAULT_CAMERA_OPTIONS: CameraOptions = {
   panDamping: 0.85,
   rotateDamping: 0.85,
   zoomDamping: 0.88,
-  panKeyVelocity: 0.01,
-  wheelRate: 0.15,
+  panKeyVelocity: 0.02,
+  wheelRate: 0.30,
   yawBiasStrength: 2, // 归一化后的新强度
   twoFingerRotate: false,
   touchZoomRate: 0.005,

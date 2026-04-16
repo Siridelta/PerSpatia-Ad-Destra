@@ -1,4 +1,4 @@
-# Ad Lumina 技术实现规范 (Tech Specs)
+# Ad Lumina 技术实现笔记
 
 记录在开发 Ad Lumina 分支过程中沉淀的、实实在在的技术方案与实现细节。
 
