@@ -500,10 +500,6 @@ const TextNode: React.FC<NodeProps<TextNodeFlowData>> = ({ id, selected }) => {
       {/* 代码区域 */}
       {!isCollapsed && (
         <div className="text-node-section text-node-code-section animate-fade-in-up" style={{ position: 'relative' }}>
-          {/* 视觉上的调节线（装饰用），仅在代码区左右 */}
-          <div className="node-decor-line left" />
-          <div className="node-decor-line right" />
-          
           <CodeEditor
             className={isCtrlPressed ? 'drag' : 'nodrag'}
             initialText={code || ''}

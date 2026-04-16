@@ -10,15 +10,14 @@
   width: fit-content;
   font-family: var(--spatial-font-family, 'Cascadia Code Variable', 'Cascadia Code', 'JetBrains Mono', 'AlimamaFangYuanTi', monospace);
   font-weight: var(--spatial-font-weight, 300);
-  /* 为可变字体开启轴控制 */
   font-variation-settings: "wght" var(--spatial-font-weight, 300);
   font-size: 14px;
   background: transparent;
   border: none;
   box-shadow: none;
   max-width: none;
-  padding: 12px;
-  padding-top: 32px;
+  padding: 16px 0; /* Purely vertical padding, no horizontal bounds */
+  gap: 16px; /* Spacing between sections */
   
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
@@ -30,11 +29,7 @@
 }
 
 .text-node.selected,
-.text-node:focus-within {
-  border-color: transparent;
-  box-shadow: none;
-}
-
+.text-node:focus-within,
 .text-node:hover:not(.selected):not(:focus-within) {
   border-color: transparent;
   box-shadow: none;
@@ -48,42 +43,12 @@
   border-radius: 0 !important;
   cursor: ew-resize !important;
   z-index: 10;
+  touch-action: none !important;
 }
 
-/* 装饰性调节线 */
-.node-decor-line {
-  position: absolute;
-  top: 0;
-  bottom: 0;
-  width: 2px;
-  background: rgba(125, 225, 234, 0.2);
-  box-shadow: 0 0 5px rgba(125, 225, 234, 0.4);
-  transition: background 0.2s, box-shadow 0.2s;
-  pointer-events: none;
-  z-index: 5;
-}
-
-.node-decor-line.left {
-  left: 0;
-}
-
-.node-decor-line.right {
-  right: 0;
-}
-
-.text-node:hover .node-decor-line,
-.text-node.selected .node-decor-line {
-  background: rgba(125, 225, 234, 0.8);
-  box-shadow: 0 0 10px rgba(125, 225, 234, 0.8);
-}
-
+/* Header naturally flows */
 .text-node-header {
-  position: absolute;
-  top: -13px;
-  left: 0px;
-  background: transparent;
   color: #7de1ea;
-  padding: 2px 0px;
   font-size: 16px;
   font-weight: 600;
   font-family: inherit;
@@ -93,14 +58,21 @@
   justify-content: space-between;
   width: 100%;
   box-sizing: border-box;
+  opacity: 0.6; /* More subtle */
+  transition: opacity 0.2s ease;
+}
+
+.text-node:hover .text-node-header {
+  opacity: 1;
 }
 
 .text-node-name {
-  color: #7de1ea;
+  color: inherit;
   font-size: 16px;
   font-weight: 600;
   cursor: pointer;
   transition: color 0.2s ease;
+  letter-spacing: 0.5px;
 }
 
 .text-node-name:hover {
@@ -110,30 +82,30 @@
 .text-node-section {
   position: relative;
   background: transparent;
-  padding: 5px 0;
-  margin-bottom: 10px;
   border: none;
-  border-top: 1px solid rgba(0, 255, 255, 0.1);
-  min-height: 20px;
   box-sizing: border-box;
-  display: block;
-}
-
-.text-node-section:first-of-type {
-  border-top: none;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
 }
 
 .section-label {
-  position: absolute;
-  top: -13px;
-  left: 0px;
   color: #7de1ea;
-  font-size: 14px;
+  font-size: 12px;
   font-weight: 600;
-  z-index: 10;
+  text-transform: uppercase;
+  letter-spacing: 1px;
+  opacity: 0.5;
   display: flex;
   align-items: center;
-  gap: 10px;
+  gap: 8px;
+  cursor: pointer;
+  transition: opacity 0.2s ease;
+}
+
+.section-label:hover {
+  opacity: 1;
+  color: #ffffff;
 }
 
 .text-node-handle {

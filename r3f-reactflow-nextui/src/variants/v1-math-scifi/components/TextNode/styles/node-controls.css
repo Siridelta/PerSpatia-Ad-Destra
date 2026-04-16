@@ -6,16 +6,18 @@
   display: flex;
   justify-content: space-between;
   align-items: center;
-  margin: 5px 0;
+  margin: 4px 0;
   font-family: inherit;
-  gap: 12px;
+  gap: 16px;
+  font-size: 13px;
+  opacity: 0.9;
 }
 
 /* 滑动条 - 能量线风格 */
 .slider-container {
   display: flex;
   align-items: center;
-  gap: 10px;
+  gap: 12px;
   flex: 1;
 }
 
@@ -37,7 +39,12 @@
   transform: translateY(-50%);
   width: 100%;
   height: 1px;
-  background: rgba(125, 225, 234, 0.15);
+  background: rgba(255, 255, 255, 0.1);
+  transition: background 0.2s;
+}
+
+.slider-track:hover::before {
+  background: rgba(255, 255, 255, 0.3);
 }
 
 .slider-progress {
@@ -45,56 +52,60 @@
   left: 0;
   top: 50%;
   transform: translateY(-50%);
-  height: 2px;
-  background: #7de1ea;
-  box-shadow: 0 0 10px rgba(125, 225, 234, 0.6);
+  height: 1px;
+  background: #ffffff;
 }
 
 .slider-input::-webkit-slider-thumb {
   -webkit-appearance: none;
-  width: 10px;
-  height: 10px;
+  width: 6px;
+  height: 6px;
   background: #ffffff;
-  box-shadow: 0 0 10px #ffffff;
-  border-radius: 50%;
+  border-radius: 0; /* Square / geometric thumb */
   cursor: grab;
+  transform: rotate(45deg); /* Diamond shape */
+  transition: transform 0.2s;
+}
+
+.slider-input:active::-webkit-slider-thumb {
+  transform: rotate(45deg) scale(1.5);
+  cursor: grabbing;
 }
 
 /* 开关 - 全息风格 */
 .toggle-switch {
   position: relative;
-  width: 50px;
-  height: 18px;
-  background: rgba(125, 225, 234, 0.1);
-  border: 1px solid rgba(125, 225, 234, 0.3);
+  width: 32px;
+  height: 14px;
+  background: rgba(255, 255, 255, 0.05);
+  border: none;
   cursor: pointer;
   display: flex;
   align-items: center;
   justify-content: center;
   color: rgba(255, 255, 255, 0.5);
-  font-size: 12px;
-  font-weight: bold;
+  font-size: 10px;
 }
 
 .toggle-switch.active {
-  border-color: #7de1ea;
-  box-shadow: 0 0 10px rgba(125, 225, 234, 0.2);
+  background: rgba(255, 255, 255, 0.15);
 }
 
 .toggle-knob {
   position: absolute;
-  top: 0;
-  width: 25px;
-  height: 100%;
-  background: rgba(125, 225, 234, 0.4);
+  top: 2px;
+  width: 10px;
+  height: 10px;
+  background: #ffffff;
   transition: left 0.3s cubic-bezier(0.23, 1, 0.32, 1);
+  border-radius: 0; /* Square */
 }
 
-/* 按钮 */
+/* 按钮 - 无边框极简浮动图标 */
 .control-button {
   background: transparent;
-  border: 1px solid rgba(125, 225, 234, 0.3);
-  color: #7de1ea;
+  border: none;
+  color: rgba(255, 255, 255, 0.4);
   cursor: pointer;
   width: 24px;
   height: 24px;
@@ -102,10 +113,11 @@
   align-items: center;
   justify-content: center;
   transition: all 0.2s ease;
+  padding: 0;
 }
 
 .control-button:hover {
-  background: rgba(125, 225, 234, 0.1);
-  border-color: #7de1ea;
   color: #ffffff;
+  transform: scale(1.1);
 }
+
