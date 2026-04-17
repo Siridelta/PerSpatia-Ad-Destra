@@ -1,6 +1,6 @@
 # 相机系统：从愿景到架构实现 (Camera: From Vision to Implementation)
 
-本文档记录了 PerSpatia 虚拟相机系统的完整演进：从最初的交互愿景，到关键的技术应对措施，再到最终稳定的架构实现。它不仅是工程规范，更是设计意图的沉淀。
+本文档记录了 PerSpatia 虚拟相机系统的完整演进：从最初的交互愿景，到关键的技术应对措施，再到最终稳定的架构实现。它不仅是工程实践记录，更是设计意图的沉淀。
 
 ## 1. 核心设计哲学 (Core Philosophy)
 
@@ -81,6 +81,11 @@ interface CameraState {
 *   **缩放联动**：`radius` 与 React Flow 的 `zoom` 存在映射关系：`zoom = 30 / radius`。
 *   **理由**：保证在任何缩放尺度下（极近或极远），同等强度的滚轮操作产生的“视觉缩放比例”是恒定的，消除线性缩放带来的突兀感。
 
+### 3.6 惯性接续 (Inertia Handover)
+*   **机制**：在 `PointerUp`（松手）瞬间，系统执行“动量注入”操作。
+*   **实现**：将偏移追踪信道的最后一帧微分增量 (`lastDelta`) 直接累加至对应的速度信道 (`Velocity.current`)。
+*   **效果**：这实现了从“交互位移”到“物理滑动”的无缝接续。用户手速越快，松手时的初始速度就越大，从而产生极其自然的惯性滑行感，彻底消除松手后的生硬停止。
+
 ---
 
 ## 4. 约束与边界 (Constraints)
@@ -100,6 +105,11 @@ interface CameraState {
     *   **Three.js**：每帧同步 `PerspectiveCamera` 的 position 和 lookAt。
     *   **CSS 3D**：通过 `subscribe` 修改 DOM 的 transform。
     *   **React Flow**：通过 `ReactFlowViewportSync` 同步更新 2D 视口。
+
+### 5.3 模拟相机 (Simulated Camera) 与抓取精度
+*   **对策**：Store 内部维护一个完全同步的 `simulatedCamera`。它在物理计算完成后立即更新，其状态往往领先 R3F 场景中的真实相机（由于渲染管线延迟）几个帧。
+*   **理由**：若直接读取场景相机进行 `screenToPlane` 计算，在高速平移或旋转时会导致位移量计算不准，产生“漂移感”。
+*   **目标**：确保在微分增量架构下，鼠标能够精准“抓住” $Z=0$ 平面上的物理点。无论如何旋转或缩放，只要光标回到起始位置，物理点就必须严丝合缝地回到光标下方。
 
 ---
 

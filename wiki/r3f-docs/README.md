@@ -2,8 +2,8 @@
 
 ## 当前有效
 
-- **[camera-architecture.md](./camera-architecture.md)** — **主文档**：实现梗概 → **数据流向与四层分工**（冒泡、`input` 与 `tick` 解耦、三路消费）→ 升维叙事 → SSOT、代码地图、公式、RF 禁忌与排错；并对照 `archive/`。以代码为准。
-- **[per-spatia-visual-language.md](./per-spatia-visual-language.md)** — **产品与美学**：为何做 plane-on-3D、与 DATA WING 气质的参照、当前仍偏毛坯的诚实说明；**空间约定**（XY 竖墙、Y 竖直、Z 纵深、保持接近平视）及与 drei 默认控制器的错位说明。
+- **[camera-control.md](./camera-control.md)** — **相机控制**：实现梗概 → **数据流向与分工**（冒泡、`input` 与 `tick` 解耦、三路消费）→ 升维叙事 → SSOT、公式、排错。以代码为准。
+- **[per-spatia-visual-language.md](../per-spatia-visual-language.md)** — **产品与美学**：为何做 plane-on-3D、与 DATA WING 气质的参照；**空间约定**（XY 竖墙、Y 竖直、Z 纵深）。
 
 ## 归档（仅供参考）
 
