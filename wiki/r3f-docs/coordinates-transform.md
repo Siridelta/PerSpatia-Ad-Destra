@@ -1,132 +1,160 @@
+# 坐标空间转换推导 (Coordinates Transform)
 
+### 1. React Flow Viewport 坐标与缩放含义
 
-关于 Reactflow viewport 坐标和缩放含义：
+React Flow Viewport 参数 `{vp.xy, vp.zoom}` 的含义是让某个画布坐标 `rfPos` 通过以下关系映射到屏幕坐标 `screenPos`：
 
-Reactfow viewport 参数 {vp.xy, vp.zoom} 的含义是让某个 Reactflow 画布坐标系的坐标 rfPos 通过以下关系映射到屏幕坐标 screenPos：
+```
+  screenPos = vp.xy + rfPos * vp.zoom
+```
 
-  screenPos = vp.xy + rfPos * vp.zoom;
+这个公式其实相当反直觉，但 React Flow 就是这么难绷（（
 
-这个公式其实相当反直觉，但 reactflow 就是这么难绷（（
+我们实际上需要设置 React Flow 的（CSS Transform 前的）尺寸一定程度上大于 window 尺寸，因为如果不扩大的话侧视时会导致画布无法完全覆盖视野。我们的方案是将相机（绕注视点）摆动的范围限制在以 $Z+$ 方向为中心的一个锥体范围内——与 $Z+$ 轴的夹角限制为不能超过一个限值 `alpha`。
 
-我们实际上需要设置 reactflow 的（css transform 前的）尺寸一定程度上大于 window 尺寸，因为如果不扩大的话侧视时会导致 reactflow 无法完全覆盖视野。
+因此我们需要适度扩张 React Flow 尺寸。如果 window height 为 `vh`，那么 React Flow 的 height 需要扩张到 `standard_z * 100 * tan(fov / 2 + alpha)`。
 
-我们的方案是将相机（绕注视点）摆动的范围限制在以 z+ 方向为中心的一个锥体范围内——与 z+ 轴的夹角限制为不能超过一个限值 alpha。
+若我们将扩张因子记作 `expans`：
 
-因此我们需要适度扩张 reactflow 尺寸...... 如果 window height 为 h，那么 reactflow 的 height 需要扩张到 standard_z * 100 * tan(fov / 2 + alpha).
+```
+  expans = tan(fov / 2 + alpha) / tan(fov / 2)
+```
 
-若我们将扩张因子记作 expans = tan(fov / 2 + alpha) / tan(fov / 2)，那么我们需要保证将 reactflow DOM 尺寸缩放 expans 倍（保持以屏幕中心为中心），
+那么我们需要保证将 React Flow DOM 尺寸缩放 `expans` 倍（保持以屏幕中心为中心），然后 `screenPos` 的实际映射公式将会变成：
 
-然后 screenPos 的实际映射公式将会变成：
+```
+  screenPos = vp.xy + rfPos * vp.zoom - (vw / 2, vh / 2) * (expans - 1)
+```
 
-  screenPos = vp.xy + rfPos * vp.zoom - (vw / 2, vh / 2) * (expans - 1);
-
-
----
-
-而对于我们的三维场景，我们将 3d 坐标 threePos (仅含xy) 映射到屏幕空间 screenPos 的近似关系是：
-
-  cam.xyz: 相机 xyz 坐标；
-
-  vw, vh: 窗口宽高；
-
-  camZoom = some_standard_z / cam.z;
-
-  screenPos = [1, 0; 0, -1] * (threePos - cam.xy) * camZoom * 100 + (vw / 2, vh / 2);
-
-（some_standard_z 可以留到最后再确定，它决定了 rf 坐标系和 three 坐标系之间的一个对应缩放因子，一个 three 坐标大致对应多少的 rf 坐标。）
-
-（一般 three 场景里事物的尺寸在 1 个单位量级，但使用标准像素的 DOM 元素尺寸一般在 100 左右的量级，因此乘以一个 100 对应，在代码里记为 SCREEN_METRIC_TO_THREE = 100）
+> **注（关于偏航的疏忽）**：这里的 `expans` 系数推导仅基于 20 度锥体的 **Base Rotation**（用户控制量），并没有考虑到由于平移速度产生的 **Drift Rotation**（动态偏航）。这是为了避免坐标映射逻辑变得过于复杂而做的工程简化。考虑到偏航角通常极小且是暂态的，这一简化在视觉上（应该？）是可接受的。
 
 ---
 
-所以我们如果要通过 3d scene camera 推算 reactflow viewport 参数，我们需要保证上面这两个映射
+### 2. 三维场景的映射关系
 
-——从 rfPos 到 screenPos，和从 threePos 到 screenPos 的（一定程度上线性的）这两个映射，一定程度上是**一致**的。
+对于我们的三维场景，我们将 3D 坐标 `threePos` (仅含 XY) 映射到屏幕空间 `screenPos` 的近似关系是：
 
-更严谨的说，对于一个确定的 threePos，一定有一个唯一确定的 rfPos，所以若认为有从 threePos 到 rfPos 的映射，
+```
+  camZoom = some_standard_z / cam.z
 
-那么我们刚才说的保持两个坐标映射一致，就是
+  screenPos = [1, 0; 0, -1] * (threePos - cam.xy) * camZoom * 100 + (vw / 2, vh / 2)
+```
 
-ff_three_screen(cam)(threePos) = ff_rf_screen(vp)(f_three_rf(threePos))
+（`some_standard_z` 可以留到最后再确定，它决定了 RF 坐标系 and Three 坐标系之间的一个对应缩放因子。）
 
-其中
+（一般 Three 场景里事物的尺寸在 1 个单位量级，但使用标准像素的 DOM 元素尺寸一般在 100 左右的量级，因此乘以一个 100 对应，在代码里记为 `SCREEN_METRIC_TO_THREE = 100`。）
 
-  camZoom(cam) = some_standard_z / cam.z;
+---
+
+### 3. 映射一致性推导
+
+我们如果要通过 3D 场景相机推算 React Flow Viewport 参数，我们需要保证上面这两个映射——从 `rfPos` 到 `screenPos`，和从 `threePos` 到 `screenPos` 的这两个映射，一定程度上是**一致**的。
+
+更严谨的说，对于一个确定的 `threePos`，一定有一个唯一确定的 `rfPos`。若认为有从 `threePos` 到 `rfPos` 的映射，那么保持两个坐标映射一致，就是：
+
+```
+  ff_three_screen(cam)(threePos) = ff_rf_screen(vp)(f_three_rf(threePos))
+```
+
+其中：
+
+```
+  camZoom(cam) = some_standard_z / cam.z
 
   ff_three_screen = (cam) => (threePos) => [1, 0; 0, -1] * (threePos - cam.xy) * camZoom(cam) * 100 + (vw / 2, vh / 2)
 
   ff_rf_screen = (vp) => (rfPos) => vp.xy + rfPos * vp.zoom - (vw / 2, vh / 2) * (expans - 1)
+```
 
-  而 f_three_rf 是 threePos 到 rfPos 的映射，我们暂时不知道，但是独立于 cam 和 vp.
+而 `f_three_rf` 是 `threePos` 到 `rfPos` 的映射，我们暂时不知道，但是独立于 `cam` 和 `vp`。因此我们需要找到 `f_three_rf` 和 `f_cam_vp`，使得：
 
-因此我们需要找到 f_three_rf 和 f_cam_vp，使得
-
+```
   ff_three_screen(cam)(threePos) = ff_rf_screen(f_cam_vp(cam))(f_three_rf(threePos))
+```
 
 ---
 
-整理一下表述，
+### 4. 系数确定路径
 
-需要找到 f_three_rf 和 f_cam_vp 满足，对于任意的 cam 和 threePos:
+需要找到 `f_three_rf` 和 `f_cam_vp` 满足，对于任意的 `cam` 和 `threePos`：
 
-  vp = f_cam_vp(cam);
+```
+  vp = f_cam_vp(cam)
 
-  rfPos = f_three_rf(threePos);
+  rfPos = f_three_rf(threePos)
 
-  camZoom = some_standard_z / cam.z;
+  [1, 0; 0, -1] * (threePos - cam.xy) * camZoom * 100 + (vw / 2, vh / 2) = vp.xy + rfPos * vp.zoom - (vw / 2, vh / 2) * (expans - 1)
+```
 
-  [1, 0; 0, -1] * (threePos - cam.xy) * camZoom * 100 + (vw / 2, vh / 2) 
-   
-    = vp.xy + rfPos * vp.zoom - (vw / 2, vh / 2) * (expans - 1)
+推断 `rfPos` 和 `threePos` 的关系：
 
-  推断 rfPos 和 threePos 的关系：
+```
+  rfPos = [[1, 0; 0, -1] * (threePos - cam.xy) * camZoom * 100 + (vw / 2, vh / 2) * expans - vp.xy] / vp.zoom
+```
 
-    rfPos = [[1, 0; 0, -1] * (threePos - cam.xy) * camZoom * 100 + (vw / 2, vh / 2) * expans - vp.xy] / vp.zoom
+然而理想状态下 `rfPos = f_three_rf(threePos)` 应该是一个跟 `cam` 和 `vp` 无关的函数，因此对于上式的系数我们可以确定：
 
-  然而理想状态下 rfPos = f_three_rf(threePos) 应该是一个跟 cam 和 vp 无关的函数，因此对于上式的系数我们可以确定：
+**一次项对比：**
 
-    一次项: rfPos = [1, 0; 0, -1] * camZoom * 100 / vp.zoom * threePos + ...
+```
+  rfPos = [1, 0; 0, -1] * camZoom * 100 / vp.zoom * threePos + ...
 
-       --- 不妨令 rfPos = 100 * [...] * threePos + ...，
-       
-       因此 camZoom = vp.zoom，也就是 vp.zoom = some_standard_z / cam.z;
-    
-    常项: rfPos = ... * threePos - [1, 0; 0, -1] * cam.xy * 100 + [(vw / 2, vh / 2) * expans - vp.xy] / vp.zoom
+  camZoom = vp.zoom 即 vp.zoom = some_standard_z / cam.z
+```
 
-    即 -[1, 0; 0, -1] * cam.xy * 100 + [(vw / 2, vh / 2) * expans - vp.xy] / vp.zoom = const
+**常数项对比：**
 
-    vp.zoom = some_standard_z / cam.z，因此可以得到由 cam 算出 vp 的表达式：
+```
+  rfPos = ... * threePos - [1, 0; 0, -1] * cam.xy * 100 + [(vw / 2, vh / 2) * expans - vp.xy] / vp.zoom
 
-    vp.xy = (vw / 2, vh / 2) * expans - [1, 0; 0, -1] * cam.xy * 100 * (some_standard_z / cam.z) - const * vp.zoom 
+  -[1, 0; 0, -1] * cam.xy * 100 + [(vw / 2, vh / 2) * expans - vp.xy] / vp.zoom = const
+```
 
-    令 const 为 0 也就是
+由 `vp.zoom = some_standard_z / cam.z` 得到由 `cam` 算出 `vp` 的表达式：
 
-    vp.xy = [-1, 0; 0, 1] * cam.xy * 100 * (some_standard_z / cam.z) + (vw / 2, vh / 2) * expans
+```
+  vp.xy = (vw / 2, vh / 2) * expans - [1, 0; 0, -1] * cam.xy * 100 * (some_standard_z / cam.z) - const * vp.zoom
 
-  再求得 rfPos 的表达式：由于前面已经算出一次项和常项（其实更多是“指定”出的），我们可以直接得出：
+  令 const 为 0 => vp.xy = [-1, 0; 0, 1] * cam.xy * 100 * (some_standard_z / cam.z) + (vw / 2, vh / 2) * expans
+```
 
-    rfPos = [1, 0; 0, -1] * threePos * 100
-    
-因此我们求得：
+> **注（关于 const = 0 的物理含义）**：在推导过程中令 `const = 0` 是为了确立两个坐标系的**对齐基准**。它物理上意味着：当相机位于 `(0,0,z)` 正视原点时，React Flow 画布的 `(0,0)` 坐标恰好映射到屏幕中心点。
 
+再求得 `rfPos` 的表达式：
+
+```
+  rfPos = [1, 0; 0, -1] * threePos * 100
+```
+
+---
+
+### 5. 总结与实现
+
+**最终转换函数：**
+
+```
   f_three_rf = (threePos) => [1, 0; 0, -1] * threePos * 100
 
-  f_cam_vp = (cam) => {
-    zoom: some_standard_z / cam.z
-    xy: [-1, 0; 0, 1] * cam.xy * 100 * .zoom + (vw / 2, vh / 2) * expans
-  }
+  f_cam_vp = (cam) => { zoom: some_standard_z / cam.z, xy: [-1, 0; 0, 1] * cam.xy * 100 * .zoom + (vw / 2, vh / 2) * expans }
+```
 
----
+**Standard Z 的确定：**
 
-怎么确定 standard z? 我们需要把相机放在一个足够自然的 z 位置上，使得如果我们规定这个视角下的“默认” 3d 场景即对应于这个公式算出来的 viewport 下的“默认” reactflow 场景，
+我们需要把相机放在一个足够自然的 $Z$ 位置上，使得默认视角下，3D 相机的视野恰好覆盖 `window / 100` 的量级：
 
-那么这个要求对 three 世界和 reactflow 世界而言都是足够自然的。
+```
+  standard_z = vh / 100 / tan(fov / 2)
+```
 
-默认 React flow 场景，zoom = 1/expans，是相机视野包括 window width 和 height 的场景（即使我们有扩张也是如此，因为我们在讨论相机和实际视觉效果），
+#### 核心公式速查 (Implementation)
 
-而默认的 three 场景是相机视野包括......多大范围？
+```typescript
+// 1. 预计算常量
+const expans = Math.tan(fov/2 + alpha) / Math.tan(fov/2);
+const standard_z = vh / 100 / Math.tan(fov/2);
 
-不妨令 three 场景里相机视野就包括 window width / 100 和 window height / 100 的范围，
-
-所以 standard_z = vh / 100 / tan(fov / 2). (fov 是用垂直方向定义的)
-
+// 2. 相机 Store -> React Flow Viewport 同步逻辑
+const vp_zoom = standard_z / cam.z;
+const vp_x = -cam.x * 100 * vp_zoom + (vw / 2) * expans;
+const vp_y =  cam.y * 100 * vp_zoom + (vh / 2) * expans;
+```
