@@ -97,6 +97,28 @@ const Canvas: React.FC = () => {
   const connectionStartNode = useToolStore((state) => state.connectionStartNode);
   const setConnectionStartNode = useToolStore((state) => state.setConnectionStartNode);
 
+  // Leva controls for visual settings
+  useLevaControls('Visual Settings', () => ({
+    fontFamily: {
+      options: {
+        'JetBrains Mono': "'JetBrains Mono', 'AlimamaFangYuanTi', monospace",
+        'Cascadia Code': "'Cascadia Code Variable', 'Cascadia Code', 'AlimamaFangYuanTi', monospace",
+        'Maple Mono': "'Maple Mono', 'AlimamaFangYuanTi', monospace",
+      },
+      value: "'Cascadia Code Variable', 'Cascadia Code', 'AlimamaFangYuanTi', monospace",
+      onChange: (v: string) => {
+        document.documentElement.style.setProperty('--spatia-font-family', v);
+      }
+    },
+    fontWeight: {
+      value: 300,
+      min: 100, max: 800, step: 10,
+      onChange: (v: number) => {
+        document.documentElement.style.setProperty('--spatia-font-weight', String(v));
+      }
+    }
+  }));
+
   // 设置面板状态
   const isSettingsPanelOpen = useSettingsStore((state) => state.isSettingsPanelOpen);
   const toggleSettingsPanel = useSettingsStore((state) => state.toggleSettingsPanel);

@@ -1,0 +1,8 @@
+packages:
+  - r3f-reactflow-nextui
+
+onlyBuiltDependencies:
+  - '@parcel/watcher'
+  - esbuild
+
+virtualStoreDirMaxLength: 60

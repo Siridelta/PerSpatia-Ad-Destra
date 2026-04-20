@@ -1,7 +1,8 @@
 import React, { useState, useCallback, useEffect, useRef } from 'react';
 import { Handle, Position, NodeProps, NodeResizeControl, useKeyPress } from '@xyflow/react';
 // 引入模块化样式
-import './styles/node-frame.css';
+import styles from './styles/node-frame.module.css';
+import clsx from 'clsx';
 import './styles/node-editor.css';
 import './styles/node-controls.css';
 import './styles/node-feedback.css';
@@ -227,7 +228,7 @@ const TextNode: React.FC<NodeProps<TextNodeFlowData>> = ({ id, selected }) => {
         // 节点宽度调整逻辑
         if (!autoResizeWidth) return;
 
-        const nodeContainer = document.querySelector(`[data-id="${id}"] .text-node`) as HTMLElement;
+        const nodeContainer = document.querySelector(`[data-id="${id}"] .${styles.container}`) as HTMLElement;
         if (!nodeContainer || !currentText) return;
 
         const tempElement = document.createElement('pre');
@@ -343,23 +344,27 @@ const TextNode: React.FC<NodeProps<TextNodeFlowData>> = ({ id, selected }) => {
   return (
     <div
       ref={nodeContainerRef}
-      className={`text-node${selected ? ' selected' : ''}${isCollapsed ? ' collapsed' : ''}`}
+      className={clsx(
+        styles.container,
+        selected && 'selected',
+        isCollapsed && 'collapsed'
+      )}
       style={{
         ...(widthStyle !== 'auto' && { width: widthStyle }),
         height: heightStyle,
-        boxSizing: 'border-box',
-        // cursor: isCollapsed ? 'default' : 'text',
-        minWidth: isCollapsed ? '200px' : '300px',
         pointerEvents: isCtrlPressed ? 'none' : 'auto'
       }}
     >
       {/* 节点头部 */}
-      <div className="text-node-header">
+      <div className={styles.header}>
         <div className="text-node-name-section">
           {isEditingName ? (
             <input
               ref={nameInputRef}
-              className={`text-node-name-input ${isCtrlPressed ? 'drag' : 'nodrag'}`}
+              className={clsx(
+                'text-node-name-input',
+                isCtrlPressed ? 'drag' : 'nodrag'
+              )}
               value={editingName || ''}
               onChange={(e) => setEditingName(e.target.value)}
               onBlur={handleNameSubmit}
@@ -367,16 +372,9 @@ const TextNode: React.FC<NodeProps<TextNodeFlowData>> = ({ id, selected }) => {
             />
           ) : (
             <div
-              className="text-node-name"
+              className={styles.name}
               onDoubleClick={isCollapsed ? toggleCollapse : handleNameEdit}
               onClick={isCollapsed ? toggleCollapse : undefined}
-              style={{
-                textAlign: isCollapsed ? 'center' : 'left',
-                cursor: 'pointer',
-                display: 'flex',
-                alignItems: 'center',
-                gap: '4px'
-              }}
               title={isCollapsed ? '点击展开节点' : '双击编辑名称'}
             >
               {nodeName || '未命名节点'}
@@ -499,7 +497,13 @@ const TextNode: React.FC<NodeProps<TextNodeFlowData>> = ({ id, selected }) => {
 
       {/* 代码区域 */}
       {!isCollapsed && (
-        <div className="text-node-section text-node-code-section animate-fade-in-up" style={{ position: 'relative' }}>
+        <div
+          className={clsx(
+            styles.section,
+            'text-node-code-section',
+            'animate-fade-in-up'
+          )}
+        >
           <CodeEditor
             className={isCtrlPressed ? 'drag' : 'nodrag'}
             initialText={code || ''}
@@ -522,16 +526,32 @@ const TextNode: React.FC<NodeProps<TextNodeFlowData>> = ({ id, selected }) => {
 
       {/* 输入区域 */}
       {!isCollapsed && (!hiddenSections.inputs || animatingOut.inputs) && controls.length > 0 && (
-        <div className={`text-node-section text-node-inputs-section ${animatingOut.inputs ? 'animate-fade-out-down' : 'animate-fade-in-up'}`}>
+        <div
+          className={clsx(
+            styles.section,
+            'text-node-inputs-section',
+            animatingOut.inputs ? 'animate-fade-out-down' : 'animate-fade-in-up'
+          )}
+        >
           <div
-            className="section-label clickable"
+            className={clsx(
+              styles.sectionLabel,
+              'clickable'
+            )}
             onClick={resetInputsToDefault}
             title="点击重置所有输入为默认值"
           >
             Inputs
           </div>
           {controls.map((control, index) => (
-            <div key={index} className={`variable-control ${animatingOut.inputs ? 'animate-fade-out-left' : 'animate-fade-in-left'}`} style={{ animationDelay: `${index * 0.1}s` }}>
+            <div
+              key={index}
+              className={clsx(
+                'variable-control',
+                animatingOut.inputs ? 'animate-fade-out-left' : 'animate-fade-in-left'
+              )}
+              style={{ animationDelay: `${index * 0.1}s` }}
+            >
               <span className="output-variable-name">{control.name}</span>
               <span className="output-variable-type">:{evalControlType(control)}</span>
               {renderControl(control)}
@@ -559,46 +579,26 @@ const TextNode: React.FC<NodeProps<TextNodeFlowData>> = ({ id, selected }) => {
         type="source"
         position={Position.Right}
         id="main"
-        className="text-node-handle"
+        className={styles.connHandle}
         isConnectable={activeTool === 'connect'}
         isConnectableStart={false}
-        style={{
-          width: '100%',
-          height: '100%',
-          background: 'transparent',
-          border: 'none',
-          borderRadius: 0,
-          right: 0,
-          top: 0,
-          transform: 'translate(0, 0)',
-          pointerEvents: 'none'
-        }}
+        style={{ right: 0 }}
       />
       <Handle
         type="target"
         position={Position.Left}
         id="main"
-        className="text-node-handle"
+        className={styles.connHandle}
         isConnectable={activeTool === 'connect'}
         isConnectableStart={false}
-        style={{
-          width: '100%',
-          height: '100%',
-          background: 'transparent',
-          border: 'none',
-          borderRadius: 0,
-          left: 0,
-          top: 0,
-          transform: 'translate(0, 0)',
-          pointerEvents: 'none'
-        }}
+        style={{ left: 0 }}
       />
 
       {/* 节点宽度调整控制 (全高度响应，但视觉上是透明的，靠 decor-line 展示) */}
       {!isCollapsed && (
         <>
           <NodeResizeControl
-            className="node-resizer-handle"
+            className={styles.resizeControl}
             position="left"
             minWidth={200}
             autoScale={false}
@@ -612,7 +612,7 @@ const TextNode: React.FC<NodeProps<TextNodeFlowData>> = ({ id, selected }) => {
             }}
           />
           <NodeResizeControl
-            className="node-resizer-handle"
+            className={styles.resizeControl}
             position="right"
             minWidth={200}
             autoScale={false}

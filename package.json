@@ -1,6 +1,6 @@
 {
-	"dependencies": {
-		"immer": "^11.1.4",
-		"zustand": "^5.0.12"
+	"devDependencies": {
+		"typescript": "6.0.3",
+		"typescript-plugin-css-modules": "^5.2.0"
 	}
 }

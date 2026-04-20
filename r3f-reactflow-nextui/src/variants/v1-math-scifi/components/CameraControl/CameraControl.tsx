@@ -85,27 +85,6 @@ export const CameraControl = ({ children, persistedCamera, pointerPolicy, onPers
     },
   }));
 
-  useLevaControls('Visual Settings', () => ({
-    fontFamily: {
-      options: {
-        'JetBrains Mono': "'JetBrains Mono', 'AlimamaFangYuanTi', monospace",
-        'Cascadia Code': "'Cascadia Code Variable', 'Cascadia Code', 'AlimamaFangYuanTi', monospace",
-        'Maple Mono': "'Maple Mono', 'AlimamaFangYuanTi', monospace",
-      },
-      value: "'Cascadia Code Variable', 'Cascadia Code', 'AlimamaFangYuanTi', monospace",
-      onChange: (v: string) => {
-        document.documentElement.style.setProperty('--spatial-font-family', v);
-      }
-    },
-    fontWeight: {
-      value: 300,
-      min: 100, max: 800, step: 10,
-      onChange: (v: number) => {
-        document.documentElement.style.setProperty('--spatial-font-weight', String(v));
-      }
-    }
-  }));
-
   // persist state down
   useEffect(() => {
     if (persistedCamera) {

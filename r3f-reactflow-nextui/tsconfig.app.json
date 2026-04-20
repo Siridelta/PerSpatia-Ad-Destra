@@ -3,7 +3,11 @@
     "tsBuildInfoFile": "./node_modules/.tmp/tsconfig.app.tsbuildinfo",
     "target": "ES2020",
     "useDefineForClassFields": true,
-    "lib": ["ES2020", "DOM", "DOM.Iterable"],
+    "lib": [
+      "ES2020",
+      "DOM",
+      "DOM.Iterable"
+    ],
     "module": "ESNext",
     "skipLibCheck": true,
 
@@ -21,13 +25,29 @@
     "noUnusedParameters": false,
     "noFallthroughCasesInSwitch": true,
     "noUncheckedSideEffectImports": true,
-
+    
     /* Path mapping */
     "paths": {
-      "@/*": ["./src/*"],
-      "@v0/*": ["./src/variants/v0-legacy/*"],
-      "@v1/*": ["./src/variants/v1-math-scifi/*"]
-    }
+      "@/*": [
+        "./src/*"
+      ],
+      "@v0/*": [
+        "./src/variants/v0-legacy/*"
+      ],
+      "@v1/*": [
+        "./src/variants/v1-math-scifi/*"
+      ]
+    },
+    "plugins": [
+      {
+        "name": "typescript-plugin-css-modules",
+        "config": {
+          "goToDefinition": true,
+        }
+      }
+    ]
   },
-  "include": ["src"]
+  "include": [
+    "src"
+  ]
 }
